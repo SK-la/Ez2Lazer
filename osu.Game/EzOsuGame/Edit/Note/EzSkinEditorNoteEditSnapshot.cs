@@ -24,7 +24,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         public EzColouringRange ColouringRange { get; private set; }
 
-        public double ColouringStrength { get; private set; } = 1;
+        public double ColouringStrength { get; private set; }
 
         public bool TrueColouring { get; private set; }
 

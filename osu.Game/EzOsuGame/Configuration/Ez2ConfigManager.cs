@@ -255,7 +255,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ColorSettingsEnabled, true);
             SetDefault(Ez2Setting.ColouringMode, EzColouringMode.True);
             SetDefault(Ez2Setting.ColouringRange, EzColouringRange.Gray);
-            SetDefault(Ez2Setting.ColouringStrength, 1.0, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.ColouringStrength, 0.0, 0.0, 255.0, 1.0);
             SetDefault(Ez2Setting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
             SetDefault(Ez2Setting.ColumnTypeB, Colour4.FromHex("#648FFF"));
             SetDefault(Ez2Setting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
@@ -1446,7 +1446,7 @@ namespace osu.Game.EzOsuGame.Configuration
         ColouringRange,
 
         /// <summary>
-        /// 着色力度。范围内像素与原图的混合量，不改范围判定。
+        /// 仅白色：离纯白的 8-bit 软衰减。0 只染纯白；255 按白量满范围混色。
         /// </summary>
         ColouringStrength,
 

@@ -163,19 +163,19 @@ namespace osu.Game.EzOsuGame.Localization
             + "\n全体：每个像素都着色。"
             + "\n仅灰度：只给接近灰色的像素着色，彩色阴影/发光保持原样。"
             + "\n保白：接近白色的高光不着色。"
-            + "\n仅白色：只给纯白和接近白色的像素着色（白条、预乘白发光）；中间灰度和彩色不动。真着色无法给纯白换色相，白条请配直接着色。",
+            + "\n仅白色：只染近白。力度 0 只换纯白；加大后把离 255 不超过该值的近白也染上，白端是目标色、向原色平滑过渡。",
             "Which pixels receive colouring; independent of the algorithm."
             + "\nAll: every pixel is recoloured."
             + "\nGray only: only near-grey pixels are recoloured; coloured shadows and glows stay as they are."
             + "\nKeep white: near-white highlights are left unchanged."
-            + "\nWhite only: only pure and near-white pixels are recoloured (white bar, premultiplied white glow); mid-greys and saturated colours stay. True colouring cannot hue-shift pure white; pair the white bar with Direct.");
+            + "\nWhite only: near-white pixels. Strength 0 is RGB(255,255,255) only; higher values also tint colours within that many 8-bit units of white, fading smoothly from the target colour back to the original.");
 
         public static readonly LocalisableString COLOURING_STRENGTH = new EzLocalizationManager.EzLocalisableString(
-            "着色力度", "Colouring Strength");
+            "着色强度", "Colouring Strength");
 
         public static readonly LocalisableString COLOURING_STRENGTH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "着色结果与原图像素的混合。不影响范围判定，只改混合量。",
-            "Blend between the original pixel and the recoloured result. Range selection is unchanged; this only scales how much colouring is applied.");
+            "仅白色范围有效。0 只把纯白 RGB(255,255,255) 染成目标色。增大后，离纯白不超过该值的近白也按距离软衰减着色，白-红会平滑变成目标色-红。255 时按白量满范围混色。",
+            "Used by White only. 0 dyes exact RGB(255,255,255). Higher values also tint pixels within that many 8-bit units of white, with a linear falloff so a white-to-red ramp stays smooth as tint-to-red. At 255 the mix uses the white amount over the full range.");
 
         public static readonly LocalisableString NOTE_HEIGHT_SCALE = new EzLocalizationManager.EzLocalisableString(
             "note 高度比例", "Note Height Scale");

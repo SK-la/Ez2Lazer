@@ -41,7 +41,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         public EzColouringRange NotePreviewColouringRange { get; private set; } = EzColouringRange.Gray;
 
-        public double NotePreviewColouringStrength { get; private set; } = 1;
+        public double NotePreviewColouringStrength { get; private set; }
 
         public void CaptureFrom(Ez2ConfigManager config, EzSkinIniSession? skinIniSession = null)
         {

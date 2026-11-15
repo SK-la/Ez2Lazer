@@ -189,8 +189,7 @@ namespace osu.Game.EzOsuGame.Screens
                         LabelText = EzSkinStrings.COLOURING_STRENGTH,
                         TooltipText = EzSkinStrings.COLOURING_STRENGTH_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<double>(Ez2Setting.ColouringStrength),
-                        KeyboardStep = 0.01f,
-                        DisplayAsPercentage = true,
+                        KeyboardStep = 1,
                     },
                     baseColorsContainer = new FillFlowContainer
                     {

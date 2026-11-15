@@ -70,13 +70,13 @@ namespace osu.Game.EzOsuGame.Skinning
         /// 给 <see cref="ColorizeSprite"/> 写 Tint/算法/范围；没有着色 sprite 时退回父级乘色。
         /// 父级 <see cref="Drawable.Colour"/> 保持白色，淡出仍走父级。
         /// </summary>
-        public static void ApplyToDrawable(Drawable target, Colour4 tint, EzColouringMode mode, EzColouringRange range, float strength = 1f)
+        public static void ApplyToDrawable(Drawable target, Colour4 tint, EzColouringMode mode, EzColouringRange range, float whiteToleranceEightBit = 0f)
         {
             ColorizeAlgorithm algorithm = isIdentityTint(tint)
                 ? ColorizeAlgorithm.Multiply
                 : ToColorizeAlgorithm(mode);
             ColorizeRange colorizeRange = ToColorizeRange(range);
-            float clampedStrength = Math.Clamp(strength, 0f, 1f);
+            float whiteTolerance = Math.Clamp(whiteToleranceEightBit, 0f, 255f) / 255f;
 
             bool found = false;
 
@@ -85,7 +85,7 @@ namespace osu.Game.EzOsuGame.Skinning
                 sprite.Tint = tint;
                 sprite.Algorithm = algorithm;
                 sprite.Range = colorizeRange;
-                sprite.Strength = clampedStrength;
+                sprite.WhiteTolerance = whiteTolerance;
                 found = true;
             }
 
@@ -100,22 +100,18 @@ namespace osu.Game.EzOsuGame.Skinning
             float chromaEpsilon = DEFAULT_CHROMA_EPSILON,
             float whiteLuma = DEFAULT_WHITE_LUMA,
             float whiteChroma = DEFAULT_WHITE_CHROMA,
-            float strength = 1f)
+            float whiteTolerance = 0f)
         {
-            if (source.A <= 0f || isIdentityTint(tint) || strength <= 0f)
+            if (source.A <= 0f || isIdentityTint(tint))
                 return source;
 
             Colour4 straight = unpremultiply(source);
+            float mask = rangeMask(straight, range, chromaEpsilon, whiteLuma, whiteChroma, whiteTolerance);
 
-            if (!passesRange(straight, range, chromaEpsilon, whiteLuma, whiteChroma))
+            if (mask <= 0f)
                 return source;
 
-            Colour4 recoloured = applyAlgorithm(straight, tint, algorithm);
-
-            if (strength < 1f)
-                recoloured = lerpRgb(straight, recoloured, strength);
-
-            return premultiply(recoloured);
+            return premultiply(lerp(straight, whiteFill(straight, tint, algorithm, range, mask), mask));
         }
 
         /// <summary>
@@ -129,44 +125,68 @@ namespace osu.Game.EzOsuGame.Skinning
             float chromaEpsilon = DEFAULT_CHROMA_EPSILON,
             float whiteLuma = DEFAULT_WHITE_LUMA,
             float whiteChroma = DEFAULT_WHITE_CHROMA,
-            float strength = 1f)
+            float whiteTolerance = 0f)
         {
-            if (source.A <= 0f || isIdentityTint(tint) || strength <= 0f)
+            if (source.A <= 0f || isIdentityTint(tint))
                 return source;
 
-            if (!passesRange(source, range, chromaEpsilon, whiteLuma, whiteChroma))
+            float mask = rangeMask(source, range, chromaEpsilon, whiteLuma, whiteChroma, whiteTolerance);
+
+            if (mask <= 0f)
                 return source;
 
-            Colour4 recoloured = applyAlgorithm(source, tint, algorithm);
-
-            if (strength < 1f)
-                return lerpRgb(source, recoloured, strength);
-
-            return recoloured;
+            return lerp(source, whiteFill(source, tint, algorithm, range, mask), mask);
         }
 
         private static bool isIdentityTint(Colour4 tint)
             => tint.R >= 1f && tint.G >= 1f && tint.B >= 1f;
 
-        private static bool passesRange(Colour4 straight, EzColouringRange range, float chromaEpsilon, float whiteLuma, float whiteChroma)
+        private static float rangeMask(Colour4 straight, EzColouringRange range, float chromaEpsilon, float whiteLuma, float whiteChroma, float whiteTolerance)
         {
             float chroma = Chroma(straight);
 
             switch (range)
             {
                 case EzColouringRange.Gray:
-                    return chroma <= chromaEpsilon;
+                    return chroma <= chromaEpsilon ? 1f : 0f;
 
                 case EzColouringRange.KeepWhite:
-                    return Luma(straight) < whiteLuma || chroma > whiteChroma;
+                    return Luma(straight) < whiteLuma || chroma > whiteChroma ? 1f : 0f;
 
                 case EzColouringRange.White:
-                    return Luma(straight) >= whiteLuma && chroma <= whiteChroma;
+                    return whiteMask(straight, whiteTolerance);
 
                 default:
-                    return true;
+                    return 1f;
             }
         }
+
+        private static float whiteMask(Colour4 straight, float whiteTolerance)
+        {
+            float deficit = 1f - Math.Min(straight.R, Math.Min(straight.G, straight.B));
+
+            if (whiteTolerance <= 0f)
+                return deficit <= 1e-6f ? 1f : 0f;
+
+            return Math.Clamp(1f - deficit / whiteTolerance, 0f, 1f);
+        }
+
+        private static Colour4 whiteFill(Colour4 straight, Colour4 tint, EzNoteRecolourAlgorithm algorithm, EzColouringRange range, float mask)
+        {
+            Colour4 recoloured = applyAlgorithm(straight, tint, algorithm);
+
+            if (range == EzColouringRange.White && algorithm == EzNoteRecolourAlgorithm.SetLum)
+                return lerp(recoloured, tint, mask);
+
+            return recoloured;
+        }
+
+        private static Colour4 lerp(Colour4 from, Colour4 to, float t)
+            => new Colour4(
+                from.R + (to.R - from.R) * t,
+                from.G + (to.G - from.G) * t,
+                from.B + (to.B - from.B) * t,
+                from.A + (to.A - from.A) * t);
 
         private static Colour4 applyAlgorithm(Colour4 straight, Colour4 tint, EzNoteRecolourAlgorithm algorithm)
         {
@@ -281,13 +301,6 @@ namespace osu.Game.EzOsuGame.Skinning
 
             return new Colour4(straight.R * straight.A, straight.G * straight.A, straight.B * straight.A, straight.A);
         }
-
-        private static Colour4 lerpRgb(Colour4 from, Colour4 to, float t)
-            => new Colour4(
-                from.R + (to.R - from.R) * t,
-                from.G + (to.G - from.G) * t,
-                from.B + (to.B - from.B) * t,
-                from.A + (to.A - from.A) * t);
 
         private static Colour4 clampRgb(float r, float g, float b, float alpha)
             => new Colour4(Math.Clamp(r, 0f, 1f), Math.Clamp(g, 0f, 1f), Math.Clamp(b, 0f, 1f), alpha);

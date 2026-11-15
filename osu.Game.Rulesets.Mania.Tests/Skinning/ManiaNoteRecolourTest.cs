@@ -16,6 +16,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         private static readonly Colour4 mid_grey = new Colour4(0.5f, 0.5f, 0.5f, 1f);
         private static readonly Colour4 white = Colour4.White;
         private static readonly Colour4 near_white = new Colour4(0.98f, 0.98f, 0.99f, 1f);
+        private static readonly Colour4 rgb_253 = new Colour4(253f / 255f, 253f / 255f, 253f / 255f, 1f);
         private static readonly Colour4 saturated_blue = new Colour4(0.1f, 0.2f, 0.9f, 1f);
         private static readonly Colour4 red = new Colour4(1f, 0f, 0f, 1f);
         private static readonly Colour4 premul_white_glow = new Colour4(0.4f, 0.4f, 0.4f, 0.4f);
@@ -150,22 +151,80 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         }
 
         [Test]
-        public void WhiteRangeDirectColoursNearWhite()
+        public void WhiteRangeZeroLeavesRgb253()
         {
-            Colour4 result = EzNoteRecolour.Apply(near_white, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White);
+            Colour4 result = EzNoteRecolour.Apply(rgb_253, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White);
 
-            Assert.That(result.R, Is.GreaterThan(result.G));
-            Assert.That(result.R, Is.GreaterThan(result.B));
+            assertColourEqual(result, rgb_253);
         }
 
         [Test]
-        public void WhiteRangeLeavesMidGreyAndSaturatedBlue()
+        public void WhiteRangeMixesGreyByValueAtFullStrength()
         {
-            foreach (var source in new[] { mid_grey, saturated_blue })
-            {
-                Colour4 result = EzNoteRecolour.Apply(source, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White);
-                assertColourEqual(result, source);
-            }
+            const float value = 50f / 255f;
+            var grey = new Colour4(value, value, value, 1f);
+            Colour4 result = EzNoteRecolour.Apply(grey, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White, whiteTolerance: 1f);
+
+            Assert.That(result.R, Is.EqualTo(value).Within(0.001f));
+            Assert.That(result.G, Is.EqualTo(value * (1f - value)).Within(0.001f));
+            Assert.That(result.B, Is.EqualTo(value * (1f - value)).Within(0.001f));
+        }
+
+        [Test]
+        public void WhiteRangeNearWhiteChromaticTakesTintAtFullStrength()
+        {
+            var nearWhitePink = new Colour4(1f, 244f / 255f, 247f / 255f, 1f);
+            Colour4 result = EzNoteRecolour.Apply(nearWhitePink, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White, whiteTolerance: 1f);
+
+            Assert.That(result.R, Is.GreaterThan(0.95f));
+            Assert.That(result.G, Is.LessThan(0.12f));
+            Assert.That(result.B, Is.LessThan(0.12f));
+        }
+
+        [Test]
+        public void WhiteRangeSoftFalloffKeepsWhiteToRedSmooth()
+        {
+            var pale = new Colour4(1f, 244f / 255f, 247f / 255f, 1f);
+            var redEnd = new Colour4(1f, 40f / 255f, 90f / 255f, 1f);
+            const float strength = 32f / 255f;
+
+            Colour4 paleResult = EzNoteRecolour.Apply(pale, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White, whiteTolerance: strength);
+            Colour4 redResult = EzNoteRecolour.Apply(redEnd, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White, whiteTolerance: strength);
+
+            Assert.That(paleResult.G, Is.LessThan(pale.G));
+            assertColourEqual(redResult, redEnd);
+        }
+
+        [Test]
+        public void WhiteRangeWhiteToRedKeepsRedEndCloserToSource()
+        {
+            var redEnd = new Colour4(1f, 40f / 255f, 90f / 255f, 1f);
+            var blue = new Colour4(0f, 0f, 1f, 1f);
+            Colour4 result = EzNoteRecolour.Apply(redEnd, blue, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White, whiteTolerance: 1f);
+
+            float toSource = Math.Abs(result.R - redEnd.R) + Math.Abs(result.G - redEnd.G) + Math.Abs(result.B - redEnd.B);
+            float toTint = Math.Abs(result.R - blue.R) + Math.Abs(result.G - blue.G) + Math.Abs(result.B - blue.B);
+
+            Assert.That(toSource, Is.LessThan(toTint));
+        }
+
+        [Test]
+        public void WhiteRangeLeavesSaturatedBlueMostlyUnchanged()
+        {
+            Colour4 result = EzNoteRecolour.Apply(saturated_blue, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White, whiteTolerance: 1f);
+
+            Assert.That(result.B, Is.GreaterThan(result.R));
+            Assert.That(Math.Abs(result.B - saturated_blue.B), Is.LessThan(0.12f));
+        }
+
+        [Test]
+        public void WhiteRangeSetLumColoursPureWhite()
+        {
+            Colour4 result = EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.SetLum, EzColouringRange.White);
+
+            Assert.That(result.R, Is.EqualTo(1f).Within(0.001f));
+            Assert.That(result.G, Is.EqualTo(0f).Within(0.001f));
+            Assert.That(result.B, Is.EqualTo(0f).Within(0.001f));
         }
 
         [Test]
@@ -176,18 +235,6 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
 
             Assert.That(result.A, Is.EqualTo(premul_white_glow.A).Within(0.0001f));
             Assert.That(straight.R, Is.GreaterThan(straight.G));
-        }
-
-        [Test]
-        public void StrengthHalfBlendsDirectWhite()
-        {
-            Colour4 full = EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White);
-            Colour4 half = EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.White, strength: 0.5f);
-
-            Assert.That(half.G, Is.EqualTo(0.5f).Within(0.001f));
-            Assert.That(half.B, Is.EqualTo(0.5f).Within(0.001f));
-            Assert.That(half.R, Is.EqualTo(1f).Within(0.001f));
-            Assert.That(full.G, Is.EqualTo(0f).Within(0.001f));
         }
 
         [Test]

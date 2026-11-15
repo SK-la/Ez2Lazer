@@ -109,7 +109,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
         private static void applyTint(Image<Rgba32> image, Colour4 tint, EzColouringMode mode, EzColouringRange range, double strength)
         {
             var algorithm = EzNoteRecolour.ToAlgorithm(mode);
-            float colouringStrength = (float)strength;
+            float whiteTolerance = (float)strength / 255f;
 
             image.ProcessPixelRows(accessor =>
             {
@@ -121,7 +121,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
                     {
                         ref Rgba32 pixel = ref row[x];
                         var source = new Colour4(pixel.R / 255f, pixel.G / 255f, pixel.B / 255f, pixel.A / 255f);
-                        var result = EzNoteRecolour.ApplyStraight(source, tint, algorithm, range, strength: colouringStrength);
+                        var result = EzNoteRecolour.ApplyStraight(source, tint, algorithm, range, whiteTolerance: whiteTolerance);
                         pixel.R = toByte(result.R);
                         pixel.G = toByte(result.G);
                         pixel.B = toByte(result.B);
