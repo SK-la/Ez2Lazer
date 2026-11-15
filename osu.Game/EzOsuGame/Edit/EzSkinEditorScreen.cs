@@ -480,6 +480,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                                 hudLayer,
                                                                 componentPicker = new EzSkinEditorComponentPickerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX)),
                                                                 colouringPreviewer = new EzSkinEditorColouringPreviewerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorColouringPreviewerX)),
+                                                                sceneLoadingOverlay = new EzSkinEditorSceneLoadingOverlay(),
                                                             },
                                                         },
                                                         sidebar = new EzSkinEditorSidebar
@@ -491,7 +492,7 @@ namespace osu.Game.EzOsuGame.Edit
                                                     },
                                                 },
                                             },
-                                            sceneLoadingOverlay = new EzSkinEditorSceneLoadingOverlay(),
+                                            // The loading overlay is scoped to gameplayHole.
                                         },
                                     },
                                 },
