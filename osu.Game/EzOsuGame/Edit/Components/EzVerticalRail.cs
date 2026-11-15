@@ -30,6 +30,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private const float dual_line_extra_height = 14;
 
+        private const float rail_button_text_size = 12;
+
         /// <summary>
         /// Raised only when the user picks an item by pressing its button. Programmatic changes to
         /// <see cref="SelectedIndex"/> (group rebuilds, external sync) do not raise it, so a rail that
@@ -197,6 +199,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private partial class RailButton : EzButton
         {
+            private readonly bool dualLine;
+
             public bool Active
             {
                 get => Accented;
@@ -212,36 +216,45 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 {
                     Text = primary;
                     Height = EzUIStyleV1.SceneBarControlHeight();
-                    TextSize = 12;
+                    TextSize = rail_button_text_size;
                     TextMargin = new MarginPadding(4);
                     return;
                 }
 
+                dualLine = true;
                 Height = EzUIStyleV1.SceneBarControlHeight() + dual_line_extra_height;
-                TextSize = 0.001f;
 
                 Add(new FillFlowContainer
                 {
+                    RelativeSizeAxes = Axes.X,
+                    AutoSizeAxes = Axes.Y,
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,
-                    AutoSizeAxes = Axes.Both,
                     Direction = FillDirection.Vertical,
                     Spacing = new Vector2(0, 1),
                     Children = new Drawable[]
                     {
-                        new OsuSpriteText
-                        {
-                            Text = primary,
-                            Font = OsuFont.TorusAlternate.With(size: 10),
-                        },
-                        new OsuSpriteText
-                        {
-                            Text = secondary.Value,
-                            Font = OsuFont.TorusAlternate.With(size: 9),
-                        },
+                        createRailLine(primary),
+                        createRailLine(secondary.Value),
                     },
                 });
             }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                if (dualLine)
+                    HideBuiltInLabel();
+            }
+
+            private static OsuSpriteText createRailLine(LocalisableString line) => new OsuSpriteText
+            {
+                Anchor = Anchor.TopCentre,
+                Origin = Anchor.TopCentre,
+                Text = line,
+                Font = OsuFont.TorusAlternate.With(size: rail_button_text_size),
+            };
         }
     }
 }

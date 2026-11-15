@@ -63,6 +63,8 @@ namespace osu.Game.EzOsuGame.UserInterface
             set => text.Margin = value;
         }
 
+        protected void HideBuiltInLabel() => textContainer.Hide();
+
         private Colour4 buttonAccentColour;
 
         public Colour4 AccentColour
