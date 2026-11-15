@@ -48,10 +48,10 @@ namespace osu.Game.EzOsuGame.Edit
         private float previousStoryboardAlpha;
 
         private bool sceneLoadingActive;
-        private int scenePlugStallFrames;
+        private double sceneLoadingStartTime;
         private int presentSettleFrames;
 
-        private const int max_scene_plug_stall_frames = 600;
+        private const double max_scene_plug_stall_ms = 10000;
 
         /// <summary>
         /// 游玩首帧展示后再露出一帧，让舞台材质（含 GrooveLight 混合与单帧呼吸）完成布局与混合。
@@ -409,7 +409,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void beginSceneLoading()
         {
-            scenePlugStallFrames = 0;
+            sceneLoadingStartTime = workspace.Time.Current;
             presentSettleFrames = 0;
 
             if (sceneLoadingActive)
@@ -421,7 +421,6 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void endSceneLoading()
         {
-            scenePlugStallFrames = 0;
             presentSettleFrames = 0;
 
             if (!sceneLoadingActive)
@@ -441,9 +440,7 @@ namespace osu.Game.EzOsuGame.Edit
             if (tryCompleteSceneLoading(current))
                 return;
 
-            scenePlugStallFrames++;
-
-            if (scenePlugStallFrames < max_scene_plug_stall_frames)
+            if (workspace.Time.Current - sceneLoadingStartTime < max_scene_plug_stall_ms)
                 return;
 
             forceEndSceneLoading();
