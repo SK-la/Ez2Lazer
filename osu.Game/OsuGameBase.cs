@@ -49,6 +49,7 @@ using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Camera;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Diagnostics;
 using osu.Game.EzOsuGame.ExternalRulesets;
 using osu.Game.EzOsuGame.Fonts;
 using osu.Game.EzOsuGame.Input;
@@ -812,6 +813,9 @@ namespace osu.Game
             LocalConfig ??= UseDevelopmentServer
                 ? new DevelopmentOsuConfigManager(Storage)
                 : new OsuConfigManager(Storage);
+
+            // present 探针靠它读 draw / update 时钟与刷新率。
+            EzFrameStallDiagnostics.AttachHost(host);
 
             host.ExceptionThrown += onExceptionThrown;
         }

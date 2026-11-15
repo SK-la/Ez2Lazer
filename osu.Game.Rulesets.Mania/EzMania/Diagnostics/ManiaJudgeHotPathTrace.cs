@@ -7,7 +7,7 @@ using osu.Game.EzOsuGame.Diagnostics;
 namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
 {
     /// <summary>
-    /// 高 KPS 判定热路径计数（TRACE-JUDGE）。与 <see cref="EzJudgmentDiagnostics.Enabled"/> 联动。
+    /// 高 KPS 判定热路径计数（TRACE-JUDGE）。开关由 <see cref="EzDiagnosticSwitches.JudgeHotPathTrace"/> 下发。
     /// </summary>
     public static class ManiaJudgeHotPathTrace
     {
@@ -41,7 +41,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Diagnostics
         private static long holdBodyForceRedraws;
 #endif
 
-        public static bool Enabled => EzJudgmentDiagnostics.Enabled;
+        /// <summary>是否采集。探针在 Mania 程序集，开关由 <see cref="EzDiagnosticSwitches"/> 下发。</summary>
+        public static bool Enabled => EzDiagnosticSwitches.JudgeHotPathTrace;
 
         public static long IsHittableCalls => Interlocked.Read(ref isHittableCalls);
 
