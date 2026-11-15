@@ -29,7 +29,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         private const int yield_every = 32;
 
         private readonly EzLocalProfileAggregator aggregator;
-        private readonly EzPlayerMinaAggregator? minaRatingAggregator;
+        private readonly EzMinaPlayerSkillAggregator? minaRatingAggregator;
         private readonly EzPlayerDanAggregator? danAggregator;
         private readonly EzPlayerPPPAggregator? osuPPPAggregator;
         private readonly EzSkillProvider? skillProvider;
@@ -77,7 +77,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             RealmAccess realm,
             EzAnalysisPersistentStore analysisStore,
             BeatmapManager beatmapManager,
-            EzPlayerMinaAggregator? minaRatingAggregator = null,
+            EzMinaPlayerSkillAggregator? minaRatingAggregator = null,
             EzPlayerDanAggregator? danAggregator = null,
             EzLocalProfileStore? sharedStore = null,
             EzSkillProvider? skillProvider = null,

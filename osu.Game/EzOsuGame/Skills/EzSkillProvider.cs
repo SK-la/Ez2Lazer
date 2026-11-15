@@ -70,7 +70,7 @@ namespace osu.Game.EzOsuGame.Skills
         private readonly ConcurrentDictionary<(string Username, int KeyCount), PlayerRatingMemo> playerRatingSnapshotMemo
             = new ConcurrentDictionary<(string Username, int KeyCount), PlayerRatingMemo>();
 
-        private readonly record struct PlayerRatingMemo(EzPlayerMinaSkillAxis Axis, long Timestamp);
+        private readonly record struct PlayerRatingMemo(EzMinaPlayerSkillRating Rating, long Timestamp);
 
         /// <summary>Short-lived dan label/rating memo (see <see cref="GetDanDisplay"/>); plain values only.</summary>
         private readonly ConcurrentDictionary<(string Username, int KeyCount, string Side), DanDisplayMemo> danDisplayMemo
@@ -428,14 +428,14 @@ namespace osu.Game.EzOsuGame.Skills
         /// (once per bindable-driven DualPanel/radar refresh); the TTL collapses those into one Realm read.
         /// Mirrors the other session caches here — a fresh compute becomes visible within the TTL at worst.
         /// </summary>
-        public EzPlayerMinaSkillAxis GetPlayerRatingSnapshot(string username, int keyCount)
+        public EzMinaPlayerSkillRating GetPlayerRatingSnapshot(string username, int keyCount)
         {
             var key = (username, keyCount);
 
             if (playerRatingSnapshotMemo.TryGetValue(key, out var memo))
             {
                 if (Stopwatch.GetElapsedTime(memo.Timestamp).TotalSeconds < display_memo_seconds)
-                    return memo.Axis;
+                    return memo.Rating;
 
                 // An expired entry is dropped rather than overwritten in place: nothing else ever revisits it.
                 playerRatingSnapshotMemo.TryRemove(key, out _);
@@ -446,7 +446,7 @@ namespace osu.Game.EzOsuGame.Skills
             return snapshot;
         }
 
-        private EzPlayerMinaSkillAxis loadPlayerRatingSnapshot(string username, int keyCount)
+        private EzMinaPlayerSkillRating loadPlayerRatingSnapshot(string username, int keyCount)
         {
             var snapshot = PlayerStore.GetPlayerMinaSkillAxisSnapshot(username, keyCount);
             if (snapshot.Values.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))

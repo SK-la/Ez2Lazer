@@ -495,7 +495,7 @@ namespace osu.Game
 
             var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, playerSkillStore, pppEngine);
 
-            var playerRatingAggregator = new EzPlayerMinaAggregator(BeatmapManager, playerSkillStore, chartSkillStore, localProfileStore);
+            var playerRatingAggregator = new EzMinaPlayerSkillAggregator(BeatmapManager, playerSkillStore, chartSkillStore, localProfileStore);
             var playerDanAggregator = new EzPlayerDanAggregator(BeatmapManager, danUnit, playerSkillStore, chartSkillStore, localProfileStore);
             var skillProvider = new EzSkillProvider(chartSkillStore, playerSkillStore, danUnit, localProfileStore, BeatmapManager, liveMetrics);
 

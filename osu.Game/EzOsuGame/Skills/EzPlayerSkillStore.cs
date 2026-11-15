@@ -104,7 +104,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// Aggregated player Mina rating skills (MinaCalc rating axes). Stored under <see cref="EzAnalysisSystem.Mina"/>,
         /// not chart <see cref="EzAnalysisSystem.SSR"/> (Sunny).
         /// </summary>
-        public EzPlayerMinaSkillAxis GetPlayerMinaSkillAxisSnapshot(string username, int keyCount, int? algorithmVersion = null)
+        public EzMinaPlayerSkillRating GetPlayerMinaSkillAxisSnapshot(string username, int keyCount, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaEngine.VERSION;
 
@@ -114,11 +114,11 @@ namespace osu.Game.EzOsuGame.Skills
                 var values = readValues(c, query);
 
                 if (values.Count == 0)
-                    return new EzPlayerMinaSkillAxis();
+                    return new EzMinaPlayerSkillRating();
 
                 var (plays, provisional) = readMeta(c, query);
 
-                return new EzPlayerMinaSkillAxis
+                return new EzMinaPlayerSkillRating
                 {
                     Values = values,
                     AnalyzedPlays = plays,

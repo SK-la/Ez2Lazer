@@ -10,7 +10,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
     /// Hub <c>play.values</c> lookup for dan skillset filing: rebuild Mina per-play rating vectors from
-    /// <see cref="EzAxisPlayEvidenceRow"/> (written by <see cref="EzPlayerMinaAggregator"/>).
+    /// <see cref="EzAxisPlayEvidenceRow"/> (written by <see cref="EzMinaPlayerSkillAggregator"/>).
     /// </summary>
     public sealed class EzDanPlayRatingIndex
     {

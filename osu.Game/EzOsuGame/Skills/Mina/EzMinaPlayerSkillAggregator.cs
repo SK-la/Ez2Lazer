@@ -22,7 +22,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// Aggregates per-play <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> vectors into persisted player Mina skill rows.
     /// Goal via <see cref="EzMinaStarRatingGoal"/> (Wife subset when statistics exist).
     /// </summary>
-    public sealed class EzPlayerMinaAggregator
+    public sealed class EzMinaPlayerSkillAggregator
     {
         /// <summary>Max skill-history samples stored per keymode (trend chart cap).</summary>
         public const int HISTORY_MAX_POINTS = 64;
@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         private readonly EzChartSkillStore chartStore;
         private readonly EzLocalProfileStore? profileStore;
 
-        public EzPlayerMinaAggregator(BeatmapManager beatmapManager, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore, EzLocalProfileStore? profileStore = null)
+        public EzMinaPlayerSkillAggregator(BeatmapManager beatmapManager, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore, EzLocalProfileStore? profileStore = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
@@ -220,8 +220,8 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 timed.Sort(static (a, b) => a.ScoredAt.CompareTo(b.ScoredAt));
 
                 var keymodeVectors = timed.Select(t => t.Vector).ToList();
-                var aggregated = EzMinaRatingAggregator.AggregateVectors(keymodeVectors);
-                bool provisional = keymodeVectors.Count < EzPlayerMinaSkillAxis.QUALIFYING_PLAYS;
+                var aggregated = EzMinaPlayerSkillRatingMath.AggregateVectors(keymodeVectors);
+                bool provisional = keymodeVectors.Count < EzMinaPlayerSkillRating.QUALIFYING_PLAYS;
 
                 IReadOnlyList<SkillVectorPlayOverall> patternPlays = patternPlaysByKey.TryGetValue(keyCount, out var pp)
                     ? pp
@@ -373,7 +373,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         }
 
         /// <summary>
-        /// Running <see cref="EzMinaRatingAggregator.AggregateVectors"/> over a rolling window of recent plays, timestamped with that play's
+        /// Running <see cref="EzMinaPlayerSkillRatingMath.AggregateVectors"/> over a rolling window of recent plays, timestamped with that play's
         /// <see cref="ScoreInfo.Date"/>. Evenly samples up to <see cref="HISTORY_MAX_POINTS"/> points
         /// across the career (always includes first and last). Unlike a career-prefix Aggregate,
         /// values can fall when strong early plays leave the window.
@@ -401,7 +401,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 for (int j = start; j <= i; j++)
                     window.Add(orderedPlays[j].Vector);
 
-                samples.Add((orderedPlays[i].ScoredAt, EzMinaRatingAggregator.AggregateVectors(window)));
+                samples.Add((orderedPlays[i].ScoredAt, EzMinaPlayerSkillRatingMath.AggregateVectors(window)));
             }
 
             return samples;

@@ -9,7 +9,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// <summary>
     /// Detached player Mina rating snapshot for one username + keymode (values + row metadata; not chart SSR).
     /// </summary>
-    public sealed class EzPlayerMinaSkillAxis
+    public sealed class EzMinaPlayerSkillRating
     {
         public const int QUALIFYING_PLAYS = 3;
 

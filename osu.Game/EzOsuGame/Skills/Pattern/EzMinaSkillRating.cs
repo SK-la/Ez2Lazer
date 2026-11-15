@@ -113,7 +113,7 @@ namespace osu.Game.EzOsuGame.Skills.Pattern
                    .Where(static kv => kv.Value.Count >= MIN_PLAYS)
                    .Select(static kv => new EzSkillRatingPlayData(
                        kv.Key,
-                       EzMinaRatingAggregator.Aggregate(kv.Value),
+                       EzMinaPlayerSkillRatingMath.Aggregate(kv.Value),
                        kv.Value.Count))
                    .Where(static entry => entry.SkillRating > 0)
                    .OrderByDescending(static entry => entry.SkillRating)

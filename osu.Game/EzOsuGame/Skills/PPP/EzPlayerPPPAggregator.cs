@@ -135,7 +135,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                 var aggregated = new Dictionary<string, double>(bySkill.Count, StringComparer.Ordinal);
 
                 foreach (var (skillId, values) in bySkill)
-                    aggregated[skillId] = EzMinaRatingAggregator.Aggregate(values);
+                    aggregated[skillId] = EzMinaPlayerSkillRatingMath.Aggregate(values);
 
                 skillStore.WritePlayerSystemSkills(
                     username,

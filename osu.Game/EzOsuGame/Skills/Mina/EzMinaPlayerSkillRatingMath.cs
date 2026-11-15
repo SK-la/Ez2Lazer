@@ -11,7 +11,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// Aggregates per-play <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> axis values into player skill ratings
     /// (Etterna ScoreManager::AggregateSunnySRs / mania-hub <c>aggregateSsrs</c> — upstream name, not chart SSR).
     /// </summary>
-    public static class EzMinaRatingAggregator
+    public static class EzMinaPlayerSkillRatingMath
     {
         private const double aggregate_rating_scaler = 1.04;
 
