@@ -32,13 +32,13 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// Chart difficulty (Mina) for the given rows. <paramref name="rate"/> applies a music-rate mod.
         /// Returns the zero vector when the keymode is unsupported or there are too few rows to rate.
         /// </summary>
-        EzMinaSkillAxisVector CalculateChartMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f);
+        EzMinaSkillAxisData CalculateChartMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f);
 
         /// <summary>
         /// Per-play Mina skill rating vector for the given rows at a Wife/accuracy goal.
         /// <paramref name="goal"/> is clamped to <see cref="EzMinaEngine.MIN_RATING_GOAL"/> … <see cref="EzMinaEngine.MAX_RATING_GOAL"/>.
         /// Returns the zero vector when the keymode is unsupported or there are too few rows to rate.
         /// </summary>
-        EzMinaSkillAxisVector CalculatePlayerMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal);
+        EzMinaSkillAxisData CalculatePlayerMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal);
     }
 }

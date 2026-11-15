@@ -58,7 +58,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// </summary>
         public IReadOnlyCollection<string> MissingChartHashes { get; private set; } = Array.Empty<string>();
 
-        private readonly record struct SkillVectorPlayTimeLine(DateTimeOffset ScoredAt, EzMinaSkillAxisVector Vector);
+        private readonly record struct SkillVectorPlayTimeLine(DateTimeOffset ScoredAt, EzMinaSkillAxisData Vector);
 
         private readonly record struct SkillVectorPlayOverall(double Overall, IReadOnlyList<string> SkillVector);
 
@@ -120,7 +120,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
                         int keyCount;
                         float rate;
-                        EzMinaSkillAxisVector vector;
+                        EzMinaSkillAxisData vector;
 
                         if (hasCachedPlay)
                         {
@@ -314,7 +314,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             EzSkillPlayRow play,
             int keyCount,
             float rate,
-            EzMinaSkillAxisVector vector,
+            EzMinaSkillAxisData vector,
             string[] patterns,
             Dictionary<int, List<SkillVectorPlayTimeLine>> byKey,
             Dictionary<int, List<SkillVectorPlayOverall>> patternPlaysByKey,
@@ -378,25 +378,25 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// across the career (always includes first and last). Unlike a career-prefix Aggregate,
         /// values can fall when strong early plays leave the window.
         /// </summary>
-        public static IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> BuildChronologicalHistorySamples(
-            IReadOnlyList<(DateTimeOffset ScoredAt, EzMinaSkillAxisVector Vector)> orderedPlays,
+        public static IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisData Vector)> BuildChronologicalHistorySamples(
+            IReadOnlyList<(DateTimeOffset ScoredAt, EzMinaSkillAxisData Vector)> orderedPlays,
             int maxPoints = HISTORY_MAX_POINTS,
             int rollingPlays = HISTORY_ROLLING_PLAYS)
         {
             if (orderedPlays.Count == 0 || maxPoints < 1)
-                return Array.Empty<(DateTimeOffset, EzMinaSkillAxisVector)>();
+                return Array.Empty<(DateTimeOffset, EzMinaSkillAxisData)>();
 
             if (rollingPlays < 1)
                 rollingPlays = 1;
 
             var indices = SampleIndices(orderedPlays.Count, maxPoints);
-            var samples = new List<(DateTimeOffset, EzMinaSkillAxisVector)>(indices.Count);
+            var samples = new List<(DateTimeOffset, EzMinaSkillAxisData)>(indices.Count);
 
             foreach (int i in indices)
             {
                 int start = Math.Max(0, i - rollingPlays + 1);
                 int count = i - start + 1;
-                var window = new List<EzMinaSkillAxisVector>(count);
+                var window = new List<EzMinaSkillAxisData>(count);
 
                 for (int j = start; j <= i; j++)
                     window.Add(orderedPlays[j].Vector);
@@ -407,7 +407,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             return samples;
         }
 
-        private static IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> buildChronologicalHistorySamples(
+        private static IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisData Vector)> buildChronologicalHistorySamples(
             IReadOnlyList<SkillVectorPlayTimeLine> orderedPlays)
             => BuildChronologicalHistorySamples(
                 orderedPlays.Select(t => (t.ScoredAt, t.Vector)).ToList());

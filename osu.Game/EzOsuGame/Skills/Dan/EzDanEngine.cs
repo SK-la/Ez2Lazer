@@ -172,7 +172,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// </summary>
         public static int TryHoldCountFromBeatmapInfo(BeatmapInfo beatmapInfo) => EzHoldMetrics.TryHoldCountFromBeatmapInfo(beatmapInfo);
 
-        public static IReadOnlyDictionary<string, double> VectorToMsdDict(EzMinaSkillAxisVector vector)
+        public static IReadOnlyDictionary<string, double> VectorToMsdDict(EzMinaSkillAxisData vector)
             => vector.Enumerate().ToDictionary(p => p.Axis.ToMetaId(), p => p.Value, StringComparer.Ordinal);
     }
 }

@@ -215,7 +215,7 @@ namespace osu.Game.EzOsuGame.Skills
         public void WritePlayerRatingSkills(
             string username,
             int keyCount,
-            EzMinaSkillAxisVector vector,
+            EzMinaSkillAxisData vector,
             int analyzedPlays,
             bool provisional = false,
             DateTimeOffset? computedAt = null,
@@ -240,10 +240,10 @@ namespace osu.Game.EzOsuGame.Skills
         public void WritePlayerSkillBundle(
             string username,
             int keyCount,
-            EzMinaSkillAxisVector minaRating,
+            EzMinaSkillAxisData minaRating,
             int analyzedPlays,
             bool provisional,
-            IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> historySamples,
+            IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisData Vector)> historySamples,
             IReadOnlyList<EzSkillRatingPlayData> skillRatings)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
@@ -301,7 +301,7 @@ namespace osu.Game.EzOsuGame.Skills
         public IReadOnlyList<EzPlayerSkillHistorySample> GetPlayerSkillHistory(string username, int keyCount, string skillId, int maxPoints = 64)
             => database.Read(c => readHistory(c, username, keyCount, skillId, maxPoints));
 
-        public void ReplacePlayerSkillHistory(string username, int keyCount, IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> samples)
+        public void ReplacePlayerSkillHistory(string username, int keyCount, IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisData Vector)> samples)
         {
             const int version = EzMinaEngine.VERSION;
 
@@ -794,7 +794,7 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         private static void replaceHistory(SqliteConnection connection, SqliteTransaction transaction, string username, int keyCount,
-                                           IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> samples, int version)
+                                           IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisData Vector)> samples, int version)
         {
             deleteRows(connection, transaction, "player_skill_history", "username = $username AND key_count = $key_count",
                 cmd =>
@@ -856,7 +856,7 @@ namespace osu.Game.EzOsuGame.Skills
             return rows;
         }
 
-        private static IReadOnlyDictionary<string, double> playerMinaSkillRowValues(EzMinaSkillAxisVector vector)
+        private static IReadOnlyDictionary<string, double> playerMinaSkillRowValues(EzMinaSkillAxisData vector)
         {
             var values = new Dictionary<string, double>(StringComparer.Ordinal);
 

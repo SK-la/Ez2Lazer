@@ -256,8 +256,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string hash_a = "batch-hash-a";
                 const string hash_b = "batch-hash-b";
 
-                store.WriteBeatmapMsd(hash_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
-                store.WriteBeatmapMsd(hash_b, new EzMinaSkillAxisVector(11, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1));
+                store.WriteBeatmapMsd(hash_a, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7));
+                store.WriteBeatmapMsd(hash_b, new EzMinaSkillAxisData(11, 1.1, 2.1, 3.1, 4.1, 5.1, 6.1, 7.1));
 
                 store.UpsertChartSkillInfo(hash_a, new EzChartSkillInfo
                 {
@@ -417,7 +417,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string live_hash = "rated-msd-hash";
 
                 store.WriteBeatmapMsdUnrateable(dead_hash, Guid.NewGuid());
-                store.WriteBeatmapMsd(live_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
+                store.WriteBeatmapMsd(live_hash, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7));
 
                 var provider = new EzSkillProvider(store, new EzPlayerSkillStore(storage));
 

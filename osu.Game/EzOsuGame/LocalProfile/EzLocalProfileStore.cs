@@ -1535,7 +1535,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             upsert.ExecuteNonQuery();
         }
 
-        private static string serializeVector(EzMinaSkillAxisVector vector) => JsonSerializer.Serialize(new[]
+        private static string serializeVector(EzMinaSkillAxisData vector) => JsonSerializer.Serialize(new[]
         {
             vector.Overall,
             vector.Stream,
@@ -1547,15 +1547,15 @@ namespace osu.Game.EzOsuGame.LocalProfile
             vector.Technical,
         });
 
-        private static EzMinaSkillAxisVector deserializeVector(string json)
+        private static EzMinaSkillAxisData deserializeVector(string json)
         {
             try
             {
                 double[]? values = JsonSerializer.Deserialize<double[]>(json);
 
-                if (values is { Length: >= EzMinaSkillAxisVector.RAW_LENGTH })
+                if (values is { Length: >= EzMinaSkillAxisData.RAW_LENGTH })
                 {
-                    return new EzMinaSkillAxisVector(
+                    return new EzMinaSkillAxisData(
                         values[0], values[1], values[2], values[3],
                         values[4], values[5], values[6], values[7]);
                 }

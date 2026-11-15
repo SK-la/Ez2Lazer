@@ -35,7 +35,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         double Rate,
         DateTimeOffset ScoredAt,
         bool HasPlayRating,
-        EzMinaSkillAxisVector Vector,
+        EzMinaSkillAxisData Vector,
         int AlgorithmVersion);
 
     /// <summary>

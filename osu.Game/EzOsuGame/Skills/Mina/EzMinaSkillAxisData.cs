@@ -10,7 +10,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// One MinaCalc skillset vector: chart Mina (<see cref="IEzMinaEngine.CalculateChartMinaSkillAxis"/>) or per-play rating (<see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/>).
     /// Axes follow <see cref="EzMinaSkillAxis"/>.
     /// </summary>
-    public readonly record struct EzMinaSkillAxisVector(
+    public readonly record struct EzMinaSkillAxisData(
         double Overall,
         double Stream,
         double Jumpstream,
@@ -46,12 +46,12 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// Builds a vector from the engine's raw eight-value output
         /// (<see cref="RAW_OUTPUT_ORDER"/> order). Shorter spans yield the zero vector.
         /// </summary>
-        public static EzMinaSkillAxisVector FromRaw(ReadOnlySpan<float> raw)
+        public static EzMinaSkillAxisData FromRaw(ReadOnlySpan<float> raw)
         {
             if (raw.Length < RAW_LENGTH)
                 return default;
 
-            return new EzMinaSkillAxisVector(raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], raw[6], raw[7]);
+            return new EzMinaSkillAxisData(raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], raw[6], raw[7]);
         }
 
         public double Get(EzMinaSkillAxis axis) => axis switch

@@ -738,7 +738,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>Bare-axis table plus the engine vector it came from.</summary>
-        internal readonly record struct MinaResult(IReadOnlyDictionary<string, double> Axes, EzMinaSkillAxisVector Vector);
+        internal readonly record struct MinaResult(IReadOnlyDictionary<string, double> Axes, EzMinaSkillAxisData Vector);
 
         /// <summary>
         /// PP+ chart vector for the current mods. Independent of the ruleset analysis provider: PP+ covers

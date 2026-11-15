@@ -58,7 +58,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var store = new EzChartSkillStore(realm);
 
                 // Mina: a complete, b settled-unrateable, c missing.
-                store.WriteBeatmapMsd(mania_a, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
+                store.WriteBeatmapMsd(mania_a, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7));
                 store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
 
                 // CSI: a complete, b settled stub, c missing.
@@ -118,7 +118,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var store = new EzChartSkillStore(realm);
 
                 // A non-mania chart with a full set of rows must not inflate the report either way.
-                store.WriteBeatmapMsd(osu_hash, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7));
+                store.WriteBeatmapMsd(osu_hash, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7));
                 store.UpsertChartSkillInfo(osu_hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 var status = store.GetSkillDataStatus();
@@ -214,7 +214,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             {
                 var store = new EzPlayerSkillStore(storage);
 
-                store.WritePlayerRatingSkills("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerRatingSkills("alpha", 4, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
 
                 // No ledger rows behind the slice: the rows cannot be behind anything, so nothing reports stale.
                 Assert.That(store.GetStalePlayerSkillUsernames(), Is.Empty);
@@ -242,8 +242,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             {
                 var store = new EzPlayerSkillStore(storage);
 
-                store.WritePlayerRatingSkills("alpha", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
-                store.WritePlayerRatingSkills("beta", 4, new EzMinaSkillAxisVector(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerRatingSkills("alpha", 4, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
+                store.WritePlayerRatingSkills("beta", 4, new EzMinaSkillAxisData(11, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 5);
 
                 // Staleness is derived from the ledger, so a slice nobody has played since its write is current.
                 Assert.That(store.GetStalePlayerSkillDetails(), Is.Empty);

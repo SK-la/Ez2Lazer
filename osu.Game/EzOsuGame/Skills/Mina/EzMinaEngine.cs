@@ -97,13 +97,13 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
         private bool disposed;
 
-        public EzMinaSkillAxisVector CalculateChartMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f)
+        public EzMinaSkillAxisData CalculateChartMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate = 1f)
             => calculate(notes, keyCount, rate, MSD_GOAL);
 
-        public EzMinaSkillAxisVector CalculatePlayerMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal)
+        public EzMinaSkillAxisData CalculatePlayerMinaSkillAxis(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal)
             => calculate(notes, keyCount, rate, Math.Clamp(goal, MIN_RATING_GOAL, MAX_RATING_GOAL));
 
-        private EzMinaSkillAxisVector calculate(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal)
+        private EzMinaSkillAxisData calculate(ReadOnlySpan<EzCalcNote> notes, int keyCount, float rate, float goal)
         {
             ObjectDisposedException.ThrowIf(disposed, this);
 
@@ -143,7 +143,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 }
             }
 
-            return EzMinaSkillAxisVector.FromRaw(raw);
+            return EzMinaSkillAxisData.FromRaw(raw);
         }
 
         /// <summary>
@@ -152,7 +152,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// </summary>
         private static bool isFloorOutput(ReadOnlySpan<float> raw)
         {
-            if (raw.Length < EzMinaSkillAxisVector.RAW_LENGTH)
+            if (raw.Length < EzMinaSkillAxisData.RAW_LENGTH)
                 return false;
 
             float stream = raw[1];
@@ -193,7 +193,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
             int ptrMasks = malloc!(count * sizeof(uint));
             int ptrTimes = malloc!(count * sizeof(float));
-            int ptrOut = malloc!(EzMinaSkillAxisVector.RAW_LENGTH * sizeof(float));
+            int ptrOut = malloc!(EzMinaSkillAxisData.RAW_LENGTH * sizeof(float));
 
             if (ptrMasks == 0 || ptrTimes == 0 || ptrOut == 0)
                 throw new EzMinaEngineException("MinaCalc n-key malloc returned a null pointer.");
@@ -207,15 +207,15 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 timeSpan[i] = notes[i].RowTime;
             }
 
-            wasmMemory.GetSpan<float>(ptrOut, EzMinaSkillAxisVector.RAW_LENGTH).Clear();
+            wasmMemory.GetSpan<float>(ptrOut, EzMinaSkillAxisData.RAW_LENGTH).Clear();
 
             int rc = compute!(keyCount, rate, goal, ptrMasks, ptrTimes, count, ptrOut);
 
             if (rc == 0)
                 throw new EzMinaEngineException("MinaCalc n-key compute reported failure.");
 
-            float[] raw = new float[EzMinaSkillAxisVector.RAW_LENGTH];
-            wasmMemory.GetSpan<float>(ptrOut, EzMinaSkillAxisVector.RAW_LENGTH).CopyTo(raw);
+            float[] raw = new float[EzMinaSkillAxisData.RAW_LENGTH];
+            wasmMemory.GetSpan<float>(ptrOut, EzMinaSkillAxisData.RAW_LENGTH).CopyTo(raw);
 
             Action<int> release = free!;
             release(ptrMasks);

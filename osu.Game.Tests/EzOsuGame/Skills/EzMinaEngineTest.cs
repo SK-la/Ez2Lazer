@@ -228,8 +228,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var plays = new[]
             {
-                new EzMinaSkillAxisVector(10, 9, 8, 7, 6, 5, 4, 3),
-                new EzMinaSkillAxisVector(12, 11, 10, 9, 8, 7, 6, 5),
+                new EzMinaSkillAxisData(10, 9, 8, 7, 6, 5, 4, 3),
+                new EzMinaSkillAxisData(12, 11, 10, 9, 8, 7, 6, 5),
             };
 
             var result = EzMinaRatingAggregator.AggregateVectors(plays);

@@ -90,7 +90,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// Mirrors the engine's overall onto the chart's Mina star. The engine scale is converted here, at the write,
         /// so every reader of the stored rating sees a star.
         /// </summary>
-        private void writeRating(BeatmapInfo beatmapInfo, EzMinaSkillAxisVector vector)
+        private void writeRating(BeatmapInfo beatmapInfo, EzMinaSkillAxisData vector)
         {
             if (vector.Overall <= 0)
                 return;
@@ -98,14 +98,14 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.Mina, EzMinaStarRatingScale.ToStarRating(vector.Overall));
         }
 
-        private static EzMinaSkillAxisVector? computeVector(
+        private static EzMinaSkillAxisData? computeVector(
             IBeatmap playable,
             BeatmapInfo beatmapInfo,
             int keyCount,
-            Action<EzMinaSkillAxisVector> onSettledMiss)
+            Action<EzMinaSkillAxisData> onSettledMiss)
         {
             var calc = EzMinaEnginePool.Rent();
-            EzMinaSkillAxisVector vector;
+            EzMinaSkillAxisData vector;
 
             try
             {
@@ -129,7 +129,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             return vector;
         }
 
-        private static Dictionary<string, double> toDictionary(EzMinaSkillAxisVector vector)
+        private static Dictionary<string, double> toDictionary(EzMinaSkillAxisData vector)
         {
             var result = new Dictionary<string, double>(StringComparer.Ordinal);
 

@@ -48,12 +48,12 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             return Math.Round(rating * aggregate_rating_scaler * 100) / 100;
         }
 
-        public static EzMinaSkillAxisVector AggregateVectors(IReadOnlyList<EzMinaSkillAxisVector> plays)
+        public static EzMinaSkillAxisData AggregateVectors(IReadOnlyList<EzMinaSkillAxisData> plays)
         {
             if (plays.Count == 0)
                 return default;
 
-            return new EzMinaSkillAxisVector(
+            return new EzMinaSkillAxisData(
                 Aggregate(plays.Select(p => p.Overall)),
                 Aggregate(plays.Select(p => p.Stream)),
                 Aggregate(plays.Select(p => p.Jumpstream)),
