@@ -600,3 +600,15 @@ namespace osu.Game.EzOsuGame.Edit
         }
     }
 }
+
+namespace osu.Game.Screens.Play
+{
+    public partial class Player
+    {
+        internal bool IsReadyForSkinEditorScenePresent() =>
+            IsLoaded
+            && LoadedBeatmapSuccessfully
+            && Alpha >= 1
+            && DrawableRuleset?.FrameStableClock.WaitingOnFrames.Value == false;
+    }
+}

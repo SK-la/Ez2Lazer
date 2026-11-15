@@ -135,6 +135,7 @@ namespace osu.Game.EzOsuGame.Edit
         private EzPlaybackBar playbackBar = null!;
         private EzSkinEditorComponentPickerWindow componentPicker = null!;
         private EzSkinEditorColouringPreviewerWindow colouringPreviewer = null!;
+        private EzSkinEditorSceneLoadingOverlay sceneLoadingOverlay = null!;
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
             => dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
@@ -158,6 +159,10 @@ namespace osu.Game.EzOsuGame.Edit
         public Bindable<EzEditorSceneType> CurrentScene => sceneBar.CurrentScene;
 
         internal void ApplyCoordinatedScene(EzEditorSceneType scene) => sceneBar.CurrentScene.Value = scene;
+
+        internal void ShowSceneLoading() => sceneLoadingOverlay.ShowLoading();
+
+        internal void HideSceneLoading() => sceneLoadingOverlay.HideLoading();
 
         /// <summary>
         /// Top-level group switch: re-selects the scene last used in that group, falling back to its
@@ -447,38 +452,46 @@ namespace osu.Game.EzOsuGame.Edit
                                 },
                                 new Drawable[]
                                 {
-                                    new GridContainer
+                                    new Container
                                     {
                                         RelativeSizeAxes = Axes.Both,
-                                        ColumnDimensions = new[]
+                                        Children = new Drawable[]
                                         {
-                                            new Dimension(GridSizeMode.AutoSize),
-                                            new Dimension(),
-                                            new Dimension(GridSizeMode.AutoSize),
-                                        },
-                                        Content = new[]
-                                        {
-                                            new Drawable[]
+                                            new GridContainer
                                             {
-                                                sceneRail = new EzSkinEditorSceneRail(),
-                                                // 游玩洞：下层 ScreenContainer 经 SetCustomRect 缩进此处；本层只叠 HUD 蓝图。
-                                                gameplayHole = new Container
+                                                RelativeSizeAxes = Axes.Both,
+                                                ColumnDimensions = new[]
                                                 {
-                                                    RelativeSizeAxes = Axes.Both,
-                                                    Children = new Drawable[]
+                                                    new Dimension(GridSizeMode.AutoSize),
+                                                    new Dimension(),
+                                                    new Dimension(GridSizeMode.AutoSize),
+                                                },
+                                                Content = new[]
+                                                {
+                                                    new Drawable[]
                                                     {
-                                                        hudLayer,
-                                                        componentPicker = new EzSkinEditorComponentPickerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX)),
-                                                        colouringPreviewer = new EzSkinEditorColouringPreviewerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorColouringPreviewerX)),
+                                                        sceneRail = new EzSkinEditorSceneRail(),
+                                                        // 游玩洞：下层 ScreenContainer 经 SetCustomRect 缩进此处；本层只叠 HUD 蓝图。
+                                                        gameplayHole = new Container
+                                                        {
+                                                            RelativeSizeAxes = Axes.Both,
+                                                            Children = new Drawable[]
+                                                            {
+                                                                hudLayer,
+                                                                componentPicker = new EzSkinEditorComponentPickerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorComponentPickerX)),
+                                                                colouringPreviewer = new EzSkinEditorColouringPreviewerWindow(ezSkinConfig.GetBindable<float>(Ez2Setting.SkinEditorColouringPreviewerX)),
+                                                            },
+                                                        },
+                                                        sidebar = new EzSkinEditorSidebar
+                                                        {
+                                                            Anchor = Anchor.TopRight,
+                                                            Origin = Anchor.TopRight,
+                                                            Width = 0,
+                                                        },
                                                     },
                                                 },
-                                                sidebar = new EzSkinEditorSidebar
-                                                {
-                                                    Anchor = Anchor.TopRight,
-                                                    Origin = Anchor.TopRight,
-                                                    Width = 0,
-                                                },
                                             },
+                                            sceneLoadingOverlay = new EzSkinEditorSceneLoadingOverlay(),
                                         },
                                     },
                                 },
