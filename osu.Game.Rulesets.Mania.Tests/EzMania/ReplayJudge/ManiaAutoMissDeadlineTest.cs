@@ -35,6 +35,36 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 Is.EqualTo(note.StartTime + windows.WindowFor(HitResult.Miss, false)));
         }
 
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.IIDX_HD)]
+        [TestCase(EzEnumJudgeMode.O2Jam)]
+        public void HoldTailIsJudgedLaterThanItsQueueDeadline(EzEnumJudgeMode judgeMode)
+        {
+            var tail = new TailNote
+            {
+                StartTime = 2000,
+                HitWindows = new ManiaHitWindows(judgeMode),
+            };
+            tail.HitWindows.SetDifficulty(8);
+
+            var drawable = new DrawableHoldNoteTail();
+            drawable.Apply(tail);
+
+            var windows = (ManiaHitWindows)tail.HitWindows;
+
+            double queueDeadline = ManiaLaneController.GetAutoMissEvaluationTime(drawable);
+
+            Assert.That(queueDeadline, Is.EqualTo(tail.StartTime + windows.WindowFor(HitResult.Miss, false)));
+
+            double actualJudgementTime = tail.StartTime + tail.MaximumJudgementOffset;
+
+            Assert.That(
+                actualJudgementTime,
+                Is.GreaterThan(queueDeadline),
+                "尾判实际落判晚于队列到期；因此 HasCompleted 的时钟条件也必须活到 MaximumJudgementOffset，"
+                + "而不是只活到 GetLastObjectTime() + 固定常量。");
+        }
+
         [Test]
         public void FutureDeadlineIsNotVisited()
         {

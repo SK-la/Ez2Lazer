@@ -116,7 +116,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         {
             base.LoadComplete();
             restoreDiagnostics = EzJudgmentDiagnostics.Enabled;
-            EzJudgmentDiagnostics.Enabled = true;
+            EzJudgmentDiagnostics.SetEnabled(true);
 
             // Column.load() 会按皮肤把 AccentColour 刷成黑；测 LN 体必须能看见。
             foreach (var column in columns)
@@ -128,7 +128,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         [SetUp]
         public void SetUp() => Schedule(() =>
         {
-            EzJudgmentDiagnostics.Enabled = true;
+            EzJudgmentDiagnostics.SetEnabled(true);
             ManiaHoldAblation.Reset();
             freezeClock = false;
             simulateHolding = false;
@@ -140,7 +140,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Diagnostics
         protected override void Dispose(bool isDisposing)
         {
             ManiaHoldAblation.Reset();
-            EzJudgmentDiagnostics.Enabled = restoreDiagnostics;
+            EzJudgmentDiagnostics.SetEnabled(restoreDiagnostics);
             base.Dispose(isDisposing);
         }
 
