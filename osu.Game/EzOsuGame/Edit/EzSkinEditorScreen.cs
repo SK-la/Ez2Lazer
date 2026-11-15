@@ -244,8 +244,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (dialogOverlay == null)
             {
-                applySettings();
-                onContinued();
+                applyUnsavedAndContinue(onContinued);
                 return;
             }
 
