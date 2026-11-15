@@ -33,7 +33,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                     continue;
 
                 // Pattern ratings are not Mina play.values.
-                if (row.SkillId.StartsWith(EzAnalysisSystem.Pattern + ".", StringComparison.Ordinal))
+                string tagPrefix = EzAnalysisSystem.Pattern.ToStorageId() + ".";
+                if (row.SkillId.StartsWith(tagPrefix, StringComparison.Ordinal))
                     continue;
 
                 // Legacy prefixed ids; current writes use bare axis ids (see ToMetaId).

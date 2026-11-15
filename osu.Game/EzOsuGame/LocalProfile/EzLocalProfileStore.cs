@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// <c>username_partitions.excluded</c> marks a player left out of the archive, and
         /// <c>online_score_contributions.username</c> attributes pulled scores to the account that pulled them.
         /// </summary>
-        public const int SCHEMA_VERSION = 3;
+        public const int SCHEMA_VERSION = 4;
 
         /// <summary>
         /// Logic version for aggregated stats (independent of table schema).
@@ -1246,7 +1246,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
         }
 
-        /// <summary>Per-play Mina rating cache (<c>ssr_score_cache</c>) for one algorithm version, keyed by score id.</summary>
+        /// <summary>Per-play Mina rating cache for one algorithm version, keyed by score id.</summary>
         public Dictionary<Guid, EzMinaPlayCacheRow> LoadMinaPlayRatingCache(int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaEngine.VERSION;
@@ -1256,9 +1256,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 ensureInitialised();
                 using var connection = openConnection();
                 using var cmd = connection.CreateCommand();
-                cmd.CommandText = """
-                                  SELECT score_id, username, beatmap_hash, key_count, rate, scored_at_ms, has_ssr, vector_json, algorithm_version
-                                  FROM ssr_score_cache
+                cmd.CommandText = $"""
+                                  SELECT score_id, username, beatmap_hash, key_count, rate, scored_at_ms, has_play_rating, vector_json, algorithm_version
+                                  FROM {EzLocalProfilePlayRatingCache.TABLE_NAME}
                                   WHERE algorithm_version = $algorithm_version;
                                   """;
                 cmd.Parameters.AddWithValue("$algorithm_version", version);
@@ -1301,18 +1301,18 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 foreach (var row in rows)
                 {
                     using var cmd = connection.CreateCommand();
-                    cmd.CommandText = """
-                                      INSERT INTO ssr_score_cache
-                                          (score_id, username, beatmap_hash, key_count, rate, scored_at_ms, has_ssr, vector_json, algorithm_version)
+                    cmd.CommandText = $"""
+                                      INSERT INTO {EzLocalProfilePlayRatingCache.TABLE_NAME}
+                                          (score_id, username, beatmap_hash, key_count, rate, scored_at_ms, has_play_rating, vector_json, algorithm_version)
                                       VALUES
-                                          ($score_id, $username, $beatmap_hash, $key_count, $rate, $scored_at_ms, $has_ssr, $vector_json, $algorithm_version)
+                                          ($score_id, $username, $beatmap_hash, $key_count, $rate, $scored_at_ms, $has_play_rating, $vector_json, $algorithm_version)
                                       ON CONFLICT(score_id) DO UPDATE SET
                                           username = excluded.username,
                                           beatmap_hash = excluded.beatmap_hash,
                                           key_count = excluded.key_count,
                                           rate = excluded.rate,
                                           scored_at_ms = excluded.scored_at_ms,
-                                          has_ssr = excluded.has_ssr,
+                                          has_play_rating = excluded.has_play_rating,
                                           vector_json = excluded.vector_json,
                                           algorithm_version = excluded.algorithm_version;
                                       """;
@@ -1322,7 +1322,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                     cmd.Parameters.AddWithValue("$key_count", row.KeyCount);
                     cmd.Parameters.AddWithValue("$rate", row.Rate);
                     cmd.Parameters.AddWithValue("$scored_at_ms", row.ScoredAt.ToUnixTimeMilliseconds());
-                    cmd.Parameters.AddWithValue("$has_ssr", row.HasPlayRating ? 1 : 0);
+                    cmd.Parameters.AddWithValue("$has_play_rating", row.HasPlayRating ? 1 : 0);
                     cmd.Parameters.AddWithValue("$vector_json", serializeVector(row.Vector));
                     cmd.Parameters.AddWithValue("$algorithm_version", row.AlgorithmVersion);
                     cmd.ExecuteNonQuery();
@@ -1433,8 +1433,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 using var connection = openConnection();
                 using var cmd = connection.CreateCommand();
                 // WHERE TRUE keeps the intentional full clear explicit (a bare DELETE FROM would be read as an oversight).
-                cmd.CommandText = """
-                                  DELETE FROM ssr_score_cache WHERE TRUE;
+                cmd.CommandText = $"""
+                                  DELETE FROM {EzLocalProfilePlayRatingCache.TABLE_NAME} WHERE TRUE;
                                   DELETE FROM dan_score_cache WHERE TRUE;
                                   """;
                 cmd.ExecuteNonQuery();
@@ -1535,22 +1535,25 @@ namespace osu.Game.EzOsuGame.LocalProfile
             upsert.ExecuteNonQuery();
         }
 
-        private static string serializeVector(EzMinaSkillAxisData vector) => JsonSerializer.Serialize(new[]
+        private static string serializeVector(EzMinaSkillAxisData vector)
         {
-            vector.Overall,
-            vector.Stream,
-            vector.Jumpstream,
-            vector.Handstream,
-            vector.Stamina,
-            vector.JackSpeed,
-            vector.Chordjack,
-            vector.Technical,
-        });
+            var byId = new Dictionary<string, double>(StringComparer.Ordinal);
+
+            foreach (var (axis, value) in vector.Enumerate())
+                byId[axis.ToMetaId()] = value;
+
+            return JsonSerializer.Serialize(byId);
+        }
 
         private static EzMinaSkillAxisData deserializeVector(string json)
         {
             try
             {
+                if (JsonSerializer.Deserialize<Dictionary<string, double>>(json) is { Count: > 0 } byId)
+                {
+                    return vectorFromIds(byId);
+                }
+
                 double[]? values = JsonSerializer.Deserialize<double[]>(json);
 
                 if (values is { Length: >= EzMinaSkillAxisData.RAW_LENGTH })
@@ -1562,10 +1565,25 @@ namespace osu.Game.EzOsuGame.LocalProfile
             }
             catch (Exception ex)
             {
-                Logger.Log($"[EzLocalProfile] Failed to parse SunnySR vector cache: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
+                Logger.Log($"[EzLocalProfile] Failed to parse Mina play rating cache: {ex.Message}", Ez2ConfigManager.LOGGER_NAME);
             }
 
             return default;
+        }
+
+        private static EzMinaSkillAxisData vectorFromIds(IReadOnlyDictionary<string, double> byId)
+        {
+            double read(string id) => byId.TryGetValue(id, out double v) ? v : 0;
+
+            return new EzMinaSkillAxisData(
+                read(EzMinaSkillAxis.Overall.ToMetaId()),
+                read(EzMinaSkillAxis.Stream.ToMetaId()),
+                read(EzMinaSkillAxis.Jumpstream.ToMetaId()),
+                read(EzMinaSkillAxis.Handstream.ToMetaId()),
+                read(EzMinaSkillAxis.Stamina.ToMetaId()),
+                read(EzMinaSkillAxis.JackSpeed.ToMetaId()),
+                read(EzMinaSkillAxis.Chordjack.ToMetaId()),
+                read(EzMinaSkillAxis.Technical.ToMetaId()));
         }
 
         private static void writeAggregationTables(SqliteConnection connection, EzLocalProfileAggregationResult result, bool writeDrills = true)
@@ -2184,19 +2202,19 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                       ON dan_clear_evidence(username, key_count, side, credited_dan DESC);
                                   CREATE INDEX IF NOT EXISTS idx_axis_play_evidence_user
                                       ON axis_play_evidence(username, key_count, skill_id, axis_value DESC);
-                                  CREATE TABLE IF NOT EXISTS ssr_score_cache (
+                                  CREATE TABLE IF NOT EXISTS mina_player_play_rating_cache (
                                       score_id TEXT PRIMARY KEY NOT NULL,
                                       username TEXT NOT NULL,
                                       beatmap_hash TEXT NOT NULL,
                                       key_count INTEGER NOT NULL,
                                       rate REAL NOT NULL,
                                       scored_at_ms INTEGER NOT NULL,
-                                      has_ssr INTEGER NOT NULL,
+                                      has_play_rating INTEGER NOT NULL,
                                       vector_json TEXT NOT NULL,
                                       algorithm_version INTEGER NOT NULL
                                   );
-                                  CREATE INDEX IF NOT EXISTS idx_ssr_score_cache_user
-                                      ON ssr_score_cache(username, algorithm_version);
+                                  CREATE INDEX IF NOT EXISTS idx_mina_player_play_rating_cache_user
+                                      ON mina_player_play_rating_cache(username, algorithm_version);
                                   CREATE TABLE IF NOT EXISTS dan_score_cache (
                                       score_id TEXT PRIMARY KEY NOT NULL,
                                       username TEXT NOT NULL,
@@ -2229,6 +2247,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             ensureColumn(connection, "drill_scores", "ssr_star_rating", "REAL NOT NULL DEFAULT -1");
             ensureColumn(connection, "drill_scores", "map_performance_points", "REAL NOT NULL DEFAULT 0");
             reconcileLegacyDrillSunnyStarColumn(connection);
+            reconcileMinaPlayRatingCacheTable(connection);
             ensureColumn(connection, "drill_scores", "bpm", "REAL NOT NULL DEFAULT 0");
             ensureColumn(connection, "drill_scores", "key_count", "INTEGER NOT NULL DEFAULT 0");
             ensureColumn(connection, "drill_scores", "is_convert", "INTEGER NOT NULL DEFAULT 0");
@@ -2285,6 +2304,52 @@ namespace osu.Game.EzOsuGame.LocalProfile
         /// Older builds named the Sunny column <c>xxy_star_rating</c>. Leaving it alongside <c>ssr_star_rating</c>
         /// breaks inserts because the legacy column stays NOT NULL without a default.
         /// </summary>
+        /// <summary>Renames legacy <c>ssr_score_cache</c> / <c>has_ssr</c> to the v12 play-rating cache wire.</summary>
+        private static void reconcileMinaPlayRatingCacheTable(SqliteConnection connection)
+        {
+            if (tableExists(connection, "ssr_score_cache") && !tableExists(connection, EzLocalProfilePlayRatingCache.TABLE_NAME))
+            {
+                using var rename = connection.CreateCommand();
+                rename.CommandText = $"ALTER TABLE ssr_score_cache RENAME TO {EzLocalProfilePlayRatingCache.TABLE_NAME};";
+                rename.ExecuteNonQuery();
+            }
+
+            if (!tableExists(connection, EzLocalProfilePlayRatingCache.TABLE_NAME))
+                return;
+
+            if (hasColumn(connection, EzLocalProfilePlayRatingCache.TABLE_NAME, "has_ssr")
+                && !hasColumn(connection, EzLocalProfilePlayRatingCache.TABLE_NAME, "has_play_rating"))
+            {
+                using var renameColumn = connection.CreateCommand();
+                renameColumn.CommandText =
+                    $"ALTER TABLE {EzLocalProfilePlayRatingCache.TABLE_NAME} RENAME COLUMN has_ssr TO has_play_rating;";
+                renameColumn.ExecuteNonQuery();
+            }
+        }
+
+        private static bool tableExists(SqliteConnection connection, string table)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $name LIMIT 1;";
+            cmd.Parameters.AddWithValue("$name", table);
+            return cmd.ExecuteScalar() != null;
+        }
+
+        private static bool hasColumn(SqliteConnection connection, string table, string column)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"PRAGMA table_info({table});";
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
+        }
+
         private static void reconcileLegacyDrillSunnyStarColumn(SqliteConnection connection)
         {
             var columns = drillScoreColumnNames(connection);

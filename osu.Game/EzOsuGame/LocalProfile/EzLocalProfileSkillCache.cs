@@ -7,6 +7,11 @@ using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
+    /// <summary>Per-play Mina rating vector cache table in <c>ez-local-profile.sqlite</c>.</summary>
+    public static class EzLocalProfilePlayRatingCache
+    {
+        public const string TABLE_NAME = "mina_player_play_rating_cache";
+    }
     /// <summary>
     /// One mania play of a player reduced to what the skill pass reads, instead of the whole-library
     /// <see cref="ScoreInfo"/> deep clone the pass used to build. A play the per-play cache answers is folded
@@ -22,7 +27,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         ScoreRank Rank);
 
     /// <summary>
-    /// Per-play Mina <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> cache in <c>ez-local-profile.sqlite</c> (<c>ssr_score_cache</c> table name is legacy).
+    /// Per-play Mina <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> cache in <c>ez-local-profile.sqlite</c> (<see cref="EzLocalProfilePlayRatingCache.TABLE_NAME"/>).
     /// A play already rated with the current algorithm is reused so a recompute only fills in missing plays.
     /// <see cref="HasPlayRating"/> false records a play the engine deliberately produced no vector for,
     /// so it is not retried on every run.

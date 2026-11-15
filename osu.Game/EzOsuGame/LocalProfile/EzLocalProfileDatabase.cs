@@ -111,7 +111,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   system_id TEXT NOT NULL,
                                   ruleset_online_id INTEGER NOT NULL,
                                   skill_id TEXT NOT NULL,
-                                  value REAL NOT NULL,
+                                  skill_value REAL NOT NULL,
                                   state INTEGER NOT NULL,
                                   analyzed_plays INTEGER NOT NULL,
                                   provisional INTEGER NOT NULL,
@@ -125,7 +125,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                   username TEXT NOT NULL,
                                   key_count INTEGER NOT NULL,
                                   skill_id TEXT NOT NULL,
-                                  value REAL NOT NULL,
+                                  skill_value REAL NOT NULL,
                                   recorded_at_ms INTEGER NOT NULL,
                                   algorithm_version INTEGER NOT NULL
                               );
@@ -162,6 +162,55 @@ namespace osu.Game.EzOsuGame.LocalProfile
                               """;
 
             cmd.ExecuteNonQuery();
+            migratePlayerSkillWire(connection);
+        }
+
+        private static void migratePlayerSkillWire(SqliteConnection connection)
+        {
+            if (tableExists(connection, "player_skill_value") && hasColumn(connection, "player_skill_value", "value")
+                && !hasColumn(connection, "player_skill_value", "skill_value"))
+            {
+                using var rename = connection.CreateCommand();
+                rename.CommandText = "ALTER TABLE player_skill_value RENAME COLUMN value TO skill_value;";
+                rename.ExecuteNonQuery();
+            }
+
+            if (tableExists(connection, "player_skill_history") && hasColumn(connection, "player_skill_history", "value")
+                && !hasColumn(connection, "player_skill_history", "skill_value"))
+            {
+                using var rename = connection.CreateCommand();
+                rename.CommandText = "ALTER TABLE player_skill_history RENAME COLUMN value TO skill_value;";
+                rename.ExecuteNonQuery();
+            }
+
+            using (var deletePattern = connection.CreateCommand())
+            {
+                deletePattern.CommandText = "DELETE FROM player_skill_value WHERE system_id = 'pattern';";
+                deletePattern.ExecuteNonQuery();
+            }
+        }
+
+        private static bool tableExists(SqliteConnection connection, string table)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $name LIMIT 1;";
+            cmd.Parameters.AddWithValue("$name", table);
+            return cmd.ExecuteScalar() != null;
+        }
+
+        private static bool hasColumn(SqliteConnection connection, string table, string column)
+        {
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = $"PRAGMA table_info({table});";
+            using var reader = cmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
     }
 }
