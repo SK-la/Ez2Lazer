@@ -42,21 +42,21 @@ namespace osu.Game.EzOsuGame.HUD.MusicPlayer
             if (container.Components.Count > 0)
                 return;
 
-            TryPlace(container, CreateVisualisation());
-            TryPlace(container, new EzVisualizerBeatmapLogo
+            tryPlace(container, CreateVisualisation());
+            tryPlace(container, new EzVisualizerBeatmapLogo
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.Centre,
                 UsesFixedAnchor = true,
             });
-            TryPlace(container, new EzVisualizerPlaybackBar
+            tryPlace(container, new EzVisualizerPlaybackBar
             {
                 Anchor = Anchor.Centre,
                 Origin = Anchor.TopCentre,
                 Y = EzVisualizerBeatmapLogo.BASE_SIZE / 2 + LOGO_TO_CONTROLS_SPACING,
                 UsesFixedAnchor = true,
             });
-            TryPlace(container, new EzVisualizerPlaylist
+            tryPlace(container, new EzVisualizerPlaylist
             {
                 Anchor = Anchor.CentreRight,
                 Origin = Anchor.CentreRight,
@@ -96,7 +96,7 @@ namespace osu.Game.EzOsuGame.HUD.MusicPlayer
             UsesFixedAnchor = true,
         };
 
-        private static void TryPlace(EzLayoutContainer container, ISerialisableDrawable component) =>
+        private static void tryPlace(EzLayoutContainer container, ISerialisableDrawable component) =>
             container.TryPlace(component, applyDefaults: false);
     }
 }

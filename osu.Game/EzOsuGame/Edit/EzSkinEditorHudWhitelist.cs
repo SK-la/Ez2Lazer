@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.Edit
             typeof(EzVisualizerPlaylist),
         };
 
-        private static readonly HashSet<Type> scene_specific = Union(results, music_player);
+        private static readonly HashSet<Type> scene_specific = union(results, music_player);
 
         public static bool IsAllowed(EzEditorSceneType scene, Type type) => scene switch
         {
@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.Edit
             _ => !scene_specific.Contains(type),
         };
 
-        private static HashSet<Type> Union(HashSet<Type> first, HashSet<Type> second)
+        private static HashSet<Type> union(HashSet<Type> first, HashSet<Type> second)
         {
             var combined = new HashSet<Type>(first);
             combined.UnionWith(second);

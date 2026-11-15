@@ -29,14 +29,14 @@ namespace osu.Game.EzOsuGame.Layout
 
         public EzConfigLayoutStore Store => layoutStore;
 
-        public EzConfigLayoutStore ClientStore => clientStore;
+        public EzConfigLayoutStore ClientStore { get; private set; } = null!;
 
         public bool HasUnflushedLayoutChanges =>
             HasUnflushedThemeLayoutChanges || HasUnflushedClientLayoutChanges;
 
         public bool HasUnflushedThemeLayoutChanges => layoutStore.HasUnflushedChanges();
 
-        public bool HasUnflushedClientLayoutChanges => IsLoaded && clientStore.HasUnflushedChanges();
+        public bool HasUnflushedClientLayoutChanges => IsLoaded && ClientStore.HasUnflushedChanges();
 
         public EzLayoutWriteKind FlushPendingLayouts()
         {
@@ -45,7 +45,7 @@ namespace osu.Game.EzOsuGame.Layout
             if (layoutStore.FlushPending())
                 kind |= EzLayoutWriteKind.Theme;
 
-            if (IsLoaded && clientStore.FlushPending())
+            if (IsLoaded && ClientStore.FlushPending())
                 kind |= EzLayoutWriteKind.Client;
 
             return kind;
@@ -56,7 +56,7 @@ namespace osu.Game.EzOsuGame.Layout
             layoutStore.DiscardPending();
 
             if (IsLoaded)
-                clientStore.DiscardPending();
+                ClientStore.DiscardPending();
         }
 
         public EzLayoutContainer? SongSelectContainer { get; private set; }
@@ -70,7 +70,6 @@ namespace osu.Game.EzOsuGame.Layout
         /// </summary>
         public event Action? LayoutTargetsChanged;
 
-        private EzConfigLayoutStore clientStore = null!;
         private EzLayoutContainer? gameplayContainer;
         private EzLayoutContainer? rulesetGameplayContainer;
         private EzLayoutContainer? rulesetPlayfieldContainer;
@@ -132,7 +131,7 @@ namespace osu.Game.EzOsuGame.Layout
         [BackgroundDependencyLoader]
         private void load(Storage storage)
         {
-            clientStore = EzConfigLayoutStore.CreateClientRoot(storage);
+            ClientStore = EzConfigLayoutStore.CreateClientRoot(storage);
             InternalChild = SongSelectContainer = new EzLayoutContainer(Store, EzLayoutFiles.SONG_SELECT, null);
         }
 
@@ -307,7 +306,7 @@ namespace osu.Game.EzOsuGame.Layout
         private void recreateMusicPlayerContainer(CompositeDrawable screen)
         {
             expireMusicPlayerContainer();
-            MusicPlayerContainer = new EzLayoutContainer(clientStore, EzLayoutFiles.MUSIC_PLAYER, null);
+            MusicPlayerContainer = new EzLayoutContainer(ClientStore, EzLayoutFiles.MUSIC_PLAYER, null);
             MusicPlayerContainer.SetDependencyDonor(screen);
             MusicPlayerContainer.OnComponentsLoaded += d =>
             {

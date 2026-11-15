@@ -20,7 +20,6 @@ using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
-using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
@@ -1417,7 +1416,7 @@ namespace osu.Game.EzOsuGame.Edit
 
         private LocalisableString unsavedApplyBody()
         {
-            var names = collectUnsavedLayers().Select(l => l.ToString()).ToArray();
+            string[] names = collectUnsavedLayers().Select(l => l.ToString()).ToArray();
 
             if (names.Length == 0)
                 return DialogStrings.ConfirmDialogBodyText;

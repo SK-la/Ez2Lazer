@@ -503,7 +503,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         private static bool legacySkinFolder(Skin skin) =>
-            global::osu.Game.EzOsuGame.EzLegacySkinFolders.TryGetDirectory(skin.SkinInfo.Value, out _);
+            EzLegacySkinFolders.TryGetDirectory(skin.SkinInfo.Value, out _);
 
         /// <summary>
         /// The container currently being edited (the active layer's only target), or null when the

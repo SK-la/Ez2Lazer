@@ -34,7 +34,6 @@ namespace osu.Game.EzOsuGame.Layout
         private const int playfield_save_debounce_ms = 200;
 
         private readonly Storage gameStorage;
-        private readonly bool clientRoot;
         private readonly Lock playfieldSaveLock = new Lock();
         private readonly Dictionary<string, SkinLayoutInfo> pendingLayouts = new Dictionary<string, SkinLayoutInfo>();
         private Storage storage = null!;
@@ -43,7 +42,7 @@ namespace osu.Game.EzOsuGame.Layout
 
         public string LayoutSetName { get; private set; }
 
-        public bool IsClientRoot => clientRoot;
+        public bool IsClientRoot { get; }
 
         public ManiaPlayfieldLayoutConfig PlayfieldLayout { get; }
 
@@ -63,7 +62,7 @@ namespace osu.Game.EzOsuGame.Layout
         private EzConfigLayoutStore(Storage gameStorage, bool clientRoot)
         {
             this.gameStorage = gameStorage;
-            this.clientRoot = clientRoot;
+            IsClientRoot = clientRoot;
             PlayfieldLayout = new ManiaPlayfieldLayoutConfig();
 
             if (clientRoot)
@@ -85,7 +84,7 @@ namespace osu.Game.EzOsuGame.Layout
         /// </summary>
         public void UseSet(string layoutSetName)
         {
-            if (clientRoot)
+            if (IsClientRoot)
                 return;
 
             if (LayoutSetName == layoutSetName)
