@@ -57,7 +57,7 @@
 
 ## Cursor Cloud
 
-- .NET SDK 10 在 `/usr/local/share/dotnet`。直接跑 `osu.Desktop` 的 apphost 时依赖 `DOTNET_ROOT`；环境安装会把它链到 `/usr/share/dotnet`。
+- .NET SDK 11 在 `/usr/local/share/dotnet`。直接跑 `osu.Desktop` 的 apphost 时依赖 `DOTNET_ROOT`；环境安装会把它链到 `/usr/share/dotnet`。
 - 不要构建 `osu.sln`。解决方案引用了仓库外的 `ez2lazer-framework` 和 `ez2lazer-resources`。默认用 NuGet：构建 `osu.Desktop/osu.Desktop.csproj`，测试用 `osu.Game.Tests`。
 - `fonts-noto-color-emoji` 会让 `EzFontSettingsOverlay` 在启动时因 FreeType `invalid pixel size` 退出。环境安装会卸掉这个包。
 - 冒烟测试：`dotnet test osu.Game.Tests/osu.Game.Tests.csproj --filter FullyQualifiedName~FilterQueryParserTest`。

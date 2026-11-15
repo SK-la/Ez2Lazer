@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup Label="Project">
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFramework>net11.0</TargetFramework>
     <OutputType>Library</OutputType>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
@@ -44,7 +44,9 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="11.0.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.9.0" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="11.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="11.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="11.0.0">
+      <NoWarn>NU1510</NoWarn>
+    </PackageReference>
     <PackageReference Include="Microsoft.Toolkit.HighPerformance" Version="7.1.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageReference Include="ppy.LocalisationAnalyser" Version="2026.611.0">
@@ -62,7 +64,9 @@
     <PackageReference Include="SharpCompress" Version="0.50.8"/>
     <PackageReference Include="NUnit" Version="5.0.0" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5"/>
-    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0"/>
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0">
+      <NoWarn>NU1510</NoWarn>
+    </PackageReference>
     <PackageReference Include="TagLibSharp" Version="2.3.0"/>
     <PackageReference Include="Live2DCSharpSDK" Version="1.0.0.6"/>
     <!-- In-process WebAssembly host for the vendored n-key MinaCalc (4-18K mania MSD/SunnySR). -->
