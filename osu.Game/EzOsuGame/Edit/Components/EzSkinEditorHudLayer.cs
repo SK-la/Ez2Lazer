@@ -374,11 +374,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         {
             foreach (var target in EnumerateTargets())
                 persistTarget(target);
-
-            if (ActiveTarget is EzLayoutContainer ezLayout)
-                ezLayout.Store.FlushPending(ezLayout.LayoutFile);
-
-            FlushSkinLayoutSave();
         }
 
         /// <summary>
@@ -492,6 +487,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
             if (!target.ComponentsLoaded)
                 return;
 
+            // Mutable skins are a no-op. Protected skins must be copied here so UpdateDrawableTarget
+            // writes the session draft onto the copy; waiting until Apply leaves dirtySkinId on the
+            // old skin and drops edits after a scene switch.
+            skins.EnsureMutableSkin();
             skins.CurrentSkin.Value.UpdateDrawableTarget(target);
             HasPendingSkinLayoutSave = true;
             dirtySkinId = skins.CurrentSkinInfo.Value.ID;

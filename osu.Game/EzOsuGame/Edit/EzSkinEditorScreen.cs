@@ -1166,7 +1166,7 @@ namespace osu.Game.EzOsuGame.Edit
 
             try
             {
-                hudLayer.PersistLayoutToCurrentSkin();
+                hudLayer.PersistAllLayouts();
                 var exportStorage = (storage as OsuStorage)?.GetExportStorage() ?? storage.GetStorageForDirectory(@"exports");
                 string path = target is EzLayoutContainer ezLayout
                     ? EzLayoutPackIO.ExportLayerJson(storage, ezLayout.Store, ezLayout.LayoutFile, exportStorage)

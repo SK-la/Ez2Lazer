@@ -233,6 +233,12 @@ namespace osu.Game.Tests.Visual.Navigation
                 Assert.That(hud.TryPlaceComponent(typeof(BoxElement)), Is.True);
             });
 
+            AddStep("drag-complete callback only captures", () =>
+            {
+                var hud = ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+                hud.PersistLayoutToCurrentSkin();
+            });
+
             AddAssert("layout json not written yet", () =>
                 (File.Exists(layoutPath) ? File.ReadAllText(layoutPath) : string.Empty) == snapshot);
 
