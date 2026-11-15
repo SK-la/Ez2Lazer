@@ -603,25 +603,8 @@ namespace osu.Game.Overlays
             if (Time.Current < subsectionHighlightSuppressUntil)
                 return;
 
-            float threshold = (SectionsContainer.FixedHeader?.ScreenSpaceDrawQuad.BottomLeft.Y ?? SectionsContainer.ScreenSpaceDrawQuad.TopLeft.Y) + 8;
-
-            SettingsSubsection current = null;
-            SettingsSubsection firstPresent = null;
-
-            foreach (var subsection in indexedSection.IndexedSubsections)
-            {
-                if (!subsection.IsPresent)
-                    continue;
-
-                firstPresent ??= subsection;
-
-                if (subsection.ScreenSpaceDrawQuad.TopLeft.Y <= threshold)
-                    current = subsection;
-                else
-                    break;
-            }
-
-            subsectionNavColumn.SetSelected(current ?? firstPresent);
+            var current = SectionsContainer.GetActiveDrawableAtScrollPosition(indexedSection.IndexedSubsections) as SettingsSubsection;
+            subsectionNavColumn.SetSelected(current);
         }
 
         private partial class NonMaskedContent : Container<Drawable>
