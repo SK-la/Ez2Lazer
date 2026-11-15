@@ -38,7 +38,7 @@ namespace osu.Game.EzOsuGame.Skills
         public static EzSkillProfile? ForChart(int rulesetOnlineId)
         {
             if (rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID)
-                return new EzSkillProfile(rulesetOnlineId, [EzAnalysisSystem.Mina, EzAnalysisSystem.PPP], EzAnalysisSystem.Mina);
+                return new EzSkillProfile(rulesetOnlineId, [EzAnalysisSystem.Mina, EzAnalysisSystem.SSR, EzAnalysisSystem.PPP], EzAnalysisSystem.Mina);
 
             if (EzPPPSkillCatalog.SupportsRuleset(rulesetOnlineId))
                 return new EzSkillProfile(rulesetOnlineId, [EzAnalysisSystem.PPP], EzAnalysisSystem.PPP);

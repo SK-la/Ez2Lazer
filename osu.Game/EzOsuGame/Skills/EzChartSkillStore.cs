@@ -13,6 +13,7 @@ using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.Startup;
 using Realms;
 
@@ -897,6 +898,7 @@ namespace osu.Game.EzOsuGame.Skills
             var facets = new List<EzFacetStatus>(report.Facets.Count + 1);
             facets.AddRange(report.Facets);
             facets.Add(scanPppCharts().Status);
+            facets.Add(scanSunnySrSkillCharts().Status);
 
             return new EzDataStateReport
             {
@@ -909,6 +911,90 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Beatmaps whose PPP chart skills are missing a current per-skill version.</summary>
         public IReadOnlyList<Guid> CollectPppChartDebt()
             => scanPppCharts().OwedIds;
+
+        /// <summary>
+        /// Mania charts with a stored Sunny star but not the full current <see cref="EzSunnySrSkillAxis"/> set.
+        /// </summary>
+        public IReadOnlyList<Guid> CollectSunnySrSkillDebt()
+        {
+            return realmAccess.Run(r =>
+            {
+                const int revision = EzSSRUnit.VERSION;
+                string ssrSystemId = EzAnalysisSystem.SSR.ToStorageId();
+                var required = EzSunnySrSkillAxisExtensions.ChartAxisIds;
+
+                var presentByHash = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+                foreach (var row in r.All<EzBeatmapSkillValue>().Where(v => v.SystemId == ssrSystemId && v.AlgorithmVersion == revision))
+                {
+                    if (!presentByHash.TryGetValue(row.BeatmapHash, out var set))
+                        presentByHash[row.BeatmapHash] = set = new HashSet<string>(StringComparer.Ordinal);
+
+                    set.Add(row.SkillId);
+                }
+
+                var owed = new List<Guid>();
+
+                foreach (var beatmap in r.All<BeatmapInfo>())
+                {
+                    if (beatmap.BeatmapSet == null || string.IsNullOrEmpty(beatmap.Hash))
+                        continue;
+
+                    if (!EzSSRUnit.SupportsRuleset(beatmap.Ruleset.OnlineID))
+                        continue;
+
+                    if (beatmap.EzRatingData.SunnySR < 0)
+                        continue;
+
+                    if (!presentByHash.TryGetValue(beatmap.Hash, out var have))
+                    {
+                        owed.Add(beatmap.ID);
+                        continue;
+                    }
+
+                    foreach (string axisId in required)
+                    {
+                        if (!have.Contains(axisId))
+                        {
+                            owed.Add(beatmap.ID);
+                            break;
+                        }
+                    }
+                }
+
+                return (IReadOnlyList<Guid>)owed;
+            });
+        }
+
+        private SunnySrSkillChartScan scanSunnySrSkillCharts()
+        {
+            var owed = CollectSunnySrSkillDebt();
+
+            int universe = realmAccess.Run(r => r.All<BeatmapInfo>().Count(b =>
+                b.BeatmapSet != null
+                && !string.IsNullOrEmpty(b.Hash)
+                && EzSSRUnit.SupportsRuleset(b.Ruleset.OnlineID)
+                && b.EzRatingData.SunnySR >= 0));
+
+            var facet = new EzDataStateFacet
+            {
+                Id = "SunnySRSkill",
+                CurrentRevision = EzSSRUnit.VERSION,
+                UniverseCount = universe,
+                Rows = new Dictionary<string, EzFacetRowState>(StringComparer.Ordinal),
+            };
+
+            int missing = owed.Count;
+
+            return new SunnySrSkillChartScan(new EzFacetStatus
+            {
+                Id = facet.Id,
+                CurrentRevision = facet.CurrentRevision,
+                Ready = Math.Max(0, universe - missing),
+                Settled = 0,
+                Missing = missing,
+            });
+        }
 
         public void ClearBeatmapPPP()
         {
@@ -1038,6 +1124,8 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         private readonly record struct PppChartScan(List<Guid> OwedIds, EzFacetStatus Status);
+
+        private readonly record struct SunnySrSkillChartScan(EzFacetStatus Status);
 
         /// <summary>
         /// Batch-read typed ChartSkillInfo rows for many hashes in one Realm run.

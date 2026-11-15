@@ -723,6 +723,9 @@ namespace osu.Game.Database
 
                 if (!populateMissingSunnyStarRatings())
                     Logger.Log("Sunny rating pass did not finish; the remaining charts stay missing and are picked up next launch.");
+
+                if (!populateMissingSunnySrSkillAxes())
+                    Logger.Log("Sunny SR4 skill axis pass did not finish; remaining charts are picked up next launch.");
             }
 
             if (scope.HasFlag(EzAnalysisSystem.Official))
@@ -953,6 +956,45 @@ namespace osu.Game.Database
                     return false;
 
                 if (settled)
+                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Fills Sunny SR4 chart skill axes where the star is already stored (see <see cref="EzChartSkillStore.CollectSunnySrSkillDebt"/>).
+        /// </summary>
+        private bool populateMissingSunnySrSkillAxes()
+        {
+            IReadOnlyList<Guid> beatmapIds = skillStore.CollectSunnySrSkillDebt();
+
+            if (beatmapIds.Count == 0)
+                return true;
+
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require Sunny SR4 skill axis backfill.");
+
+            var notification = showProgressNotification(beatmapIds.Count,
+                EzAnalysisNotificationStrings.SUNNY_SKILL_AXES_RUNNING,
+                EzAnalysisNotificationStrings.SUNNY_SKILL_AXES_COMPLETED);
+
+            ChartBatchResult batch = runChartBatch(beatmapIds.ToList(), processSunnySkillAxes, notification);
+
+            completeNotification(notification, batch.Processed, beatmapIds.Count, batch.Failed);
+
+            return !batch.Aborted && notification?.State != ProgressNotificationState.Cancelled;
+
+            bool processSunnySkillAxes(Guid id)
+            {
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                    return false;
+
+                if (!ezSSRUnit.BackfillChartSkillAxes(beatmap, CancellationToken.None))
+                    return false;
+
+                if (beatmap.Hash != null)
                     ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
 
                 return true;

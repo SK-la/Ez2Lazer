@@ -16,6 +16,12 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SUNNY_RUNNING = new EzLocalizationManager.EzLocalisableString("补算谱面 Sunny SR", "Filling chart Sunny SR");
         public static readonly LocalisableString SUNNY_COMPLETED = new EzLocalizationManager.EzLocalisableString("谱面 Sunny SR 已更新", "beatmaps' Sunny SR updated");
 
+        public static readonly LocalisableString SUNNY_SKILL_AXES_RUNNING =
+            new EzLocalizationManager.EzLocalisableString("补算谱面 Sunny 技能轴", "Filling chart Sunny skill axes");
+
+        public static readonly LocalisableString SUNNY_SKILL_AXES_COMPLETED =
+            new EzLocalizationManager.EzLocalisableString("谱面 Sunny 技能轴已更新", "beatmaps' Sunny skill axes updated");
+
         public static readonly LocalisableString OFFICIAL_RUNNING = new EzLocalizationManager.EzLocalisableString("补算官方 SR / PP", "Filling official SR / PP");
         public static readonly LocalisableString OFFICIAL_COMPLETED = new EzLocalizationManager.EzLocalisableString("官方 SR / PP 已更新", "beatmaps' official SR / PP updated");
 
