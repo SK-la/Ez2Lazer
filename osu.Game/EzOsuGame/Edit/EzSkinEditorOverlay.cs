@@ -550,6 +550,8 @@ namespace osu.Game.EzOsuGame.Edit
 
         private partial class EzEditorEndlessPlayer : ReplayPlayer
         {
+            private bool awaitingLoopRewind;
+
             protected override UserActivity? InitialActivity => null;
 
             public override bool DisallowExternalBeatmapRulesetChanges => true;
@@ -577,8 +579,23 @@ namespace osu.Game.EzOsuGame.Edit
             {
                 base.Update();
 
-                if (LoadedBeatmapSuccessfully && GameplayState.HasPassed)
-                    GameplayClockContainer.Seek(0);
+                if (!LoadedBeatmapSuccessfully)
+                    return;
+
+                if (awaitingLoopRewind)
+                {
+                    if (!GameplayState.HasPassed)
+                        awaitingLoopRewind = false;
+
+                    return;
+                }
+
+                if (!GameplayState.HasPassed)
+                    return;
+
+                awaitingLoopRewind = true;
+                GameplayState.HasPassed = false;
+                GameplayClockContainer.Seek(0);
             }
         }
     }

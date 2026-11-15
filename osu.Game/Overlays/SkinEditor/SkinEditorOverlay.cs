@@ -584,6 +584,8 @@ namespace osu.Game.Overlays.SkinEditor
 
         private partial class EndlessPlayer : ReplayPlayer
         {
+            private bool awaitingLoopRewind;
+
             protected override UserActivity? InitialActivity => null;
 
             public override bool DisallowExternalBeatmapRulesetChanges => true;
@@ -614,8 +616,20 @@ namespace osu.Game.Overlays.SkinEditor
                 if (!LoadedBeatmapSuccessfully)
                     return;
 
-                if (GameplayState.HasPassed)
-                    GameplayClockContainer.Seek(0);
+                if (awaitingLoopRewind)
+                {
+                    if (!GameplayState.HasPassed)
+                        awaitingLoopRewind = false;
+
+                    return;
+                }
+
+                if (!GameplayState.HasPassed)
+                    return;
+
+                awaitingLoopRewind = true;
+                GameplayState.HasPassed = false;
+                GameplayClockContainer.Seek(0);
             }
         }
     }
