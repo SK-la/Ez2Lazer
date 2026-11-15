@@ -1,5 +1,4 @@
-# PR：非 SK-la 作者自动 Sonar；SK-la 自己的 PR 不自动。
-# 在 PR 评论 /sonar：SK-la 或 PR 作者可手动触发。
+# PR 打开/更新时自动 Sonar。在 PR 对话评论 /sonar：SK-la 或 PR 作者可手动触发。
 name: SonarQube
 
 on:
@@ -17,13 +16,12 @@ concurrency:
 permissions:
   contents: read
   pull-requests: read
+  issues: read
 
 jobs:
 
   sonar-auto:
-    if: |
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.user.login != 'SK-la'
+    if: github.event_name == 'pull_request'
 
     name: Sonar Auto Review
     runs-on: windows-latest
@@ -91,27 +89,39 @@ jobs:
   sonar-manual:
     if: |
       github.event_name == 'issue_comment' &&
-      github.event.issue.pull_request &&
-      contains(github.event.comment.body, '/sonar') &&
-      (
-        github.event.comment.user.login == 'SK-la' ||
-        github.event.comment.user.login == github.event.issue.user.login
-      )
+      contains(github.event.comment.body, '/sonar')
 
     name: Sonar Manual Review
     runs-on: windows-latest
 
     steps:
-      - name: Resolve pull request
+      - name: Validate /sonar and resolve pull request
         id: pr
         uses: actions/github-script@v7
         with:
           script: |
-            const { data: pr } = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: context.payload.issue.number,
-            });
+            const maintainer = 'SK-la';
+            const commenter = context.payload.comment.user.login;
+            const issueNumber = context.payload.issue.number;
+
+            let pr;
+            try {
+              const { data } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: issueNumber,
+              });
+              pr = data;
+            } catch {
+              core.setFailed('当前话题不是 Pull Request，无法通过 /sonar 触发分析');
+              return;
+            }
+
+            if (commenter !== maintainer && commenter !== pr.user.login) {
+              core.setFailed('仅仓库维护者或 PR 作者可使用 /sonar 手动触发 Sonar');
+              return;
+            }
+
             core.setOutput('number', String(pr.number));
             core.setOutput('head_sha', pr.head.sha);
             core.setOutput('head_ref', pr.head.ref);
