@@ -10,7 +10,6 @@ using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.Pattern;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
 namespace osu.Game.EzOsuGame.LocalProfile
@@ -32,14 +31,14 @@ namespace osu.Game.EzOsuGame.LocalProfile
         public bool HasSidePanel => true;
 
         public IReadOnlyList<int> GetSliceKeys(string username)
-            => provider.GetPlayerSsrKeyCounts(username);
+            => provider.GetPlayerRatingKeyCounts(username);
 
         public EzTrackSkillsSnapshot Load(string username, int sliceKey)
         {
             if (sliceKey <= 0)
                 return EzTrackSkillsSnapshot.Empty;
 
-            var ssr = provider.GetPlayerSsrSnapshot(username, sliceKey);
+            var playerRating = provider.GetPlayerRatingSnapshot(username, sliceKey);
             var modeEntries = provider.GetSkillModeEntries(username, sliceKey);
 
             var radar = modeEntries
@@ -48,13 +47,13 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             var bars = new List<EzTrackSkillsAxis>(radar.Count + 1);
 
-            if (ssr.Overall >= EzPatternRatings.DISPLAY_MIN)
+            if (playerRating.Overall >= EzMinaPlayerSkillModeData.DISPLAY_MIN)
             {
                 var overallMeta = EzMinaSkillAxis.Overall.Meta();
                 bars.Add(new EzTrackSkillsAxis(
-                    EzMinaSkillAxis.Overall.ToSsrSkillId(),
+                    EzMinaSkillAxis.Overall.ToMetaId(),
                     overallMeta.DisplayName,
-                    ssr.Overall,
+                    playerRating.Overall,
                     overallMeta.AccentHex));
             }
 
@@ -63,10 +62,10 @@ namespace osu.Game.EzOsuGame.LocalProfile
             return new EzTrackSkillsSnapshot
             {
                 HeaderTitle = EzSettingsProfile.LOCAL_PROFILE_SKILL_RATING.Format(sliceKey),
-                Overall = ssr.Overall,
-                PlaysAnalyzed = ssr.AnalyzedPlays,
-                Provisional = ssr.Provisional,
-                Stale = ssr.Stale,
+                Overall = playerRating.Overall,
+                PlaysAnalyzed = playerRating.AnalyzedPlays,
+                Provisional = playerRating.Provisional,
+                Stale = playerRating.Stale,
                 RadarAxes = radar,
                 BarAxes = bars,
             };
@@ -74,7 +73,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public LocalisableString ResolveDisplayName(string skillId)
         {
-            if (EzPatternRatings.TryParseSkillId(skillId, out string patternId)
+            if (EzMinaPlayerSkillModeData.TryParseSkillId(skillId, out string patternId)
                 && EzManiaRCAxisExtensions.TryParse(patternId, out var patternAxis))
             {
                 return patternAxis.Meta().DisplayName;

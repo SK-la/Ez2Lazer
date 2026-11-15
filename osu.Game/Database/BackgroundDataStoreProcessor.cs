@@ -1332,8 +1332,8 @@ namespace osu.Game.Database
                 {
                     var minaRows = skillStore.GetBeatmapSkills(candidate.Hash, EzAnalysisSystem.Mina);
 
-                    if (minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMsdSkillId(), out double storedMina) && storedMina > 0)
-                        minaSr = EzMinaRatingScale.ToStarRating(storedMina);
+                    if (minaRows.TryGetValue(EzMinaSkillAxis.Overall.ToMetaId(), out double storedMina) && storedMina > 0)
+                        minaSr = EzMinaStarRatingScale.ToStarRating(storedMina);
                 }
 
                 bool wrote = false;
@@ -1389,7 +1389,7 @@ namespace osu.Game.Database
             if (provisional.Count == 0)
                 return provisional;
 
-            string overallId = EzMinaSkillAxis.Overall.ToMsdSkillId();
+            string overallId = EzMinaSkillAxis.Overall.ToMetaId();
             var minaSkills = skillStore.GetBeatmapSkillsForHashes(
                 provisional.Where(p => p.NeedMinaSr).Select(p => p.Hash),
                 EzAnalysisSystem.Mina);

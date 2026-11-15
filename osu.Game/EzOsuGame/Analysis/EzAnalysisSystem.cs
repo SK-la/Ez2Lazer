@@ -7,7 +7,6 @@ using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.Pattern;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SSR;
@@ -23,8 +22,8 @@ namespace osu.Game.EzOsuGame.Analysis
     /// system and the scope that covers it are the same vocabulary.
     /// <para>
     /// A system may have any subset of a chart vector, a player vector and a scalar rating; which subset it has
-    /// follows from what it computes, not from a declaration. Mina owns both of its vectors; SSR owns one chart
-    /// star and nothing else.
+    /// follows from what it computes, not from a declaration. Mina owns chart MSD and player rating aggregates
+    /// (product “Sunny skills”, stored as <c>system_id = mina</c>). SSR owns chart Sunny star (<c>SunnySR</c>) only.
     /// </para>
     /// </remarks>
     [Flags]
@@ -141,7 +140,7 @@ namespace osu.Game.EzOsuGame.Analysis
             EzAnalysisSystem.CSI => EzCSIEngine.VERSION,
             EzAnalysisSystem.Dan => EzDanEngine.VERSION,
             EzAnalysisSystem.PPP => EzPPPEngine.VERSION,
-            EzAnalysisSystem.Pattern => EzPatternRatings.VERSION,
+            EzAnalysisSystem.Pattern => EzMinaPlayerSkillModeData.VERSION,
             EzAnalysisSystem.SSR => EzSSRUnit.VERSION,
             _ => 0,
         };

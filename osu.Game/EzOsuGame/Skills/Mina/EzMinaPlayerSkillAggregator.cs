@@ -12,23 +12,22 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Dan;
-using osu.Game.EzOsuGame.Skills.Pattern;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Scoring;
 
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Aggregates per-play SunnySR vectors into independent player skills (Etterna AggregateSunnySRs).
-    /// Goal via <see cref="EzMinaRatingGoal"/> (Wife subset when statistics exist).
+    /// Aggregates per-play <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> vectors into persisted player Mina skill rows.
+    /// Goal via <see cref="EzMinaStarRatingGoal"/> (Wife subset when statistics exist).
     /// </summary>
-    public sealed class EzPlayerMinaAggregator
+    public sealed class EzMinaPlayerSkillAggregator
     {
         /// <summary>Max skill-history samples stored per keymode (trend chart cap).</summary>
         public const int HISTORY_MAX_POINTS = 64;
 
         /// <summary>
-        /// Rolling play count for history AggregateSunnySRs (recent window so the curve can fall).
+        /// Rolling play count for history rating aggregation (recent window so the curve can fall).
         /// Career-prefix Aggregate is structurally monotonic.
         /// </summary>
         public const int HISTORY_ROLLING_PLAYS = 50;
@@ -40,7 +39,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         private readonly EzChartSkillStore chartStore;
         private readonly EzLocalProfileStore? profileStore;
 
-        public EzPlayerMinaAggregator(BeatmapManager beatmapManager, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore, EzLocalProfileStore? profileStore = null)
+        public EzMinaPlayerSkillAggregator(BeatmapManager beatmapManager, EzPlayerSkillStore skillStore, EzChartSkillStore chartStore, EzLocalProfileStore? profileStore = null)
         {
             this.beatmapManager = beatmapManager;
             this.skillStore = skillStore;
@@ -58,16 +57,16 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// </summary>
         public IReadOnlyCollection<string> MissingChartHashes { get; private set; } = Array.Empty<string>();
 
-        private readonly record struct TimedPlay(DateTimeOffset ScoredAt, EzMinaSkillAxisVector Vector);
+        private readonly record struct PlayAxisTimeline(DateTimeOffset ScoredAt, EzMinaSkillAxisData Vector);
 
-        private readonly record struct PatternPlay(double Overall, IReadOnlyList<string> Patterns);
+        private readonly record struct PatternTaggedPlay(double Overall, IReadOnlyList<string> PatternTags);
 
         /// <summary>
         /// One load of the per-play cache for a whole pass, so a multi-player run does not re-read (and re-parse the
         /// vectors of) the table once per player. Pass the result to <see cref="ComputeAndStore"/>.
         /// </summary>
         public IReadOnlyDictionary<Guid, EzMinaPlayCacheRow> LoadPlayCache()
-            => profileStore?.LoadSsrPlayCache() ?? new Dictionary<Guid, EzMinaPlayCacheRow>();
+            => profileStore?.LoadMinaPlayRatingCache() ?? new Dictionary<Guid, EzMinaPlayCacheRow>();
 
         /// <param name="plays">
         /// The player's mania plays as reduced rows (the row collector filters to mania). A play the per-play cache
@@ -87,15 +86,15 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
 
-            var byKey = new Dictionary<int, List<TimedPlay>>();
-            var patternPlaysByKey = new Dictionary<int, List<PatternPlay>>();
+            var byKey = new Dictionary<int, List<PlayAxisTimeline>>();
+            var patternPlaysByKey = new Dictionary<int, List<PatternTaggedPlay>>();
             var evidence = new List<EzAxisPlayEvidenceRow>();
             var missingCharts = new HashSet<string>(StringComparer.Ordinal);
             var patternsByHash = new Dictionary<string, string[]>(StringComparer.Ordinal);
 
-            // Per-play SunnySR cache: an already-rated play skips the MinaCalc engine (incremental backfill, not full recompute).
+            // Per-play rating cache: an already-rated play skips the MinaCalc engine (incremental backfill, not full recompute).
             // The caller can hand one in so a multi-player pass loads the table once instead of once per player.
-            var cachedPlays = loadedPlayCache ?? profileStore?.LoadSsrPlayCache() ?? new Dictionary<Guid, EzMinaPlayCacheRow>();
+            var cachedPlays = loadedPlayCache ?? profileStore?.LoadMinaPlayRatingCache() ?? new Dictionary<Guid, EzMinaPlayCacheRow>();
             var pendingCacheWrites = new List<EzMinaPlayCacheRow>();
 
             using var calc = new EzMinaEngine();
@@ -115,12 +114,12 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                                              && string.Equals(cachedPlay.BeatmapHash, play.BeatmapHash, StringComparison.Ordinal);
 
                         // A cached negative marks a play the engine deliberately produced nothing for; never retry it.
-                        if (hasCachedPlay && !cachedPlay.HasSsr)
+                        if (hasCachedPlay && !cachedPlay.HasPlayRating)
                             continue;
 
                         int keyCount;
                         float rate;
-                        EzMinaSkillAxisVector vector;
+                        EzMinaSkillAxisData vector;
 
                         if (hasCachedPlay)
                         {
@@ -150,7 +149,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                             double holdRatio = EzHoldMetrics.ComputeHoldRatio(playable);
                             double od = beatmapInfo.Difficulty.OverallDifficulty;
 
-                            float? goal = EzMinaRatingGoal.ForScore(score, holdRatio, od);
+                            float? goal = EzMinaStarRatingGoal.ForScore(score, holdRatio, od);
 
                             if (goal is not float goalValue)
                             {
@@ -168,13 +167,13 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
                             try
                             {
-                                vector = calc.CalculateRating(notes, keyCount, rate, goalValue);
+                                vector = calc.CalculatePlayerMinaSkillAxis(notes, keyCount, rate, goalValue);
                             }
                             catch (EzMinaEngineException e)
                             {
                                 // A chart the engine cannot rate (e.g. a chord wider than its column
-                                // limit) simply contributes no SunnySR; the engine rebuilds itself for the next play.
-                                Logger.Log($"[EzSkills] SunnySR compute failed for {play.BeatmapHash} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                                // limit) simply contributes no rating vector; the engine rebuilds itself for the next play.
+                                Logger.Log($"[EzSkills] per-play rating compute failed for {play.BeatmapHash} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                                 cacheNegative(play, username, keyCount, rate, pendingCacheWrites);
                                 continue;
                             }
@@ -215,22 +214,22 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 flushCache(pendingCacheWrites);
             }
 
-            foreach ((int keyCount, List<TimedPlay> timed) in byKey)
+            foreach ((int keyCount, List<PlayAxisTimeline> timed) in byKey)
             {
                 timed.Sort(static (a, b) => a.ScoredAt.CompareTo(b.ScoredAt));
 
                 var keymodeVectors = timed.Select(t => t.Vector).ToList();
-                var aggregated = EzMinaRatingAggregator.AggregateVectors(keymodeVectors);
-                bool provisional = keymodeVectors.Count < EzPlayerRatingSnapshot.QUALIFYING_PLAYS;
+                var aggregated = EzMinaPlayerSkillMath.AggregateVectors(keymodeVectors);
+                bool provisional = keymodeVectors.Count < EzMinaPlayerSkillSnapshot.QUALIFYING_PLAYS;
 
-                IReadOnlyList<PatternPlay> patternPlays = patternPlaysByKey.TryGetValue(keyCount, out var pp)
+                IReadOnlyList<PatternTaggedPlay> patternPlays = patternPlaysByKey.TryGetValue(keyCount, out var pp)
                     ? pp
-                    : Array.Empty<PatternPlay>();
+                    : Array.Empty<PatternTaggedPlay>();
 
-                var patternRatings = EzPatternRatings.AggregateModePatternRatings(
-                    patternPlays.Select(static p => (p.Overall, p.Patterns)));
+                var skillRatings = EzMinaPlayerSkillModeData.AggregateModeSkillRatings(
+                    patternPlays.Select(static p => (p.Overall, Patterns: p.PatternTags)));
 
-                // One transaction for the keymode: the SunnySR values, the replaced history curve and the pattern
+                // One transaction for the keymode: the aggregated rating skills, the replaced history curve and the pattern
                 // ratings. Issued separately they were three transactions per keymode per player.
                 skillStore.WritePlayerSkillBundle(
                     username,
@@ -239,7 +238,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                     keymodeVectors.Count,
                     provisional,
                     buildChronologicalHistorySamples(timed),
-                    patternRatings);
+                    skillRatings);
             }
 
             PendingEvidence = evidence;
@@ -305,7 +304,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             if (profileStore == null || pending.Count == 0)
                 return;
 
-            profileStore.UpsertSsrPlayCache(pending);
+            profileStore.UpsertMinaPlayRatingCache(pending);
             pending.Clear();
         }
 
@@ -314,23 +313,23 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             EzSkillPlayRow play,
             int keyCount,
             float rate,
-            EzMinaSkillAxisVector vector,
+            EzMinaSkillAxisData vector,
             string[] patterns,
-            Dictionary<int, List<TimedPlay>> byKey,
-            Dictionary<int, List<PatternPlay>> patternPlaysByKey,
+            Dictionary<int, List<PlayAxisTimeline>> byKey,
+            Dictionary<int, List<PatternTaggedPlay>> patternPlaysByKey,
             List<EzAxisPlayEvidenceRow> evidence)
         {
             if (!byKey.TryGetValue(keyCount, out var list))
-                byKey[keyCount] = list = new List<TimedPlay>();
+                byKey[keyCount] = list = new List<PlayAxisTimeline>();
 
-            list.Add(new TimedPlay(play.ScoredAt, vector));
+            list.Add(new PlayAxisTimeline(play.ScoredAt, vector));
 
             if (patterns.Length > 0)
             {
                 if (!patternPlaysByKey.TryGetValue(keyCount, out var patternList))
-                    patternPlaysByKey[keyCount] = patternList = new List<PatternPlay>();
+                    patternPlaysByKey[keyCount] = patternList = new List<PatternTaggedPlay>();
 
-                patternList.Add(new PatternPlay(vector.Overall, patterns));
+                patternList.Add(new PatternTaggedPlay(vector.Overall, patterns));
 
                 foreach (string patternId in patterns.Distinct(StringComparer.Ordinal))
                 {
@@ -341,7 +340,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                     {
                         Username = username,
                         KeyCount = keyCount,
-                        SkillId = EzPatternRatings.ToSkillId(patternId),
+                        SkillId = EzMinaPlayerSkillModeData.ToSkillId(patternId),
                         BeatmapHash = play.BeatmapHash,
                         AxisValue = vector.Overall,
                         Accuracy = play.Accuracy,
@@ -361,7 +360,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 {
                     Username = username,
                     KeyCount = keyCount,
-                    SkillId = axis.ToSsrSkillId(),
+                    SkillId = axis.ToMetaId(),
                     BeatmapHash = play.BeatmapHash,
                     AxisValue = axisValue,
                     Accuracy = play.Accuracy,
@@ -373,42 +372,42 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         }
 
         /// <summary>
-        /// Running AggregateSunnySRs over a rolling window of recent plays, timestamped with that play's
+        /// Running <see cref="EzMinaPlayerSkillMath.AggregateVectors"/> over a rolling window of recent plays, timestamped with that play's
         /// <see cref="ScoreInfo.Date"/>. Evenly samples up to <see cref="HISTORY_MAX_POINTS"/> points
         /// across the career (always includes first and last). Unlike a career-prefix Aggregate,
         /// values can fall when strong early plays leave the window.
         /// </summary>
-        public static IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> BuildChronologicalHistorySamples(
-            IReadOnlyList<(DateTimeOffset ScoredAt, EzMinaSkillAxisVector Vector)> orderedPlays,
+        public static IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisData Vector)> BuildChronologicalHistorySamples(
+            IReadOnlyList<(DateTimeOffset ScoredAt, EzMinaSkillAxisData Vector)> orderedPlays,
             int maxPoints = HISTORY_MAX_POINTS,
             int rollingPlays = HISTORY_ROLLING_PLAYS)
         {
             if (orderedPlays.Count == 0 || maxPoints < 1)
-                return Array.Empty<(DateTimeOffset, EzMinaSkillAxisVector)>();
+                return Array.Empty<(DateTimeOffset, EzMinaSkillAxisData)>();
 
             if (rollingPlays < 1)
                 rollingPlays = 1;
 
             var indices = SampleIndices(orderedPlays.Count, maxPoints);
-            var samples = new List<(DateTimeOffset, EzMinaSkillAxisVector)>(indices.Count);
+            var samples = new List<(DateTimeOffset, EzMinaSkillAxisData)>(indices.Count);
 
             foreach (int i in indices)
             {
                 int start = Math.Max(0, i - rollingPlays + 1);
                 int count = i - start + 1;
-                var window = new List<EzMinaSkillAxisVector>(count);
+                var window = new List<EzMinaSkillAxisData>(count);
 
                 for (int j = start; j <= i; j++)
                     window.Add(orderedPlays[j].Vector);
 
-                samples.Add((orderedPlays[i].ScoredAt, EzMinaRatingAggregator.AggregateVectors(window)));
+                samples.Add((orderedPlays[i].ScoredAt, EzMinaPlayerSkillMath.AggregateVectors(window)));
             }
 
             return samples;
         }
 
-        private static IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> buildChronologicalHistorySamples(
-            IReadOnlyList<TimedPlay> orderedPlays)
+        private static IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisData Vector)> buildChronologicalHistorySamples(
+            IReadOnlyList<PlayAxisTimeline> orderedPlays)
             => BuildChronologicalHistorySamples(
                 orderedPlays.Select(t => (t.ScoredAt, t.Vector)).ToList());
 
@@ -439,6 +438,6 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         }
 
         /// <summary>Accuracy-only clamp path (tests / callers without full score).</summary>
-        public static float AccuracyToGoal(double accuracy) => EzMinaRatingGoal.ForAccuracy(accuracy);
+        public static float AccuracyToGoal(double accuracy) => EzMinaStarRatingGoal.ForAccuracy(accuracy);
     }
 }

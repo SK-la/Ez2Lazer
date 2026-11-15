@@ -300,7 +300,7 @@ namespace osu.Game.EzOsuGame.Analysis
                         minaAxes = mina.Axes;
 
                         if (mina.Vector.Overall > 0)
-                            minaSr = EzMinaRatingScale.ToStarRating(mina.Vector.Overall);
+                            minaSr = EzMinaStarRatingScale.ToStarRating(mina.Vector.Overall);
                     }
                 }
 
@@ -719,7 +719,7 @@ namespace osu.Game.EzOsuGame.Analysis
             try
             {
                 var engine = EzMinaEnginePool.Rent();
-                var vector = engine.CalculateMsd(EzMinaNoteConverter.Convert(measured.Chart.Notes), keyCount, (float)rate);
+                var vector = engine.CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(measured.Chart.Notes), keyCount, (float)rate);
 
                 if (vector.Overall <= 0 && vector.Stream <= 0)
                     return null;
@@ -727,7 +727,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 var axes = new Dictionary<string, double>(StringComparer.Ordinal);
 
                 foreach (var (axis, value) in vector.Enumerate())
-                    axes[axis.ToId()] = value;
+                    axes[axis.ToMetaId()] = value;
 
                 return new MinaResult(axes, vector);
             }
@@ -738,7 +738,7 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>Bare-axis table plus the engine vector it came from.</summary>
-        internal readonly record struct MinaResult(IReadOnlyDictionary<string, double> Axes, EzMinaSkillAxisVector Vector);
+        internal readonly record struct MinaResult(IReadOnlyDictionary<string, double> Axes, EzMinaSkillAxisData Vector);
 
         /// <summary>
         /// PP+ chart vector for the current mods. Independent of the ruleset analysis provider: PP+ covers

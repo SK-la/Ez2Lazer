@@ -5,7 +5,7 @@ using System;
 
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
-    /// <summary>Abramowitz &amp; Stegun 7.1.26 (shared by SunnySR goal / AggregateSunnySRs).</summary>
+    /// <summary>Abramowitz &amp; Stegun 7.1.26 (shared by <see cref="EzMinaPlayerSkillMath"/>).</summary>
     internal static class EzAbramowitzErf
     {
         public static double Erf(double x)

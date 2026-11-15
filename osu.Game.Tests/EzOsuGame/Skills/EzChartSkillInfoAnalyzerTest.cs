@@ -129,7 +129,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void JackDemandRequiresFourKey()
         {
-            var verdict = EzFourKeyJackDemand.Classify(new EzFourKeyJackDemand.Input
+            var verdict = EzMinaFourKeyJackDemand.Classify(new EzMinaFourKeyJackDemand.Input
             {
                 KeyCount = 7,
                 ChordRatio = 1,
@@ -143,7 +143,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void JackDemandDenseAlternatingChords()
         {
-            var verdict = EzFourKeyJackDemand.Classify(new EzFourKeyJackDemand.Input
+            var verdict = EzMinaFourKeyJackDemand.Classify(new EzMinaFourKeyJackDemand.Input
             {
                 KeyCount = 4,
                 DurationMs = 60_000,

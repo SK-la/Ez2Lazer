@@ -84,7 +84,7 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
             // value is already a star and readers never scale it again.
             double overall = 27;
 
-            Assert.That(EzMinaRatingScale.ToStarRating(overall), Is.EqualTo(6));
+            Assert.That(EzMinaStarRatingScale.ToStarRating(overall), Is.EqualTo(6));
         }
 
         [Test]

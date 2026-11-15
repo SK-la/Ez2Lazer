@@ -23,8 +23,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             {
                 var store = new EzChartSkillStore(realm);
                 const string hash = "ppp-version-hash";
-                string aim = EzPPPSkillAxis.Aim.ToChartSkillId();
-                string speed = EzPPPSkillAxis.Speed.ToChartSkillId();
+                string aim = EzPPPSkillAxis.Aim.ToId();
+                string speed = EzPPPSkillAxis.Speed.ToId();
                 int staleBundle = EzPPPEngine.VERSION - 1;
 
                 store.WriteBeatmapSystemSkills(

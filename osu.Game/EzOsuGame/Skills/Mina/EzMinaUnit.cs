@@ -90,26 +90,26 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         /// Mirrors the engine's overall onto the chart's Mina star. The engine scale is converted here, at the write,
         /// so every reader of the stored rating sees a star.
         /// </summary>
-        private void writeRating(BeatmapInfo beatmapInfo, EzMinaSkillAxisVector vector)
+        private void writeRating(BeatmapInfo beatmapInfo, EzMinaSkillAxisData vector)
         {
             if (vector.Overall <= 0)
                 return;
 
-            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.Mina, EzMinaRatingScale.ToStarRating(vector.Overall));
+            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.Mina, EzMinaStarRatingScale.ToStarRating(vector.Overall));
         }
 
-        private static EzMinaSkillAxisVector? computeVector(
+        private static EzMinaSkillAxisData? computeVector(
             IBeatmap playable,
             BeatmapInfo beatmapInfo,
             int keyCount,
-            Action<EzMinaSkillAxisVector> onSettledMiss)
+            Action<EzMinaSkillAxisData> onSettledMiss)
         {
             var calc = EzMinaEnginePool.Rent();
-            EzMinaSkillAxisVector vector;
+            EzMinaSkillAxisData vector;
 
             try
             {
-                vector = calc.CalculateMsd(EzMinaNoteConverter.Convert(playable), keyCount, rate: 1f);
+                vector = calc.CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(playable), keyCount, rate: 1f);
             }
             catch (Exception e)
             {
@@ -129,12 +129,12 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             return vector;
         }
 
-        private static Dictionary<string, double> toDictionary(EzMinaSkillAxisVector vector)
+        private static Dictionary<string, double> toDictionary(EzMinaSkillAxisData vector)
         {
             var result = new Dictionary<string, double>(StringComparer.Ordinal);
 
             foreach (var (axis, value) in vector.Enumerate())
-                result[axis.ToMsdSkillId()] = value;
+                result[axis.ToMetaId()] = value;
 
             return result;
         }
@@ -150,7 +150,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
             foreach (var axis in EzMinaSkillAxisExtensions.All)
             {
-                if (!existing.ContainsKey(axis.ToId()))
+                if (!existing.ContainsKey(axis.ToMetaId()))
                     return false;
             }
 

@@ -16,7 +16,6 @@ using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.Pattern;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets.Mods;
 
@@ -24,7 +23,7 @@ namespace osu.Game.EzOsuGame.Skills
 {
     /// <summary>
     /// Unified read API for skill metrics (song select, local profile Track, …).
-    /// Covers beatmap Mina, player SunnySR, player dan estimates, chart skill info, and chart-dan verdicts.
+    /// Covers beatmap Mina/SSR chart metrics, player Mina rating skills, player dan estimates, chart skill info, and chart-dan verdicts.
     /// Writers (computers / aggregators) are separate DI services and are not read here.
     /// All UI surfaces (HUD DualPanel / Radar, Analysis Wedge, LocalProfile Track, display tags) read through this type.
     /// </summary>
@@ -65,12 +64,12 @@ namespace osu.Game.EzOsuGame.Skills
             = new ConcurrentDictionary<string, EzPersistedChartDan>(StringComparer.Ordinal);
 
         /// <summary>
-        /// Short-lived player SunnySR memo (see <see cref="GetPlayerSsrSnapshot"/>). Keyed by (username, keyCount).
+        /// Short-lived player rating snapshot memo (see <see cref="GetPlayerRatingSnapshot"/>). Keyed by (username, keyCount).
         /// </summary>
-        private readonly ConcurrentDictionary<(string Username, int KeyCount), SsrSnapshotMemo> ssrSnapshotMemo
-            = new ConcurrentDictionary<(string Username, int KeyCount), SsrSnapshotMemo>();
+        private readonly ConcurrentDictionary<(string Username, int KeyCount), PlayerRatingMemo> playerRatingSnapshotMemo
+            = new ConcurrentDictionary<(string Username, int KeyCount), PlayerRatingMemo>();
 
-        private readonly record struct SsrSnapshotMemo(EzPlayerRatingSnapshot Snapshot, long Timestamp);
+        private readonly record struct PlayerRatingMemo(EzMinaPlayerSkillSnapshot Rating, long Timestamp);
 
         /// <summary>Short-lived dan label/rating memo (see <see cref="GetDanDisplay"/>); plain values only.</summary>
         private readonly ConcurrentDictionary<(string Username, int KeyCount, string Side), DanDisplayMemo> danDisplayMemo
@@ -418,50 +417,48 @@ namespace osu.Game.EzOsuGame.Skills
         public bool TryGetBeatmapMsdSkill(string beatmapHash, string axisId, out double value)
         {
             string skillId = EzMinaSkillAxisExtensions.TryParse(axisId, out var axis)
-                ? axis.ToMsdSkillId()
+                ? axis.ToMetaId()
                 : axisId;
             return ChartStore.TryGetBeatmapSkill(beatmapHash, skillId, out value);
         }
 
-        public IReadOnlyDictionary<string, double> GetPlayerSsr(string username, int keyCount) => GetPlayerSsrSnapshot(username, keyCount).Values;
-
         /// <summary>
-        /// Player SunnySR snapshot with a short-lived memo. Song select re-reads this several times per switch
+        /// Player Mina rating skills (<c>player_skill_value</c> / Mina system) with a short-lived memo. Song select re-reads this several times per switch
         /// (once per bindable-driven DualPanel/radar refresh); the TTL collapses those into one Realm read.
         /// Mirrors the other session caches here — a fresh compute becomes visible within the TTL at worst.
         /// </summary>
-        public EzPlayerRatingSnapshot GetPlayerSsrSnapshot(string username, int keyCount)
+        public EzMinaPlayerSkillSnapshot GetPlayerRatingSnapshot(string username, int keyCount)
         {
             var key = (username, keyCount);
 
-            if (ssrSnapshotMemo.TryGetValue(key, out var memo))
+            if (playerRatingSnapshotMemo.TryGetValue(key, out var memo))
             {
                 if (Stopwatch.GetElapsedTime(memo.Timestamp).TotalSeconds < display_memo_seconds)
-                    return memo.Snapshot;
+                    return memo.Rating;
 
                 // An expired entry is dropped rather than overwritten in place: nothing else ever revisits it.
-                ssrSnapshotMemo.TryRemove(key, out _);
+                playerRatingSnapshotMemo.TryRemove(key, out _);
             }
 
-            var snapshot = loadPlayerSsrSnapshot(username, keyCount);
-            storeBounded(ssrSnapshotMemo, key, new SsrSnapshotMemo(snapshot, Stopwatch.GetTimestamp()));
+            var snapshot = loadPlayerRatingSnapshot(username, keyCount);
+            storeBounded(playerRatingSnapshotMemo, key, new PlayerRatingMemo(snapshot, Stopwatch.GetTimestamp()));
             return snapshot;
         }
 
-        private EzPlayerRatingSnapshot loadPlayerSsrSnapshot(string username, int keyCount)
+        private EzMinaPlayerSkillSnapshot loadPlayerRatingSnapshot(string username, int keyCount)
         {
-            var snapshot = PlayerStore.GetPlayerSsrSnapshot(username, keyCount);
+            var snapshot = PlayerStore.GetPlayerMinaSkillAxisSnapshot(username, keyCount);
             if (snapshot.Values.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return snapshot;
 
-            return PlayerStore.GetPlayerSsrSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
+            return PlayerStore.GetPlayerMinaSkillAxisSnapshot(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
         }
 
-        /// <summary>Drop the SunnySR snapshot memo (after a recompute / write).</summary>
-        public void InvalidatePlayerSsrSnapshot() => ssrSnapshotMemo.Clear();
+        /// <summary>Drop the player rating snapshot memo (after a recompute / write).</summary>
+        public void InvalidatePlayerRatingSnapshot() => playerRatingSnapshotMemo.Clear();
 
         /// <summary>
-        /// Maintenance of the player-side skill rows (SunnySR / pattern / history / Dan) - the writes and identity reads the
+        /// Maintenance of the player-side skill rows (Mina rating / pattern / history / Dan) - the writes and identity reads the
         /// archive owns, as opposed to the metric reads the rest of this provider serves. Every write here drops the
         /// memos that would otherwise keep serving the rows it just changed, which is why callers go through this and
         /// not straight to the store.
@@ -497,7 +494,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 int changed = provider.PlayerStore.SetPlayerSkillStale(username, stale);
 
-                provider.InvalidatePlayerSsrSnapshot();
+                provider.InvalidatePlayerRatingSnapshot();
 
                 return changed;
             }
@@ -515,37 +512,37 @@ namespace osu.Game.EzOsuGame.Skills
 
                 int removed = provider.PlayerStore.DeletePlayerSkillData(username);
 
-                provider.InvalidatePlayerSsrSnapshot();
+                provider.InvalidatePlayerRatingSnapshot();
                 provider.InvalidateDanDisplay();
 
                 return removed;
             }
         }
 
-        public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount)
+        public IReadOnlyList<EzMinaPlayerSkillTagPlayData> GetPlayerSkillRatings(string username, int keyCount)
         {
-            var ratings = PlayerStore.GetPlayerPatternRatings(username, keyCount);
+            var ratings = PlayerStore.GetPlayerSkillRatings(username, keyCount);
             if (ratings.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return ratings;
 
-            return PlayerStore.GetPlayerPatternRatings(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
+            return PlayerStore.GetPlayerSkillRatings(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME, keyCount);
         }
 
         /// <summary>Hub <c>skillModeEntries</c> for LocalProfile Track / Skills HUD.</summary>
-        public IReadOnlyList<EzSkillModeEntry> GetSkillModeEntries(string username, int keyCount)
+        public IReadOnlyList<EzMinaPlayerSkillModeEntry> GetSkillModeEntries(string username, int keyCount)
         {
-            var snapshot = GetPlayerSsrSnapshot(username, keyCount);
-            var patterns = GetPlayerPatternRatings(username, keyCount);
-            return EzPatternRatings.SkillModeEntries(keyCount, snapshot.Values, patterns);
+            var snapshot = GetPlayerRatingSnapshot(username, keyCount);
+            var patterns = GetPlayerSkillRatings(username, keyCount);
+            return EzMinaPlayerSkillModeData.SkillModeEntries(keyCount, snapshot.Values, patterns);
         }
 
-        public IReadOnlyList<int> GetPlayerSsrKeyCounts(string username)
+        public IReadOnlyList<int> GetPlayerRatingKeyCounts(string username)
         {
-            var keys = PlayerStore.GetPlayerSsrKeyCounts(username);
+            var keys = PlayerStore.GetPlayerRatingKeyCounts(username);
             if (keys.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
                 return keys;
 
-            return PlayerStore.GetPlayerSsrKeyCounts(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
+            return PlayerStore.GetPlayerRatingKeyCounts(EzLocalProfileConstants.LEGACY_UNKNOWN_USERNAME);
         }
 
         /// <summary>
@@ -583,7 +580,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>
         /// Dan label + rating for DualPanel display, with a short-lived snapshot memo. The Realm row itself must
         /// not outlive its transaction, so only the two plain values the caller renders are cached. Same TTL as
-        /// the SunnySR memo — a switch only needs to read this once instead of once per bindable-driven refresh.
+        /// the player rating snapshot memo — a switch only needs to read this once instead of once per bindable-driven refresh.
         /// </summary>
         public (string Label, double RawDan) GetDanDisplay(string username, int keyCount, string side)
         {
@@ -671,7 +668,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         /// <summary>
         /// Recompute and persist skillset caches for a user after dan clears are replaced.
-        /// Prefetches play SunnySR (axis evidence = hub <c>play.values</c>) and ChartSkillInfo for clear hashes.
+        /// Prefetches per-clear rating axis evidence (hub <c>play.values</c>) and ChartSkillInfo for clear hashes.
         /// Missing ChartSkillInfo is computed (hub load + heal), not left permanently null.
         /// Empty verdicts leave a miss (no empty sentinel write).
         /// </summary>
@@ -1275,7 +1272,7 @@ namespace osu.Game.EzOsuGame.Skills
                 algorithmVersion);
         }
 
-        /// <summary>SunnySR axis play evidence (sqlite). Empty when local-profile store unset.</summary>
+        /// <summary>Per-play Mina rating axis evidence (sqlite). Empty when local-profile store unset.</summary>
         public IReadOnlyList<EzAxisPlayEvidenceRow> GetAxisPlays(string username, int? keyCount = null, string? skillId = null, int? algorithmVersion = null)
         {
             var rows = localProfileStore?.GetAxisPlays(username, keyCount, skillId, algorithmVersion) ?? [];

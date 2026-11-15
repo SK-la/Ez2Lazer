@@ -165,7 +165,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 seedChart(realm, hash);
                 stampWholeChain(store);
 
-                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
                 store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 realm.Write(r =>
@@ -239,17 +239,17 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 var msd = new Dictionary<string, double>
                 {
-                    [EzMinaSkillAxis.Overall.ToMsdSkillId()] = 20,
-                    [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 18,
-                    [EzMinaSkillAxis.Jumpstream.ToMsdSkillId()] = 16,
-                    [EzMinaSkillAxis.Handstream.ToMsdSkillId()] = 14,
-                    [EzMinaSkillAxis.Stamina.ToMsdSkillId()] = 12,
-                    [EzMinaSkillAxis.JackSpeed.ToMsdSkillId()] = 10,
-                    [EzMinaSkillAxis.Chordjack.ToMsdSkillId()] = 8,
-                    [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 6,
+                    [EzMinaSkillAxis.Overall.ToMetaId()] = 20,
+                    [EzMinaSkillAxis.Stream.ToMetaId()] = 18,
+                    [EzMinaSkillAxis.Jumpstream.ToMetaId()] = 16,
+                    [EzMinaSkillAxis.Handstream.ToMetaId()] = 14,
+                    [EzMinaSkillAxis.Stamina.ToMetaId()] = 12,
+                    [EzMinaSkillAxis.JackSpeed.ToMetaId()] = 10,
+                    [EzMinaSkillAxis.Chordjack.ToMetaId()] = 8,
+                    [EzMinaSkillAxis.Technical.ToMetaId()] = 6,
                 };
 
-                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
 
                 var computed = EzPersistedChartDan.TryComputeFromStored(
                     hash,
@@ -307,7 +307,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Assert.That(EzMinaUnit.IsCurrentMinaCache(skills), Is.False);
 
                 // Successful Mina write replaces the marker.
-                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
                 Assert.That(store.CollectChartChainState().CompleteMsd, Does.Contain(hash));
                 Assert.That(store.GetBeatmapSystemState(hash, EzAnalysisSystem.Mina), Is.EqualTo(EzSkillRowState.Current));
             });
@@ -328,7 +328,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 // 5K: not a 4/6/7K interval table, and no SunnyStarRating to borrow one from.
                 seedChart(realm, hash, circleSize: 5);
-                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
 
                 var chain = store.CollectChartChainState();
 
@@ -355,7 +355,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 const string hash = "chart-dan-upstream";
 
                 seedChart(realm, hash);
-                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisVector(20, 18, 16, 14, 12, 10, 8, 6));
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
                 store.UpsertChartDan(new EzPersistedChartDan
                 {
                     BeatmapHash = hash,

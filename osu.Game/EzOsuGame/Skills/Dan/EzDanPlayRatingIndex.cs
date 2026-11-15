@@ -9,8 +9,8 @@ using osu.Game.EzOsuGame.Skills.Mina;
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
     /// <summary>
-    /// Hub <c>play.values</c> lookup for dan skillset filing: rebuild Mina SunnySR vectors from
-    /// <see cref="EzAxisPlayEvidenceRow"/> (written by <see cref="EzPlayerMinaAggregator"/>).
+    /// Hub <c>play.values</c> lookup for dan skillset filing: rebuild Mina per-play rating vectors from
+    /// <see cref="EzAxisPlayEvidenceRow"/> (written by <see cref="EzMinaPlayerSkillAggregator"/>).
     /// </summary>
     public sealed class EzDanPlayRatingIndex
     {
@@ -36,7 +36,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 if (row.SkillId.StartsWith(EzAnalysisSystem.Pattern + ".", StringComparison.Ordinal))
                     continue;
 
+                // Legacy prefixed ids; current writes use bare axis ids (see ToMetaId).
                 if (!row.SkillId.StartsWith(EzAnalysisSystem.SSR + ".", StringComparison.Ordinal)
+                    && !row.SkillId.StartsWith("player_ssr.", StringComparison.Ordinal)
                     && !EzMinaSkillAxisExtensions.TryParse(row.SkillId, out _))
                     continue;
 
@@ -80,7 +82,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             return new EzDanPlayRatingIndex(list);
         }
 
-        /// <summary>Hub: the rated play's SunnySR vector for this clear; null when no matching axis evidence.</summary>
+        /// <summary>Hub: the rated play's <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> vector for this clear; null when no matching axis evidence.</summary>
         public IReadOnlyDictionary<string, double>? Resolve(EzDanClearEvidenceRow clear)
         {
             if (string.IsNullOrEmpty(clear.BeatmapHash) || plays.Count == 0)

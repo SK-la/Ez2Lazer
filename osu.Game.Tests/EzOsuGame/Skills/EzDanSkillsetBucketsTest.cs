@@ -77,8 +77,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var msd = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 18,
-                [EzMinaSkillAxis.Technical.ToMsdSkillId()] = 10,
+                [EzMinaSkillAxis.Stream.ToMetaId()] = 18,
+                [EzMinaSkillAxis.Technical.ToMetaId()] = 10,
             };
 
             var buckets = EzDanSkillsetFiling.BucketsForValues(4, EzDanSide.Rc, msd, lengthSeconds: 60, rate: 1, chart: null);

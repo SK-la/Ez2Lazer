@@ -429,7 +429,7 @@ namespace osu.Game.EzOsuGame.HUD
                                          : KeyCount.Value;
 
                                      double overall = result.AxesOf(EzAnalysisSystem.Mina)
-                                                            .GetValueOrDefault(EzMinaSkillAxis.Overall.ToId(), 0);
+                                                            .GetValueOrDefault(EzMinaSkillAxis.Overall.ToMetaId(), 0);
 
                                      applyLive(result.Dan, overall, liveKeys);
                                  });
@@ -472,7 +472,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             if (wantPlayer && hasUser && skillProvider != null)
             {
-                double overall = skillProvider.GetPlayerSsrSnapshot(user!, keys).Overall;
+                double overall = skillProvider.GetPlayerRatingSnapshot(user!, keys).Overall;
                 if (overall > 0 && double.IsFinite(overall))
                     playerOverall = overall;
             }

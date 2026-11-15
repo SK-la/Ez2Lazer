@@ -37,13 +37,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         [Test]
         public void JackDemandClusterDominantArmFiresWithJacksShare()
         {
-            var clusters = new List<EzFourKeyJackDemand.Cluster>
+            var clusters = new List<EzMinaFourKeyJackDemand.Cluster>
             {
-                new EzFourKeyJackDemand.Cluster { Pattern = "Jacks", Bpm = 160, Importance = 90, Label = "Jacks" },
-                new EzFourKeyJackDemand.Cluster { Pattern = "Chordstream", Bpm = 200, Importance = 10, Label = "Chordstream" },
+                new EzMinaFourKeyJackDemand.Cluster { Pattern = "Jacks", Bpm = 160, Importance = 90, Label = "Jacks" },
+                new EzMinaFourKeyJackDemand.Cluster { Pattern = "Chordstream", Bpm = 200, Importance = 10, Label = "Chordstream" },
             };
 
-            var verdict = EzFourKeyJackDemand.Classify(new EzFourKeyJackDemand.Input
+            var verdict = EzMinaFourKeyJackDemand.Classify(new EzMinaFourKeyJackDemand.Input
             {
                 KeyCount = 4,
                 DurationMs = 90_000,

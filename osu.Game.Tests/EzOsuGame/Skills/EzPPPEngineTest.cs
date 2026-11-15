@@ -39,18 +39,18 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var skills = new EzPPPEngine().CalculateChart(beatmap, Array.Empty<Mod>());
 
-            double aim = skills[EzPPPSkillAxis.Aim.ToChartSkillId()];
-            double jump = skills[EzPPPSkillAxis.JumpAim.ToChartSkillId()];
-            double flow = skills[EzPPPSkillAxis.FlowAim.ToChartSkillId()];
-            double speed = skills[EzPPPSkillAxis.Speed.ToChartSkillId()];
-            double stamina = skills[EzPPPSkillAxis.Stamina.ToChartSkillId()];
-            double star = skills[EzPPPSkillAxis.StarRating.ToChartSkillId()];
+            double aim = skills[EzPPPSkillAxis.Aim.ToId()];
+            double jump = skills[EzPPPSkillAxis.JumpAim.ToId()];
+            double flow = skills[EzPPPSkillAxis.FlowAim.ToId()];
+            double speed = skills[EzPPPSkillAxis.Speed.ToId()];
+            double stamina = skills[EzPPPSkillAxis.Stamina.ToId()];
+            double star = skills[EzPPPSkillAxis.StarRating.ToId()];
             double expected = 1.6 * Math.Pow(Math.Pow(aim, 3) + Math.Pow(Math.Max(speed, stamina), 3), 1.0 / 3.0);
 
             Assert.That(isCompleteChart(0, skills), Is.True);
             Assert.That(jump, Is.GreaterThan(0.01));
             Assert.That(jump, Is.GreaterThan(flow));
-            Assert.That(skills[EzPPPSkillAxis.Accuracy.ToChartSkillId()], Is.GreaterThanOrEqualTo(1));
+            Assert.That(skills[EzPPPSkillAxis.Accuracy.ToId()], Is.GreaterThanOrEqualTo(1));
             Assert.That(star, Is.EqualTo(expected).Within(1e-6));
         }
 
@@ -72,10 +72,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var skills = new EzPPPEngine().CalculateChart(beatmap, Array.Empty<Mod>());
 
-            Assert.That(skills.ContainsKey(EzPPPSkillAxis.RawAim.ToChartSkillId()), Is.True);
-            Assert.That(skills[EzPPPSkillAxis.RawAim.ToChartSkillId()], Is.GreaterThan(0));
-            Assert.That(skills[EzPPPSkillAxis.Precision.ToChartSkillId()], Is.GreaterThanOrEqualTo(0));
-            Assert.That(skills[EzPPPSkillAxis.Aim.ToChartSkillId()], Is.GreaterThanOrEqualTo(skills[EzPPPSkillAxis.JumpAim.ToChartSkillId()]));
+            Assert.That(skills.ContainsKey(EzPPPSkillAxis.RawAim.ToId()), Is.True);
+            Assert.That(skills[EzPPPSkillAxis.RawAim.ToId()], Is.GreaterThan(0));
+            Assert.That(skills[EzPPPSkillAxis.Precision.ToId()], Is.GreaterThanOrEqualTo(0));
+            Assert.That(skills[EzPPPSkillAxis.Aim.ToId()], Is.GreaterThanOrEqualTo(skills[EzPPPSkillAxis.JumpAim.ToId()]));
         }
 
         [Test]
@@ -169,8 +169,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var chart = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzPPPSkillAxis.Speed.ToChartSkillId()] = 4,
-                [EzPPPSkillAxis.Accuracy.ToChartSkillId()] = 2,
+                [EzPPPSkillAxis.Speed.ToId()] = 4,
+                [EzPPPSkillAxis.Accuracy.ToId()] = 2,
             };
 
             var score = new ScoreInfo

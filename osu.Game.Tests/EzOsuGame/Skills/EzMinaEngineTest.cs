@@ -41,7 +41,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             Assert.That(engine.SupportsKeyCount(keyCount), Is.True);
 
-            var msd = engine.CalculateMsd(createStreamNotes(keyCount), keyCount);
+            var msd = engine.CalculateChartMinaSkillAxis(createStreamNotes(keyCount), keyCount);
 
             Assert.That(msd.Overall, Is.GreaterThan(0), $"{keyCount}K produced a zero Mina vector.");
             Assert.That(msd.Stream, Is.GreaterThan(0), $"{keyCount}K produced a zero Stream axis.");
@@ -58,8 +58,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             Assert.That(engine.SupportsKeyCount(keyCount), Is.False);
             Assert.That(EzMinaEngine.IsSupportedKeyCount(keyCount), Is.False);
-            Assert.That(engine.CalculateMsd(createStreamNotes(4), keyCount).Overall, Is.EqualTo(0));
-            Assert.That(engine.CalculateRating(createStreamNotes(4), keyCount, 1f, 0.97f).Overall, Is.EqualTo(0));
+            Assert.That(engine.CalculateChartMinaSkillAxis(createStreamNotes(4), keyCount).Overall, Is.EqualTo(0));
+            Assert.That(engine.CalculatePlayerMinaSkillAxis(createStreamNotes(4), keyCount, 1f, 0.97f).Overall, Is.EqualTo(0));
         }
 
         [Test]
@@ -67,12 +67,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             using var engine = new EzMinaEngine();
 
-            Assert.That(engine.CalculateMsd(Array.Empty<EzCalcNote>(), 4).Overall, Is.EqualTo(0));
-            Assert.That(engine.CalculateMsd(new[] { new EzCalcNote(1u, 0f) }, 4).Overall, Is.EqualTo(0));
+            Assert.That(engine.CalculateChartMinaSkillAxis(Array.Empty<EzCalcNote>(), 4).Overall, Is.EqualTo(0));
+            Assert.That(engine.CalculateChartMinaSkillAxis(new[] { new EzCalcNote(1u, 0f) }, 4).Overall, Is.EqualTo(0));
 
             // Exactly at the minimum row count is still rateable.
             var atMinimum = createStreamNotes(4, rows: EzMinaEngine.MIN_RATEABLE_ROWS);
-            Assert.That(engine.CalculateMsd(atMinimum, 4).Overall, Is.GreaterThan(0));
+            Assert.That(engine.CalculateChartMinaSkillAxis(atMinimum, 4).Overall, Is.GreaterThan(0));
         }
 
         [Test]
@@ -81,8 +81,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var notes = createStreamNotes(4);
 
             using var engine = new EzMinaEngine();
-            var msd = engine.CalculateMsd(notes, 4);
-            var ssr = engine.CalculateRating(notes, 4, 1f, 0.99f);
+            var msd = engine.CalculateChartMinaSkillAxis(notes, 4);
+            var ssr = engine.CalculatePlayerMinaSkillAxis(notes, 4, 1f, 0.99f);
 
             Assert.That(msd.Overall, Is.GreaterThan(0));
             Assert.That(ssr.Overall, Is.GreaterThan(msd.Overall));
@@ -95,11 +95,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             using var engine = new EzMinaEngine();
 
-            var atMax = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MAX_SunnySR_GOAL);
-            var atMin = engine.CalculateRating(notes, 4, 1f, EzMinaEngine.MIN_SunnySR_GOAL);
+            var atMax = engine.CalculatePlayerMinaSkillAxis(notes, 4, 1f, EzMinaEngine.MAX_RATING_GOAL);
+            var atMin = engine.CalculatePlayerMinaSkillAxis(notes, 4, 1f, EzMinaEngine.MIN_RATING_GOAL);
 
-            Assert.That(engine.CalculateRating(notes, 4, 1f, 4f).Overall, Is.EqualTo(atMax.Overall).Within(1e-4));
-            Assert.That(engine.CalculateRating(notes, 4, 1f, 0.1f).Overall, Is.EqualTo(atMin.Overall).Within(1e-4));
+            Assert.That(engine.CalculatePlayerMinaSkillAxis(notes, 4, 1f, 4f).Overall, Is.EqualTo(atMax.Overall).Within(1e-4));
+            Assert.That(engine.CalculatePlayerMinaSkillAxis(notes, 4, 1f, 0.1f).Overall, Is.EqualTo(atMin.Overall).Within(1e-4));
         }
 
         [Test]
@@ -108,8 +108,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var notes = createStreamNotes(4);
 
             using var engine = new EzMinaEngine();
-            var normal = engine.CalculateMsd(notes, 4, 1f);
-            var fast = engine.CalculateMsd(notes, 4, 1.3f);
+            var normal = engine.CalculateChartMinaSkillAxis(notes, 4, 1f);
+            var fast = engine.CalculateChartMinaSkillAxis(notes, 4, 1.3f);
 
             Assert.That(normal.Overall, Is.GreaterThan(0));
             Assert.That(fast.Overall, Is.GreaterThan(normal.Overall));
@@ -121,8 +121,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var notes = createStreamNotes(6);
 
             using var engine = new EzMinaEngine();
-            var first = engine.CalculateMsd(notes, 6);
-            var second = engine.CalculateMsd(notes, 6);
+            var first = engine.CalculateChartMinaSkillAxis(notes, 6);
+            var second = engine.CalculateChartMinaSkillAxis(notes, 6);
 
             Assert.That(first.Overall, Is.GreaterThan(0));
             Assert.That(second.Overall, Is.EqualTo(first.Overall).Within(1e-4));
@@ -138,7 +138,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var notes = createStreamNotes(4, rows: 64, rowSeconds: 0.05f);
 
             using var engine = new EzMinaEngine();
-            var msd = engine.CalculateMsd(notes, 4);
+            var msd = engine.CalculateChartMinaSkillAxis(notes, 4);
 
             Assert.That(msd.Overall, Is.EqualTo(13.2229395).Within(0.25));
             Assert.That(msd.Stream, Is.EqualTo(12.41642).Within(0.25));
@@ -150,7 +150,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             using var engine = new EzMinaEngine();
 
-            var msd = engine.CalculateMsd(createChordNotes(rows: 8, width: 16), 18);
+            var msd = engine.CalculateChartMinaSkillAxis(createChordNotes(rows: 8, width: 16), 18);
 
             Assert.That(msd.Overall, Is.GreaterThan(0));
         }
@@ -162,9 +162,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             // discard that instance instead of staying poisoned for every later chart.
             var engine = new EzMinaEngine();
 
-            Assert.Throws<EzMinaEngineException>(() => engine.CalculateMsd(createChordNotes(rows: 8, width: 17), 18));
+            Assert.Throws<EzMinaEngineException>(() => engine.CalculateChartMinaSkillAxis(createChordNotes(rows: 8, width: 17), 18));
 
-            var msd = engine.CalculateMsd(createStreamNotes(18), 18);
+            var msd = engine.CalculateChartMinaSkillAxis(createStreamNotes(18), 18);
 
             Assert.That(msd.Overall, Is.GreaterThan(0), "engine did not recover after a trapped compute.");
         }
@@ -175,7 +175,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var engine = new EzMinaEngine();
             engine.Dispose();
 
-            Assert.Throws<ObjectDisposedException>(() => engine.CalculateMsd(createStreamNotes(4), 4));
+            Assert.Throws<ObjectDisposedException>(() => engine.CalculateChartMinaSkillAxis(createStreamNotes(4), 4));
         }
 
         /// <summary>One note per row, rotating columns — a plain stream.</summary>
@@ -205,18 +205,18 @@ namespace osu.Game.Tests.EzOsuGame.Skills
     }
 
     [TestFixture]
-    public class EzMinaRatingAggregatorTest
+    public class EzMinaPlayerSkillMathTest
     {
         [Test]
         public void Aggregate_empty_returns_zero()
         {
-            Assert.That(EzMinaRatingAggregator.Aggregate(Array.Empty<double>()), Is.EqualTo(0));
+            Assert.That(EzMinaPlayerSkillMath.Aggregate(Array.Empty<double>()), Is.EqualTo(0));
         }
 
         [Test]
         public void Aggregate_single_value_near_input()
         {
-            double rating = EzMinaRatingAggregator.Aggregate(new[] { 20.0 });
+            double rating = EzMinaPlayerSkillMath.Aggregate(new[] { 20.0 });
             Assert.That(rating, Is.GreaterThan(10));
             Assert.That(rating, Is.LessThan(25));
             // Etterna AggregateSunnySRs with a single sample sits slightly below the raw SunnySR after scaler/rounding.
@@ -228,11 +228,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var plays = new[]
             {
-                new EzMinaSkillAxisVector(10, 9, 8, 7, 6, 5, 4, 3),
-                new EzMinaSkillAxisVector(12, 11, 10, 9, 8, 7, 6, 5),
+                new EzMinaSkillAxisData(10, 9, 8, 7, 6, 5, 4, 3),
+                new EzMinaSkillAxisData(12, 11, 10, 9, 8, 7, 6, 5),
             };
 
-            var result = EzMinaRatingAggregator.AggregateVectors(plays);
+            var result = EzMinaPlayerSkillMath.AggregateVectors(plays);
             Assert.That(result.Overall, Is.GreaterThan(0));
             Assert.That(result.Stream, Is.GreaterThan(0));
             Assert.That(result.Technical, Is.GreaterThan(0));
@@ -296,7 +296,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(rows.Min(r => r.RowTime), Is.GreaterThanOrEqualTo(0));
 
             using var engine = new EzMinaEngine();
-            Assert.That(engine.CalculateMsd(rows, 4).Overall, Is.GreaterThan(0));
+            Assert.That(engine.CalculateChartMinaSkillAxis(rows, 4).Overall, Is.GreaterThan(0));
         }
 
         [Test]

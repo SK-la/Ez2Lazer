@@ -116,9 +116,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             var axes = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzMinaSkillAxis.Overall.ToMsdSkillId()] = 20,
-                [EzMinaSkillAxis.Stream.ToMsdSkillId()] = 18,
-                [EzMinaSkillAxis.JackSpeed.ToMsdSkillId()] = 16,
+                [EzMinaSkillAxis.Overall.ToMetaId()] = 20,
+                [EzMinaSkillAxis.Stream.ToMetaId()] = 18,
+                [EzMinaSkillAxis.JackSpeed.ToMetaId()] = 16,
             };
 
             return axes;
@@ -128,9 +128,9 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         {
             var axes = new Dictionary<string, double>(StringComparer.Ordinal)
             {
-                [EzMinaSkillAxis.Overall.ToId()] = 20,
-                [EzMinaSkillAxis.Stream.ToId()] = 18,
-                [EzMinaSkillAxis.JackSpeed.ToId()] = 16,
+                [EzMinaSkillAxis.Overall.ToMetaId()] = 20,
+                [EzMinaSkillAxis.Stream.ToMetaId()] = 18,
+                [EzMinaSkillAxis.JackSpeed.ToMetaId()] = 16,
             };
 
             var table = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>

@@ -88,6 +88,6 @@ Use the following rule of thumb:
 ## Suggested first implementation target
 
 1. Introduce a shared skill-engine interface.
-2. Route `EzBeatmapMsdComputer`, `EzChartDanEstimator`, and `EzPlayerSsrAggregator` through it.
+2. Route `EzBeatmapMsdComputer`, `EzChartDanEstimator`, and `EzPlayerMinaAggregator` through it.
 3. Add tests proving the routing works before changing the heavy compute logic.
 

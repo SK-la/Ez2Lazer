@@ -193,7 +193,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The axis the Mina engine's headline sits on. Only Mina has one: every other system's star is a scalar
         /// read through <see cref="EzAnalysisResult.RatingOf"/>.
         /// </summary>
-        public static string RatingAxisOf(EzAnalysisSystem system) => EzMinaSkillAxis.Overall.ToId();
+        public static string RatingAxisOf(EzAnalysisSystem system) => EzMinaSkillAxis.Overall.ToMetaId();
 
         /// <summary>Whether the readout's star is the official rating, which the official pill already shows.</summary>
         public static bool IsOfficial(EzReadout readout) => readout.Rating == EzAnalysisSystem.Official;
@@ -231,7 +231,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         /// <summary>The live chart-skill axis as the pill prints it: Mina measures in Etterna units.</summary>
         private static double liveSkillStar(EzAnalysisSystem system, double value)
-            => system == EzAnalysisSystem.Mina ? EzMinaRatingScale.ToStarRating(value) : value;
+            => system == EzAnalysisSystem.Mina ? EzMinaStarRatingScale.ToStarRating(value) : value;
     }
 
     /// <summary>

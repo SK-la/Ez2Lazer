@@ -22,9 +22,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
         ScoreRank Rank);
 
     /// <summary>
-    /// Per-play SunnySR cache entry in <c>ez-local-profile.sqlite</c>. Mirrors the official star cache:
-    /// a play already rated with the current algorithm is reused so a recompute only fills in missing plays.
-    /// <see cref="HasSsr"/> false records a play the engine deliberately produced no vector for,
+    /// Per-play Mina <see cref="IEzMinaEngine.CalculatePlayerMinaSkillAxis"/> cache in <c>ez-local-profile.sqlite</c> (<c>ssr_score_cache</c> table name is legacy).
+    /// A play already rated with the current algorithm is reused so a recompute only fills in missing plays.
+    /// <see cref="HasPlayRating"/> false records a play the engine deliberately produced no vector for,
     /// so it is not retried on every run.
     /// </summary>
     public readonly record struct EzMinaPlayCacheRow(
@@ -34,8 +34,8 @@ namespace osu.Game.EzOsuGame.LocalProfile
         int KeyCount,
         double Rate,
         DateTimeOffset ScoredAt,
-        bool HasSsr,
-        EzMinaSkillAxisVector Vector,
+        bool HasPlayRating,
+        EzMinaSkillAxisData Vector,
         int AlgorithmVersion);
 
     /// <summary>

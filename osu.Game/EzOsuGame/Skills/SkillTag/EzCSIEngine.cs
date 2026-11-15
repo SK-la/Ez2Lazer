@@ -102,11 +102,11 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             if (EzPatternTagRules.UsesPatternSkillAxes(keyCount) && isJack && !patternIds.Contains(EzManiaRCAxis.Jack.ToId()))
                 patternIds.Add(EzManiaRCAxis.Jack.ToId());
 
-            var jackDemandClusters = new List<EzFourKeyJackDemand.Cluster>(leoClusters.Count);
+            var jackDemandClusters = new List<EzMinaFourKeyJackDemand.Cluster>(leoClusters.Count);
 
             foreach (var cluster in leoClusters)
             {
-                jackDemandClusters.Add(new EzFourKeyJackDemand.Cluster
+                jackDemandClusters.Add(new EzMinaFourKeyJackDemand.Cluster
                 {
                     Label = cluster.Label,
                     Pattern = cluster.Pattern,
@@ -115,7 +115,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 });
             }
 
-            var jackDemand = EzFourKeyJackDemand.Classify(new EzFourKeyJackDemand.Input
+            var jackDemand = EzMinaFourKeyJackDemand.Classify(new EzMinaFourKeyJackDemand.Input
             {
                 KeyCount = keyCount,
                 DurationMs = features.DurationMs,
@@ -124,7 +124,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 TwoBackColumnRehitExcess = features.Metrics.TwoBackColumnRehitExcess,
                 JackPressure = features.Metrics.JackPressure,
                 Patterns = patterns.AllPatterns
-                                   .Select(p => new EzFourKeyJackDemand.PatternScore { Id = p.Id, Score = p.Score })
+                                   .Select(p => new EzMinaFourKeyJackDemand.PatternScore { Id = p.Id, Score = p.Score })
                                    .ToList(),
                 Clusters = jackDemandClusters,
             });

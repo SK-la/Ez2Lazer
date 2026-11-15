@@ -20,8 +20,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             return new Dictionary<string, double>
             {
-                [EzMinaSkillAxis.Overall.ToMsdSkillId()] = overall,
-                [EzMinaSkillAxis.Stream.ToMsdSkillId()] = dominantAxisValue,
+                [EzMinaSkillAxis.Overall.ToMetaId()] = overall,
+                [EzMinaSkillAxis.Stream.ToMetaId()] = dominantAxisValue,
             };
         }
 

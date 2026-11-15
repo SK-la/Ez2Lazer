@@ -10,24 +10,24 @@ using osu.Game.Scoring;
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
     [TestFixture]
-    public class EzMinaRatingGoalTest
+    public class EzMinaStarRatingGoalTest
     {
         [Test]
         public void AccuracyBelowFloorMapsToMin()
         {
-            Assert.That(EzMinaRatingGoal.ForAccuracy(0.5), Is.EqualTo(0.8f).Within(0.0001f));
+            Assert.That(EzMinaStarRatingGoal.ForAccuracy(0.5), Is.EqualTo(0.8f).Within(0.0001f));
         }
 
         [Test]
         public void AccuracyCapsAtCalcGoal()
         {
-            Assert.That(EzMinaRatingGoal.ForAccuracy(1.0), Is.EqualTo(0.965f).Within(0.0001f));
+            Assert.That(EzMinaStarRatingGoal.ForAccuracy(1.0), Is.EqualTo(0.965f).Within(0.0001f));
         }
 
         [Test]
         public void NonFiniteAccuracyFallsBack()
         {
-            Assert.That(EzMinaRatingGoal.ForAccuracy(double.NaN), Is.EqualTo(0.93f).Within(0.0001f));
+            Assert.That(EzMinaStarRatingGoal.ForAccuracy(double.NaN), Is.EqualTo(0.93f).Within(0.0001f));
         }
 
         [Test]
@@ -40,8 +40,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 Statistics = new Dictionary<HitResult, int>(),
             };
 
-            float? goal = EzMinaRatingGoal.ForScore(score, lnRatio: 0, od: 8);
-            Assert.That(goal, Is.EqualTo(EzMinaRatingGoal.ForAccuracy(0.99)).Within(0.0001f));
+            float? goal = EzMinaStarRatingGoal.ForScore(score, lnRatio: 0, od: 8);
+            Assert.That(goal, Is.EqualTo(EzMinaStarRatingGoal.ForAccuracy(0.99)).Within(0.0001f));
         }
 
         [Test]
@@ -57,10 +57,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 },
             };
 
-            float? goal = EzMinaRatingGoal.ForScore(score, lnRatio: 0, od: 8);
+            float? goal = EzMinaStarRatingGoal.ForScore(score, lnRatio: 0, od: 8);
             Assert.That(goal, Is.Not.Null);
             Assert.That(goal!.Value, Is.GreaterThan(0.96f));
-            Assert.That(goal.Value, Is.LessThanOrEqualTo((float)EzMinaRatingGoal.GOAL_CAP));
+            Assert.That(goal.Value, Is.LessThanOrEqualTo((float)EzMinaStarRatingGoal.GOAL_CAP));
         }
 
         [Test]
@@ -77,7 +77,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 },
             };
 
-            Assert.That(EzMinaRatingGoal.ForScore(score, lnRatio: 0, od: 8), Is.Null);
+            Assert.That(EzMinaStarRatingGoal.ForScore(score, lnRatio: 0, od: 8), Is.Null);
         }
     }
 }

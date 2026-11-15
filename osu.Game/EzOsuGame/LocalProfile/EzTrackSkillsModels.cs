@@ -57,7 +57,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public IReadOnlyList<EzTrackSkillsAxis> BarAxes { get; init; } = [];
 
-        public bool IsEffectivelyProvisional => Provisional || PlaysAnalyzed < EzPlayerRatingSnapshot.QUALIFYING_PLAYS;
+        public bool IsEffectivelyProvisional => Provisional || PlaysAnalyzed < EzMinaPlayerSkillSnapshot.QUALIFYING_PLAYS;
     }
 
     public static class EzTrackSkillsPresenterFactory

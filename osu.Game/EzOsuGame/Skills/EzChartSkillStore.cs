@@ -483,7 +483,7 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        public void WriteBeatmapMsd(string beatmapHash, EzMinaSkillAxisVector vector, Guid beatmapId = default, DateTimeOffset? computedAt = null)
+        public void WriteBeatmapMsd(string beatmapHash, EzMinaSkillAxisData vector, Guid beatmapId = default, DateTimeOffset? computedAt = null)
         {
             DateTimeOffset at = computedAt ?? DateTimeOffset.UtcNow;
             int version = minaChartRevision;
@@ -506,7 +506,7 @@ namespace osu.Game.EzOsuGame.Skills
                         BeatmapId = beatmapId,
                         SystemId = EzAnalysisSystem.Mina.ToStorageId(),
                         RulesetOnlineId = EzLocalProfileConstants.MANIA_RULESET_ID,
-                        SkillId = axis.ToMsdSkillId(),
+                        SkillId = axis.ToMetaId(),
                         Value = value,
                         AlgorithmVersion = version,
                         ComputedAt = at,

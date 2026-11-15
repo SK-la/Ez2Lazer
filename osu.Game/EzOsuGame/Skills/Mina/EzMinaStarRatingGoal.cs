@@ -13,7 +13,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// Ports mania-hub <c>ssrGoalForScore</c> / <c>estimateWifeAccuracy</c> (subset).
     /// Pre-release corrective: does not bump <see cref="EzMinaEngine.VERSION"/>.
     /// </summary>
-    public static class EzMinaRatingGoal
+    public static class EzMinaStarRatingGoal
     {
         // --- Goal clamps (hub ssrGoalForScore) ---
         public const double GOAL_MIN = 0.8;

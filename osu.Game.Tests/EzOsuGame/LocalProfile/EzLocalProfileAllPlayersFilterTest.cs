@@ -89,15 +89,15 @@ namespace osu.Game.Tests.EzOsuGame.LocalProfile
 
             store.ReplaceAxisPlays("alice", new[]
             {
-                createAxisPlay("alice", "player_ssr.jack", 5),
+                createAxisPlay("alice", "jack", 5),
             });
             store.ReplaceAxisPlays("bob", new[]
             {
-                createAxisPlay("bob", "player_ssr.stream", 6),
+                createAxisPlay("bob", "stream", 6),
             });
             store.ReplaceAxisPlays(EzLocalProfileConstants.ALL_PLAYERS, new[]
             {
-                createAxisPlay(EzLocalProfileConstants.ALL_PLAYERS, "player_ssr.jack", 99),
+                createAxisPlay(EzLocalProfileConstants.ALL_PLAYERS, "jack", 99),
             });
 
             var all = store.GetAxisPlays(EzLocalProfileConstants.ALL_PLAYERS);

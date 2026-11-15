@@ -43,7 +43,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             RunTestWithRealm((_, storage) =>
             {
                 var store = new EzPlayerSkillStore(storage);
-                store.WritePlayerSsr("ledger-user", 4, new EzMinaSkillAxisVector(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 1);
+                store.WritePlayerRatingSkills("ledger-user", 4, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7), analyzedPlays: 1);
 
                 for (int i = 0; i < 3; i++)
                     insertDrillRow(storage, "ledger-user", keyCount: 4);

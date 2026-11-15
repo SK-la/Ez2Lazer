@@ -25,7 +25,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         public void TestIsCurrentMinaCacheRequiresEveryAxis()
         {
             var skills = buildCompleteSkills();
-            skills.Remove(EzMinaSkillAxis.JackSpeed.ToMsdSkillId());
+            skills.Remove(EzMinaSkillAxis.JackSpeed.ToMetaId());
 
             Assert.That(EzMinaUnit.IsCurrentMinaCache(skills), Is.False);
         }
@@ -60,7 +60,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var skills = new Dictionary<string, double>();
 
             foreach (var axis in EzMinaSkillAxisExtensions.All)
-                skills[axis.ToMsdSkillId()] = 10;
+                skills[axis.ToMetaId()] = 10;
 
             return skills;
         }

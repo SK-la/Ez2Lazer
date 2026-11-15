@@ -4,9 +4,8 @@
 using System;
 using System.Collections.Generic;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Skills.SkillTag;
 
-namespace osu.Game.EzOsuGame.Skills.Mina
+namespace osu.Game.EzOsuGame.Skills.SkillTag
 {
     /// <summary>
     /// LN skill radar: six spokes built from the long-note axis declaration.

@@ -19,7 +19,6 @@ using osu.Game.EzOsuGame.Screens;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.Pattern;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SSR;
@@ -607,10 +606,10 @@ namespace osu.Game.EzOsuGame.HUD
             }
 
             string? username = TargetUsername.Value;
-            IReadOnlyDictionary<string, double> ssr = no_skill_values;
+            IReadOnlyDictionary<string, double> playerRatingSkills = no_skill_values;
 
             if (!string.IsNullOrWhiteSpace(username) && keyCount > 0 && skillProvider != null)
-                ssr = skillProvider.GetPlayerSsrSnapshot(username, keyCount).Values;
+                playerRatingSkills = skillProvider.GetPlayerRatingSnapshot(username, keyCount).Values;
 
             bool beatmapOnly = RadarDisplayMode.Value == EzRadarDisplayMode.MSDSkillChart;
             var spokes = new List<SkillSpoke>(skill_radar_axes.Length);
@@ -619,8 +618,8 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 spokes.Add(new SkillSpoke(
                     skillAxisDisplayName(axis),
-                    displayValue(msd.GetValueOrDefault(axis.ToId(), 0)),
-                    displayValue(ssr.GetValueOrDefault(axis.ToSsrSkillId(), 0))));
+                    displayValue(msd.GetValueOrDefault(axis.ToMetaId(), 0)),
+                    displayValue(playerRatingSkills.GetValueOrDefault(axis.ToMetaId(), 0))));
             }
 
             applySkillSpokes(spokes, beatmapOnly);
@@ -630,7 +629,7 @@ namespace osu.Game.EzOsuGame.HUD
         /// The generic n-key engine returns a ~0.18 sliver for skillsets it does not rate, which is noise next to a
         /// real bar. The spoke stays; only its value reads as absent.
         /// </summary>
-        private static double displayValue(double value) => double.IsFinite(value) && value >= EzPatternRatings.DISPLAY_MIN ? value : 0;
+        private static double displayValue(double value) => double.IsFinite(value) && value >= EzMinaPlayerSkillModeData.DISPLAY_MIN ? value : 0;
 
         private static IReadOnlyDictionary<string, double> structureAxesOf(in EzAnalysisResult analysis) => analysis.AxesOf(EzAnalysisSystem.CSI);
 

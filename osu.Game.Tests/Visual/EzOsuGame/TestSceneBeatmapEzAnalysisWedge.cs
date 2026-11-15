@@ -184,7 +184,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 beatmap.BeatmapInfo.Hash = hash;
             }
 
-            var chartMsd = new EzMinaSkillAxisVector(
+            var chartMsd = new EzMinaSkillAxisData(
                 Overall: 22.4,
                 Stream: 21.0,
                 Jumpstream: 23.5,
@@ -194,7 +194,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 Chordjack: 18.6,
                 Technical: 22.0);
 
-            var playerSsr = new EzMinaSkillAxisVector(
+            var playerSsr = new EzMinaSkillAxisData(
                 Overall: 20.1,
                 Stream: 19.5,
                 Jumpstream: 21.2,
@@ -205,7 +205,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                 Technical: 20.0);
 
             skillStore.WriteBeatmapMsd(hash, chartMsd, beatmap.BeatmapInfo.ID);
-            playerStore.WritePlayerSsr(test_player, test_keys, playerSsr, analyzedPlays: 40, provisional: false);
+            playerStore.WritePlayerRatingSkills(test_player, test_keys, playerSsr, analyzedPlays: 40, provisional: false);
 
             writeDan(test_player, EzDanSide.Rc, chartMsd.Overall, clears: 12);
             writeDan(test_player, EzDanSide.Ln, chartMsd.Overall * 0.92, clears: 5);

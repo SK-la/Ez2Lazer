@@ -4,7 +4,7 @@
 namespace osu.Game.EzOsuGame.LocalProfile
 {
     /// <summary>
-    /// Local profile analysis surface under mania: Ez archive stats vs Track (MinaCalc SunnySR skills).
+    /// Local profile analysis surface under mania: Ez archive stats vs Track (MinaCalc player rating skills).
     /// </summary>
     public enum EzLocalProfileAnalysisSystem
     {
