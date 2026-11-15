@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// <summary>
     /// Draggable colouring previewer. Same chrome and horizontal drag as
     /// <see cref="EzSkinEditorComponentPickerWindow"/>; the body is a 3×5 grid of the current note
-    /// set (algorithms × ranges). Click-to-apply is not wired yet.
+    /// set (algorithms × ranges). Clicking a cell writes that combination into the colouring settings.
     /// </summary>
     public partial class EzSkinEditorColouringPreviewerWindow : CompositeDrawable
     {
@@ -46,6 +46,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private const float cell_height_min = 48;
         private const float cell_height_max = 96;
         private const string note_folder_suffix = "note";
+        private const double max_white_strength = 255;
 
         private static readonly EzColouringMode[] modes =
         {
@@ -73,6 +74,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzResourceStore resources = null!;
         private Bindable<string> noteSetName = null!;
         private Bindable<Colour4> previewTint = null!;
+        private Bindable<EzColouringMode> colouringMode = null!;
+        private Bindable<EzColouringRange> colouringRange = null!;
         private Bindable<double> colouringStrength = null!;
 
         private PreviewCell[] cells = Array.Empty<PreviewCell>();
@@ -105,6 +108,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             noteSetName = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
             previewTint = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
+            colouringMode = ezConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode);
+            colouringRange = ezConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange);
             colouringStrength = ezConfig.GetBindable<double>(Ez2Setting.ColouringStrength);
 
             CornerRadius = corner_radius;
@@ -222,7 +227,13 @@ namespace osu.Game.EzOsuGame.Edit.Components
             }, true);
             prefix.BindValueChanged(_ => requestRebuild());
             previewTint.BindValueChanged(_ => applyColours());
-            colouringStrength.BindValueChanged(_ => applyColours());
+            colouringMode.BindValueChanged(_ => updateSelection());
+            colouringRange.BindValueChanged(_ => updateSelection());
+            colouringStrength.BindValueChanged(_ =>
+            {
+                applyColours();
+                updateSelection();
+            });
         }
 
         private void requestRebuild() => Scheduler.AddOnce(rebuildGrid);
@@ -342,7 +353,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
                 for (int column = 0; column < modes.Length; column++)
                 {
-                    var cell = new PreviewCell(colourProvider, modes[column], range, maxStrength);
+                    var cell = new PreviewCell(colourProvider, modes[column], range, maxStrength, applyFromCell);
                     Drawable? note = factory.CreateAnimation(component, recolour: true);
 
                     if (note != null)
@@ -376,6 +387,34 @@ namespace osu.Game.EzOsuGame.Edit.Components
             };
 
             applyColours();
+            updateSelection();
+        }
+
+        private void applyFromCell(EzColouringMode mode, EzColouringRange range, bool maxWhiteStrength)
+        {
+            colouringMode.Value = mode;
+            colouringRange.Value = range;
+
+            if (maxWhiteStrength)
+                colouringStrength.Value = max_white_strength;
+        }
+
+        private bool isCellSelected(PreviewCell cell)
+        {
+            if (cell.Mode != colouringMode.Value || cell.Range != colouringRange.Value)
+                return false;
+
+            if (cell.Range != EzColouringRange.White)
+                return true;
+
+            bool atMax = colouringStrength.Value >= max_white_strength;
+            return cell.MaxWhiteStrength == atMax;
+        }
+
+        private void updateSelection()
+        {
+            foreach (var cell in cells)
+                cell.SetSelected(isCellSelected(cell));
         }
 
         private static LocalisableString rangeLabel(int row) => row switch
@@ -495,16 +534,28 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private partial class PreviewCell : Container
         {
-            private readonly EzColouringMode mode;
-            private readonly EzColouringRange range;
-            private readonly bool maxWhiteStrength;
-            private readonly Container noteHost;
+            public EzColouringMode Mode { get; }
+            public EzColouringRange Range { get; }
+            public bool MaxWhiteStrength { get; }
 
-            public PreviewCell(OverlayColourProvider colourProvider, EzColouringMode mode, EzColouringRange range, bool maxWhiteStrength)
+            private readonly Action<EzColouringMode, EzColouringRange, bool> onApply;
+            private readonly OverlayColourProvider colourProvider;
+            private readonly Container noteHost;
+            private readonly Box stateBox;
+            private bool selected;
+
+            public PreviewCell(
+                OverlayColourProvider colourProvider,
+                EzColouringMode mode,
+                EzColouringRange range,
+                bool maxWhiteStrength,
+                Action<EzColouringMode, EzColouringRange, bool> onApply)
             {
-                this.mode = mode;
-                this.range = range;
-                this.maxWhiteStrength = maxWhiteStrength;
+                this.colourProvider = colourProvider;
+                this.onApply = onApply;
+                Mode = mode;
+                Range = range;
+                MaxWhiteStrength = maxWhiteStrength;
 
                 RelativeSizeAxes = Axes.Both;
                 Masking = true;
@@ -519,6 +570,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
                         Colour = colourProvider.Background5,
                         Alpha = 0.85f,
                     },
+                    stateBox = new Box
+                    {
+                        RelativeSizeAxes = Axes.Both,
+                        Colour = colourProvider.Highlight1,
+                        Alpha = 0,
+                    },
                     noteHost = new Container
                     {
                         RelativeSizeAxes = Axes.Both,
@@ -530,8 +587,38 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             public void Apply(Colour4 tint, float currentStrength)
             {
-                float strength = maxWhiteStrength ? 255f : currentStrength;
-                EzNoteRecolour.ApplyToDrawable(noteHost, tint, mode, range, strength);
+                float strength = MaxWhiteStrength ? (float)max_white_strength : currentStrength;
+                EzNoteRecolour.ApplyToDrawable(noteHost, tint, Mode, Range, strength);
+            }
+
+            public void SetSelected(bool value)
+            {
+                selected = value;
+                updateState();
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                updateState();
+                return true;
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                updateState();
+                base.OnHoverLost(e);
+            }
+
+            protected override bool OnClick(ClickEvent e)
+            {
+                onApply(Mode, Range, MaxWhiteStrength);
+                return true;
+            }
+
+            private void updateState()
+            {
+                float targetAlpha = selected ? (IsHovered ? 0.45f : 0.3f) : (IsHovered ? 0.15f : 0f);
+                stateBox.FadeTo(targetAlpha, 120, Easing.OutQuint);
             }
         }
     }
