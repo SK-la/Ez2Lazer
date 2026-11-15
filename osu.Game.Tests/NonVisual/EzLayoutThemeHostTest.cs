@@ -27,5 +27,17 @@ namespace osu.Game.Tests.NonVisual
             Assert.That(store.LayoutSetName, Is.EqualTo("layout-alt"));
             Assert.That(config.GetBindable<string>(Ez2Setting.LayoutSetName).Value, Is.EqualTo("layout-alt"));
         }
+
+        [Test]
+        public void TestClientRootStoreIgnoresUseSet()
+        {
+            using var storage = new TemporaryNativeStorage("ez-layout-client-root");
+            var store = EzConfigLayoutStore.CreateClientRoot(storage);
+
+            store.UseSet("layout-alt");
+
+            Assert.That(store.IsClientRoot, Is.True);
+            Assert.That(store.LayoutSetName, Is.EqualTo(string.Empty));
+        }
     }
 }

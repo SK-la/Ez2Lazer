@@ -19,8 +19,9 @@ namespace osu.Game.EzOsuGame.Layout
     /// </summary>
     public partial class EzLayoutContainer : SkinnableContainer
     {
-        private readonly EzConfigLayoutStore store;
         private CompositeDrawable? dependencyDonor;
+
+        public EzConfigLayoutStore Store { get; }
 
         public string LayoutFile { get; }
 
@@ -30,7 +31,7 @@ namespace osu.Game.EzOsuGame.Layout
             : base(EzLayoutFiles.SkinLookup(layoutFile, ruleset)
                    ?? throw new ArgumentException($"Ez layout file {layoutFile} is not a skin area.", nameof(layoutFile)))
         {
-            this.store = store;
+            Store = store;
             LayoutFile = layoutFile;
             Ruleset = ruleset;
             RelativeSizeAxes = Axes.Both;
@@ -61,9 +62,9 @@ namespace osu.Game.EzOsuGame.Layout
             LoadFromStore();
         }
 
-        public void LoadFromStore() => Reload(store.CreateComponentsContainer(LayoutFile, Ruleset));
+        public void LoadFromStore() => Reload(Store.CreateComponentsContainer(LayoutFile, Ruleset));
 
-        internal bool Uses(EzConfigLayoutStore candidate) => ReferenceEquals(store, candidate);
+        internal bool Uses(EzConfigLayoutStore candidate) => ReferenceEquals(Store, candidate);
 
         /// <summary>
         /// Places a component into this container with sane defaults, mirroring the official skin editor's

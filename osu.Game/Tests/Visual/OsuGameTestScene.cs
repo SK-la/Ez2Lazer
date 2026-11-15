@@ -17,6 +17,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Online.API;
@@ -177,6 +178,7 @@ namespace osu.Game.Tests.Visual
 
                 LocalConfig.SetValue(OsuSetting.IntroSequence, IntroSequence.Circles);
                 LocalConfig.SetValue(OsuSetting.ShowFirstRunSetup, false);
+                EzFirstUseNotice.MarkSeen(Storage, EzFirstUseNotice.legacy_skin_storage);
 
                 API.Login("Rhythm Champion", "osu!");
                 ((DummyAPIAccess)API).AuthenticateSecondFactor("abcdefgh");

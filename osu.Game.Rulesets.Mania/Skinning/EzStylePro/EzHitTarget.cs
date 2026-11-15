@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         protected override bool ShowSeparators => false;
 
         /// <summary>
-        /// 重载判定用前缀，与 <see cref="EzNoteBase.LoadEzProNoteComponent"/> 里实际加载路径无关。
+        /// 重载判定用前缀，与 <see cref="EzNoteBase.LoadEzProNoteComponent(EzManiaNotePart)"/> 里实际加载路径无关。
         /// 贴图：<see cref="ManiaPlayfieldNoteDisplayTint.UseTintBaseTexture"/> 为真→白底；为假→列型/降级查找（与 note 同源）。
         /// 乘色：<see cref="IEzSkinInfo.HitTargetColouringEnabled"/> 与列色开关；靶不吃节拍线时刻色。
         /// </summary>

@@ -14,6 +14,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input;
 using osu.Framework.Screens;
+using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
@@ -37,6 +38,7 @@ using osu.Game.Screens.Play;
 using osu.Game.Screens.Play.HUD;
 using osu.Game.Screens.Select;
 using osu.Game.Skinning;
+using osu.Game.Skinning.Components;
 using osu.Game.Tests.Beatmaps.IO;
 using osu.Game.Tests.Resources;
 using osuTK;
@@ -200,6 +202,55 @@ namespace osu.Game.Tests.Visual.Navigation
 
                 return unchanged;
             });
+        }
+
+        [Test]
+        public void TestEzHudEditDoesNotWriteLayoutUntilApply()
+        {
+            string layoutPath = null;
+            string snapshot = null;
+
+            advanceToSongSelect();
+            openEzEditor();
+            AddUntilStep("song select scene selected", () => ezSkinEditor.Workspace!.CurrentScene.Value == EzEditorSceneType.SongSelectHud);
+
+            AddUntilStep("hud target ready", () =>
+            {
+                var hud = ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().SingleOrDefault();
+                return hud?.ActiveTarget?.ComponentsLoaded == true;
+            });
+
+            AddStep("snapshot song select layout json", () =>
+            {
+                var storage = Game.Dependencies.Get<Storage>();
+                layoutPath = storage.GetFullPath($"{EzModifyPath.LayoutSetPath(EzModifyPath.LAYOUT_SET_DEFAULT)}/{EzLayoutFiles.SONG_SELECT}");
+                snapshot = File.Exists(layoutPath) ? File.ReadAllText(layoutPath) : string.Empty;
+            });
+
+            AddStep("place song select component", () =>
+            {
+                var hud = ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+                Assert.That(hud.TryPlaceComponent(typeof(BoxElement)), Is.True);
+            });
+
+            AddStep("drag-complete callback only captures", () =>
+            {
+                var hud = ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+                hud.PersistLayoutToCurrentSkin();
+            });
+
+            AddAssert("layout json not written yet", () =>
+                (File.Exists(layoutPath) ? File.ReadAllText(layoutPath) : string.Empty) == snapshot);
+
+            AddStep("undo placement", () =>
+            {
+                var hud = ezSkinEditor.Workspace!.ChildrenOfType<EzSkinEditorHudLayer>().Single();
+                hud.RestoreState(-1);
+            });
+
+            AddAssert("workspace survived undo", () => ezSkinEditor.Workspace!.IsLoaded);
+            AddAssert("layout json still unchanged", () =>
+                (File.Exists(layoutPath) ? File.ReadAllText(layoutPath) : string.Empty) == snapshot);
         }
 
         [Test]

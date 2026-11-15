@@ -141,5 +141,112 @@ namespace osu.Game.Tests.NonVisual
             Assert.That(filter.IsExcluded(typeof(BigBlackBox)), Is.True);
             Assert.That(filter.IsExcluded(typeof(BoxElement)), Is.False);
         }
+
+        [Test]
+        public void TestCaptureStaysInMemoryUntilFlush()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "ez-layout-test-" + Guid.NewGuid().ToString("N"));
+            var storage = new NativeStorage(path);
+
+            try
+            {
+                var store = new EzConfigLayoutStore(storage);
+                var layoutStorage = storage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(EzModifyPath.LAYOUT_SET_DEFAULT));
+
+                store.Capture(EzLayoutFiles.SONG_SELECT, null, new[] { new SerialisedDrawableInfo(new BoxElement()) });
+
+                Assert.That(layoutStorage.Exists(EzLayoutFiles.SONG_SELECT), Is.False);
+                Assert.That(store.HasUnflushedChanges(), Is.True);
+
+                var loaded = store.Load(EzLayoutFiles.SONG_SELECT);
+                Assert.That(loaded.TryGetDrawableInfo(null, out var pending), Is.True);
+                Assert.That(pending![0].Type, Is.EqualTo(typeof(BoxElement)));
+
+                Assert.That(store.FlushPending(), Is.True);
+                Assert.That(layoutStorage.Exists(EzLayoutFiles.SONG_SELECT), Is.True);
+                Assert.That(store.HasUnflushedChanges(), Is.False);
+                Assert.That(store.FlushPending(), Is.False);
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(path))
+                        Directory.Delete(path, true);
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        [Test]
+        public void TestDiscardPendingRestoresDisk()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "ez-layout-test-" + Guid.NewGuid().ToString("N"));
+            var storage = new NativeStorage(path);
+
+            try
+            {
+                var store = new EzConfigLayoutStore(storage);
+
+                var onDisk = new SkinLayoutInfo();
+                onDisk.Update(null, new[] { new SerialisedDrawableInfo(new BoxElement()) });
+                store.Save(EzLayoutFiles.SONG_SELECT, onDisk);
+
+                store.Capture(EzLayoutFiles.SONG_SELECT, null, new[] { new SerialisedDrawableInfo(new BigBlackBox()) });
+                Assert.That(store.Load(EzLayoutFiles.SONG_SELECT).TryGetDrawableInfo(null, out var pending), Is.True);
+                Assert.That(pending![0].Type, Is.EqualTo(typeof(BigBlackBox)));
+
+                store.DiscardPending();
+                Assert.That(store.HasUnflushedChanges(), Is.False);
+                Assert.That(store.Load(EzLayoutFiles.SONG_SELECT).TryGetDrawableInfo(null, out var restored), Is.True);
+                Assert.That(restored![0].Type, Is.EqualTo(typeof(BoxElement)));
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(path))
+                        Directory.Delete(path, true);
+                }
+                catch
+                {
+                }
+            }
+        }
+
+        [Test]
+        public void TestClientRootFlushWritesConfigNotThemeSet()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "ez-layout-test-" + Guid.NewGuid().ToString("N"));
+            var storage = new NativeStorage(path);
+
+            try
+            {
+                var store = EzConfigLayoutStore.CreateClientRoot(storage);
+                store.Capture(EzLayoutFiles.MUSIC_PLAYER, null, new[] { new SerialisedDrawableInfo(new BoxElement()) });
+
+                Assert.That(store.IsClientRoot, Is.True);
+                Assert.That(store.FlushPending(), Is.True);
+
+                var configStorage = storage.GetStorageForDirectory(EzModifyPath.CONFIG_ROOT_PATH);
+                var themeStorage = storage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(EzModifyPath.LAYOUT_SET_DEFAULT));
+
+                Assert.That(configStorage.Exists(EzLayoutFiles.MUSIC_PLAYER), Is.True);
+                Assert.That(themeStorage.Exists(EzLayoutFiles.MUSIC_PLAYER), Is.False);
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(path))
+                        Directory.Delete(path, true);
+                }
+                catch
+                {
+                }
+            }
+        }
     }
 }

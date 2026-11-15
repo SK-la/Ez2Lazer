@@ -2,6 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -9,16 +11,25 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Overlays;
+using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 using osuTK.Input;
 
 namespace osu.Game.EzOsuGame.Screens.Visualizer
 {
-    public partial class EzVisualizerBeatmapLogo : CompositeDrawable
+    public partial class EzVisualizerBeatmapLogo : CompositeDrawable, ISerialisableDrawable, IEzSceneHudComponent
     {
+        public bool UsesFixedAnchor { get; set; }
+
+        public GlobalSkinnableContainers LayoutTarget => GlobalSkinnableContainers.MusicPlayer;
+
+        public bool CanBePlaced(IEnumerable<ISerialisableDrawable> otherComponents) =>
+            otherComponents.All(c => c.GetType() != GetType());
+
         public const float BASE_SIZE = 350;
         private const float progress_padding = 10;
 

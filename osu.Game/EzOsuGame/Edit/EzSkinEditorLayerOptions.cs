@@ -102,14 +102,20 @@ namespace osu.Game.EzOsuGame.Edit
             SKIN_HUD, SKIN_HUD_RULESET, SKIN_PLAYFIELD_RULESET,
         };
 
+        private static readonly EzSkinEditorLayerDefinition[] ez_only_layers =
+        {
+            HUD_OFF, EZ_HUD,
+        };
+
         /// <summary>
         /// Layers offered for a scene. Song select only has the global song-select layout, so it lists
-        /// the hidden state and the global Ez / skin HUD layers. HUD-capable gameplay scenes offer the
-        /// full layer set.
+        /// the hidden state and the global Ez / skin HUD layers. Results and music player are Ez JSON
+        /// only. HUD-capable gameplay scenes offer the full layer set.
         /// </summary>
         public static IReadOnlyList<EzSkinEditorLayerDefinition> For(EzEditorSceneType sceneType) => sceneType switch
         {
             EzEditorSceneType.SongSelectHud => new[] { HUD_OFF, EZ_HUD, SKIN_HUD },
+            EzEditorSceneType.ResultsHud or EzEditorSceneType.MusicPlayerHud => ez_only_layers,
             _ => gameplay_layers,
         };
 
@@ -141,6 +147,12 @@ namespace osu.Game.EzOsuGame.Edit
 
             if (sceneType == EzEditorSceneType.SongSelectHud)
                 return new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.SongSelect);
+
+            if (sceneType == EzEditorSceneType.ResultsHud)
+                return new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.Results);
+
+            if (sceneType == EzEditorSceneType.MusicPlayerHud)
+                return new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.MusicPlayer);
 
             var definition = Get(layer);
 

@@ -171,7 +171,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private bool lastDisplayTintActive;
 
         /// <summary>
-        /// 带 <see cref="EzSkinEditorNotePreviewRequest"/> 的静态 note 预览：列显色只读本列 bindable，<see cref="syncNoteDisplayColourCache"/> 不同步全局列色。
+        /// 带 <see cref="osu.Game.EzOsuGame.Edit.Note.EzSkinEditorNotePreviewRequest"/> 的静态 note 预览：列显色只读本列 bindable，<see cref="syncNoteDisplayColourCache"/> 不同步全局列色。
         /// </summary>
         internal bool IsolateNoteColourForPreview { get; set; }
 

@@ -7,7 +7,9 @@ using System.Linq;
 using osu.Framework.Screens;
 using osu.Game.EzOsuGame.Edit.Scenes;
 using osu.Game.EzOsuGame.Layout;
+using osu.Game.EzOsuGame.Screens.Visualizer;
 using osu.Game.Screens.Play;
+using osu.Game.Screens.Ranking;
 using osu.Game.Screens.Select;
 
 namespace osu.Game.EzOsuGame.Edit
@@ -21,6 +23,8 @@ namespace osu.Game.EzOsuGame.Edit
         {
             new SongSelectSceneStrategy(),
             new BeatmapPreviewSceneStrategy(),
+            new ResultsSceneStrategy(),
+            new MusicPlayerSceneStrategy(),
             new GameplaySceneStrategy(),
             new AppearanceSceneStrategy(),
             new NoteSceneStrategy(),
@@ -60,6 +64,12 @@ namespace osu.Game.EzOsuGame.Edit
         {
             if (screenType != null && typeof(SoloSongSelect).IsAssignableFrom(screenType))
                 return EzEditorSceneType.SongSelectHud;
+
+            if (screenType != null && typeof(ResultsScreen).IsAssignableFrom(screenType))
+                return EzEditorSceneType.ResultsHud;
+
+            if (screenType != null && typeof(EzVisualizerScreen).IsAssignableFrom(screenType))
+                return EzEditorSceneType.MusicPlayerHud;
 
             if (screenType != null && typeof(Player).IsAssignableFrom(screenType))
                 return EzEditorSceneType.GameplayHud;

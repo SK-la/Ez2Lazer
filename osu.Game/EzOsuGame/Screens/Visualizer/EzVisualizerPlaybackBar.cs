@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
@@ -17,9 +18,11 @@ using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Screens.Select;
 using osu.Game.EzOsuGame.UI;
+using osu.Game.Skinning;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
@@ -33,8 +36,15 @@ namespace osu.Game.EzOsuGame.Screens.Visualizer
     /// <summary>
     /// Now Playing card bottom controls, shown when the pointer approaches the bar under the visualizer logo.
     /// </summary>
-    public partial class EzVisualizerPlaybackBar : CompositeDrawable
+    public partial class EzVisualizerPlaybackBar : CompositeDrawable, ISerialisableDrawable, IEzSceneHudComponent
     {
+        public bool UsesFixedAnchor { get; set; }
+
+        public GlobalSkinnableContainers LayoutTarget => GlobalSkinnableContainers.MusicPlayer;
+
+        public bool CanBePlaced(IEnumerable<ISerialisableDrawable> otherComponents) =>
+            otherComponents.All(c => c.GetType() != GetType());
+
         private const float bar_height = 55;
         private const float bar_width = 400;
         private const float hover_padding = 40;
