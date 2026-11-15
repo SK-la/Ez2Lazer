@@ -215,5 +215,38 @@ namespace osu.Game.Tests.NonVisual
                 }
             }
         }
+
+        [Test]
+        public void TestClientRootFlushWritesConfigNotThemeSet()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "ez-layout-test-" + Guid.NewGuid().ToString("N"));
+            var storage = new NativeStorage(path);
+
+            try
+            {
+                var store = EzConfigLayoutStore.CreateClientRoot(storage);
+                store.Capture(EzLayoutFiles.MUSIC_PLAYER, null, new[] { new SerialisedDrawableInfo(new BoxElement()) });
+
+                Assert.That(store.IsClientRoot, Is.True);
+                Assert.That(store.FlushPending(), Is.True);
+
+                var configStorage = storage.GetStorageForDirectory(EzModifyPath.CONFIG_ROOT_PATH);
+                var themeStorage = storage.GetStorageForDirectory(EzModifyPath.LayoutSetPath(EzModifyPath.LAYOUT_SET_DEFAULT));
+
+                Assert.That(configStorage.Exists(EzLayoutFiles.MUSIC_PLAYER), Is.True);
+                Assert.That(themeStorage.Exists(EzLayoutFiles.MUSIC_PLAYER), Is.False);
+            }
+            finally
+            {
+                try
+                {
+                    if (Directory.Exists(path))
+                        Directory.Delete(path, true);
+                }
+                catch
+                {
+                }
+            }
+        }
     }
 }

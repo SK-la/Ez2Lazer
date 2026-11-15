@@ -32,16 +32,23 @@ namespace osu.Game.EzOsuGame.Layout
         public EzConfigLayoutStore ClientStore => clientStore;
 
         public bool HasUnflushedLayoutChanges =>
-            layoutStore.HasUnflushedChanges() || (IsLoaded && clientStore.HasUnflushedChanges());
+            HasUnflushedThemeLayoutChanges || HasUnflushedClientLayoutChanges;
 
-        public bool FlushPendingLayouts()
+        public bool HasUnflushedThemeLayoutChanges => layoutStore.HasUnflushedChanges();
+
+        public bool HasUnflushedClientLayoutChanges => IsLoaded && clientStore.HasUnflushedChanges();
+
+        public EzLayoutWriteKind FlushPendingLayouts()
         {
-            bool written = layoutStore.FlushPending();
+            var kind = EzLayoutWriteKind.None;
 
-            if (IsLoaded)
-                written |= clientStore.FlushPending();
+            if (layoutStore.FlushPending())
+                kind |= EzLayoutWriteKind.Theme;
 
-            return written;
+            if (IsLoaded && clientStore.FlushPending())
+                kind |= EzLayoutWriteKind.Client;
+
+            return kind;
         }
 
         public void DiscardPendingLayouts()

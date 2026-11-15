@@ -121,10 +121,14 @@ namespace osu.Game.EzOsuGame.Edit.Components
         /// </summary>
         public bool HasPendingEzLayoutSave => layoutLayer?.HasUnflushedLayoutChanges == true;
 
+        public bool HasPendingThemeLayoutSave => layoutLayer?.HasUnflushedThemeLayoutChanges == true;
+
+        public bool HasPendingClientLayoutSave => layoutLayer?.HasUnflushedClientLayoutChanges == true;
+
         /// <summary>
-        /// 布局写入磁盘后触发，供编辑器弹出保存通知。
+        /// 布局写入磁盘后触发，供编辑器弹出对应保存层的通知。
         /// </summary>
-        public event Action? LayoutWritten;
+        public event Action<EzLayoutWriteKind>? LayoutWritten;
 
         [Resolved]
         private SkinManager skins { get; set; } = null!;
@@ -277,13 +281,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             captureLiveTargets();
 
-            bool written = layoutLayer?.FlushPendingLayouts() ?? false;
-            written |= FlushSkinLayoutSave();
+            var kind = layoutLayer?.FlushPendingLayouts() ?? EzLayoutWriteKind.None;
 
-            if (written)
-                LayoutWritten?.Invoke();
+            if (FlushSkinLayoutSave())
+                kind |= EzLayoutWriteKind.Skin;
 
-            return written;
+            if (kind != EzLayoutWriteKind.None)
+                LayoutWritten?.Invoke(kind);
+
+            return kind != EzLayoutWriteKind.None;
         }
 
         /// <summary>

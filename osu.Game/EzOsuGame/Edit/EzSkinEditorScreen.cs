@@ -20,6 +20,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
@@ -31,12 +32,11 @@ using osu.Game.EzOsuGame.ScriptedSkin;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Input.Bindings;
-using osu.Game.Localisation;
 using osu.Game.IO;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.OSD;
 using osu.Game.Overlays.SkinEditor;
-using OfficialSkinEditor = osu.Game.Overlays.SkinEditor.SkinEditor;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
@@ -248,7 +248,7 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            dialogOverlay.Push(new ConfirmDialog(EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN, () =>
+            dialogOverlay.Push(new ConfirmDialog(unsavedApplyPrompt(), () =>
             {
                 applySettings();
                 onContinued();
@@ -738,7 +738,9 @@ namespace osu.Game.EzOsuGame.Edit
                 return;
             }
 
-            ezSkinConfig.Save();
+            if (configDirty)
+                ezSkinConfig.Save();
+
             hudLayer.PersistAllLayouts();
 
             if (jsonDirty)
@@ -1350,11 +1352,79 @@ namespace osu.Game.EzOsuGame.Edit
 
         private void postNotification(LocalisableString text) => notifications?.Post(new SimpleNotification { Text = text });
 
-        private void onLayoutWritten()
+        private void onLayoutWritten(EzLayoutWriteKind kind)
         {
-            onScreenDisplay?.Display(new OfficialSkinEditor.SkinEditorToast(
-                ToastStrings.SkinSaved,
-                skinManager.CurrentSkin.Value.SkinInfo.ToString() ?? "Unknown"));
+            if (kind == EzLayoutWriteKind.None)
+                return;
+
+            onScreenDisplay?.Display(new EzLayoutSavedToast(layoutWriteHeader(kind), layoutWriteExtra(kind)));
+        }
+
+        private static LocalisableString layoutWriteHeader(EzLayoutWriteKind kind)
+        {
+            bool skin = (kind & EzLayoutWriteKind.Skin) != 0;
+            bool theme = (kind & EzLayoutWriteKind.Theme) != 0;
+            bool client = (kind & EzLayoutWriteKind.Client) != 0;
+            int layers = (skin ? 1 : 0) + (theme ? 1 : 0) + (client ? 1 : 0);
+
+            if (layers != 1)
+                return EzEditorStrings.TOAST_HEADER_LAYOUT;
+
+            if (skin)
+                return EzEditorStrings.TOAST_HEADER_SKIN_LAYOUT;
+
+            if (theme)
+                return EzEditorStrings.TOAST_HEADER_THEME_LAYOUT;
+
+            return EzEditorStrings.TOAST_HEADER_CLIENT_LAYOUT;
+        }
+
+        private string layoutWriteExtra(EzLayoutWriteKind kind)
+        {
+            var parts = new List<string>();
+
+            if ((kind & EzLayoutWriteKind.Skin) != 0)
+                parts.Add(skinManager.CurrentSkin.Value.SkinInfo.ToString() ?? "Unknown");
+
+            if ((kind & EzLayoutWriteKind.Theme) != 0 && layoutLayer != null)
+                parts.Add($"{EzModifyPath.CONFIG_ROOT_PATH}/{layoutLayer.Store.LayoutSetName}");
+
+            if ((kind & EzLayoutWriteKind.Client) != 0)
+                parts.Add(EzModifyPath.CONFIG_ROOT_PATH);
+
+            return string.Join(" · ", parts);
+        }
+
+        private LocalisableString unsavedApplyPrompt()
+        {
+            bool skinSide = hudLayer.HasPendingSkinLayoutSave
+                            || SkinIniSession.IsDirty
+                            || hasUnsavedConfigChanges()
+                            || (SkinJsonSession?.IsDirty(ezSkinConfig) ?? false);
+            bool theme = hudLayer.HasPendingThemeLayoutSave;
+            bool client = hudLayer.HasPendingClientLayoutSave;
+            int layers = (skinSide ? 1 : 0) + (theme ? 1 : 0) + (client ? 1 : 0);
+
+            if (layers > 1)
+                return EzEditorStrings.EXIT_CONFIRM_APPLY_UNSAVED;
+
+            if (client)
+                return EzEditorStrings.EXIT_CONFIRM_APPLY_TO_CLIENT;
+
+            if (theme)
+                return EzEditorStrings.EXIT_CONFIRM_APPLY_TO_THEME;
+
+            if (layers == 0)
+            {
+                return EzSkinEditorSceneRegistry.LayoutRootOf(sceneBar.CurrentScene.Value) switch
+                {
+                    EzLayoutRoot.Client => EzEditorStrings.EXIT_CONFIRM_APPLY_TO_CLIENT,
+                    EzLayoutRoot.Theme => EzEditorStrings.EXIT_CONFIRM_APPLY_TO_THEME,
+                    _ => EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN,
+                };
+            }
+
+            return EzEditorStrings.EXIT_CONFIRM_APPLY_TO_SKIN;
         }
 
         private void onCurrentSkinChanged(ValueChangedEvent<Skin> skin)
@@ -1666,6 +1736,15 @@ namespace osu.Game.EzOsuGame.Edit
             }
 
             base.Dispose(isDisposing);
+        }
+
+        private partial class EzLayoutSavedToast : Toast
+        {
+            public EzLayoutSavedToast(LocalisableString header, string extra)
+                : base(header, EzEditorStrings.TOAST_LAYOUT_SAVED)
+            {
+                ExtraText = extra;
+            }
         }
     }
 }

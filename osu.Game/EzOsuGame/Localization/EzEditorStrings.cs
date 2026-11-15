@@ -16,9 +16,11 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SETTINGS_SKIN_EDITOR_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "此编辑器中的HUD均修改Ez布局图层，不会修改皮肤HUD图层"
-            + "\n主题 HUD 布局存于 EzResources/Config/layout 与 layout-{主题} 文件夹",
+            + "\n主题 HUD 布局存于 EzResources/Config/layout 与 layout-{主题} 文件夹"
+            + "\n音乐播放器 HUD 存于 EzResources/Config（全局，不随主题切换）",
             "Editor HUDs in this editor modify the Ez layout layer, not the skin HUD layer"
-            + "\nThemed HUD layouts live under EzResources/Config/layout and layout-{theme} folders");
+            + "\nThemed HUD layouts live under EzResources/Config/layout and layout-{theme} folders"
+            + "\nMusic player HUD lives under EzResources/Config (client-wide, not theme-switched)");
 
         public static readonly EzLocalizationManager.EzLocalisableString NOTIFY_SKIN_LAYOUT_EXIT_SAVE_FAILED = new EzLocalizationManager.EzLocalisableString(
             "皮肤 HUD 布局未写入磁盘，请退出前再试保存。",
@@ -297,6 +299,38 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString EXIT_CONFIRM_APPLY_TO_SKIN = new EzLocalizationManager.EzLocalisableString(
             "应用更改到皮肤？",
             "Apply changes to skin?");
+
+        public static readonly LocalisableString EXIT_CONFIRM_APPLY_TO_THEME = new EzLocalizationManager.EzLocalisableString(
+            "应用更改到主题布局？",
+            "Apply changes to the theme layout?");
+
+        public static readonly LocalisableString EXIT_CONFIRM_APPLY_TO_CLIENT = new EzLocalizationManager.EzLocalisableString(
+            "应用更改到全局布局？",
+            "Apply changes to the client layout?");
+
+        public static readonly LocalisableString EXIT_CONFIRM_APPLY_UNSAVED = new EzLocalizationManager.EzLocalisableString(
+            "应用未保存的更改？",
+            "Apply unsaved changes?");
+
+        public static readonly LocalisableString TOAST_LAYOUT_SAVED = new EzLocalizationManager.EzLocalisableString(
+            "已保存",
+            "Saved");
+
+        public static readonly LocalisableString TOAST_HEADER_SKIN_LAYOUT = new EzLocalizationManager.EzLocalisableString(
+            "皮肤布局",
+            "Skin layout");
+
+        public static readonly LocalisableString TOAST_HEADER_THEME_LAYOUT = new EzLocalizationManager.EzLocalisableString(
+            "主题布局",
+            "Theme layout");
+
+        public static readonly LocalisableString TOAST_HEADER_CLIENT_LAYOUT = new EzLocalizationManager.EzLocalisableString(
+            "全局布局",
+            "Client layout");
+
+        public static readonly LocalisableString TOAST_HEADER_LAYOUT = new EzLocalizationManager.EzLocalisableString(
+            "布局",
+            "Layout");
 
         public static readonly LocalisableString SWITCH_EDITOR_SAVE_OFFICIAL_LAYOUT = new EzLocalizationManager.EzLocalisableString(
             "保存 HUD 布局到当前皮肤？",
