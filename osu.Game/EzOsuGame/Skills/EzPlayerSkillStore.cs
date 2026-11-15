@@ -244,11 +244,11 @@ namespace osu.Game.EzOsuGame.Skills
             int analyzedPlays,
             bool provisional,
             IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisVector Vector)> historySamples,
-            IReadOnlyList<EzPatternRating> patternRatings)
+            IReadOnlyList<EzSkillRatingPlayData> skillRatings)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
             ArgumentNullException.ThrowIfNull(historySamples);
-            ArgumentNullException.ThrowIfNull(patternRatings);
+            ArgumentNullException.ThrowIfNull(skillRatings);
 
             DateTimeOffset at = DateTimeOffset.UtcNow;
             const int version = EzMinaEngine.VERSION;
@@ -261,13 +261,13 @@ namespace osu.Game.EzOsuGame.Skills
                 replaceHistory(c, tx, username, keyCount, historySamples, version);
 
                 replaceValues(c, tx, username, keyCount, EzAnalysisSystem.Pattern.ToStorageId(), -1,
-                    toRows(patternValues(patternRatings), analyzedPlays, provisional, version, at), version);
+                    toRows(patternValues(skillRatings), analyzedPlays, provisional, version, at), version);
             });
         }
 
-        public IReadOnlyList<EzPatternRating> GetPlayerPatternRatings(string username, int keyCount, int? algorithmVersion = null)
+        public IReadOnlyList<EzSkillRatingPlayData> GetPlayerSkillRatings(string username, int keyCount, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzPatternRatings.VERSION;
+            int version = algorithmVersion ?? EzMinaSkillRating.VERSION;
 
             return database.Read(c =>
             {
@@ -283,18 +283,18 @@ namespace osu.Game.EzOsuGame.Skills
                 cmd.Parameters.AddWithValue("$system", EzAnalysisSystem.Pattern.ToStorageId());
                 cmd.Parameters.AddWithValue("$version", version);
 
-                var list = new List<EzPatternRating>();
+                var list = new List<EzSkillRatingPlayData>();
                 using var reader = cmd.ExecuteReader();
 
                 while (reader.Read())
                 {
-                    if (!EzPatternRatings.TryParseSkillId(reader.GetString(0), out string patternId))
+                    if (!EzMinaSkillRating.TryParseSkillId(reader.GetString(0), out string patternId))
                         continue;
 
-                    list.Add(new EzPatternRating(patternId, reader.GetDouble(1), reader.GetInt32(2)));
+                    list.Add(new EzSkillRatingPlayData(patternId, reader.GetDouble(1), reader.GetInt32(2)));
                 }
 
-                return (IReadOnlyList<EzPatternRating>)list;
+                return (IReadOnlyList<EzSkillRatingPlayData>)list;
             });
         }
 
@@ -866,12 +866,12 @@ namespace osu.Game.EzOsuGame.Skills
             return values;
         }
 
-        private static IReadOnlyDictionary<string, double> patternValues(IReadOnlyList<EzPatternRating> ratings)
+        private static IReadOnlyDictionary<string, double> patternValues(IReadOnlyList<EzSkillRatingPlayData> ratings)
         {
             var values = new Dictionary<string, double>(ratings.Count, StringComparer.Ordinal);
 
             foreach (var rating in ratings)
-                values[EzPatternRatings.ToSkillId(rating.Id)] = rating.Rating;
+                values[EzMinaSkillRating.ToSkillId(rating.SkillId)] = rating.SkillRating;
 
             return values;
         }

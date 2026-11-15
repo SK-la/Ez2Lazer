@@ -11,7 +11,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
     /// The closed vocabulary of pattern tags produced by the structure pass.
     /// </summary>
     /// <remarks>
-    /// Tag ids are storage keys and must stay stable. <see cref="EzManiaRCAxisExtensions.PLAYER_AXES"/> is the
+    /// Tag ids are storage keys and must stay stable. <see cref="EzManiaRCAxisExtensions.PLAYER_RC_AXES"/> is the
     /// subset that carries a player rating, in presentation order.
     /// </remarks>
     public enum EzManiaRCAxis
@@ -64,7 +64,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public static EzManiaRCAxis[] All => EzEnumMetaCache<EzManiaRCAxis>.ALL;
 
         /// <summary>Tags that carry a player rating. Order defines the rating presentation order.</summary>
-        public static readonly EzManiaRCAxis[] PLAYER_AXES =
+        public static readonly EzManiaRCAxis[] PLAYER_RC_AXES =
         {
             EzManiaRCAxis.Chordstream,
             EzManiaRCAxis.Bracket,
@@ -72,11 +72,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             EzManiaRCAxis.Stream,
             EzManiaRCAxis.Jack,
             EzManiaRCAxis.Tech,
-            EzManiaRCAxis.Ln,
         };
-
-        /// <summary>Player axes drawn on the pattern radar polygon; LN has its own layer.</summary>
-        public static EzManiaRCAxis[] PlayerRadarAxes { get; } = PLAYER_AXES.Where(static a => a != EzManiaRCAxis.Ln).ToArray();
 
         /// <summary>Every declared pattern id, for set membership tests.</summary>
         public static IReadOnlySet<string> AllIds { get; } = new HashSet<string>(All.Select(static a => a.ToId()), StringComparer.Ordinal);
@@ -84,9 +80,6 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public static EzSkillMetaAttribute Meta(this EzManiaRCAxis tag) => EzEnumMetaCache<EzManiaRCAxis>.Meta(tag);
 
         public static string ToId(this EzManiaRCAxis tag) => tag.Meta().Id;
-
-        /// <summary>Player rating row id: the pattern system prefix plus the tag id.</summary>
-        public static string ToSkillId(this EzManiaRCAxis tag) => tag.ToId();
 
         public static EzSkillChip Chip(this EzManiaRCAxis tag) => tag.Meta().Chip;
 

@@ -630,7 +630,7 @@ namespace osu.Game.EzOsuGame.HUD
         /// The generic n-key engine returns a ~0.18 sliver for skillsets it does not rate, which is noise next to a
         /// real bar. The spoke stays; only its value reads as absent.
         /// </summary>
-        private static double displayValue(double value) => double.IsFinite(value) && value >= EzPatternRatings.DISPLAY_MIN ? value : 0;
+        private static double displayValue(double value) => double.IsFinite(value) && value >= EzMinaSkillRating.DISPLAY_MIN ? value : 0;
 
         private static IReadOnlyDictionary<string, double> structureAxesOf(in EzAnalysisResult analysis) => analysis.AxesOf(EzAnalysisSystem.CSI);
 

@@ -227,7 +227,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                     ? pp
                     : Array.Empty<SkillVectorPlayOverall>();
 
-                var patternRatings = EzPatternRatings.AggregateModePatternRatings(
+                var skillRatings = EzMinaSkillRating.AggregateModeSkillRatings(
                     patternPlays.Select(static p => (p.Overall, Patterns: p.SkillVector)));
 
                 // One transaction for the keymode: the aggregated rating skills, the replaced history curve and the pattern
@@ -239,7 +239,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                     keymodeVectors.Count,
                     provisional,
                     buildChronologicalHistorySamples(timed),
-                    patternRatings);
+                    skillRatings);
             }
 
             PendingEvidence = evidence;
@@ -341,7 +341,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                     {
                         Username = username,
                         KeyCount = keyCount,
-                        SkillId = EzPatternRatings.ToSkillId(patternId),
+                        SkillId = EzMinaSkillRating.ToSkillId(patternId),
                         BeatmapHash = play.BeatmapHash,
                         AxisValue = vector.Overall,
                         Accuracy = play.Accuracy,

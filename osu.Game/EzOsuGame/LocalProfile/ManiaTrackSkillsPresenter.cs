@@ -48,7 +48,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             var bars = new List<EzTrackSkillsAxis>(radar.Count + 1);
 
-            if (playerRating.Overall >= EzPatternRatings.DISPLAY_MIN)
+            if (playerRating.Overall >= EzMinaSkillRating.DISPLAY_MIN)
             {
                 var overallMeta = EzMinaSkillAxis.Overall.Meta();
                 bars.Add(new EzTrackSkillsAxis(
@@ -74,7 +74,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
         public LocalisableString ResolveDisplayName(string skillId)
         {
-            if (EzPatternRatings.TryParseSkillId(skillId, out string patternId)
+            if (EzMinaSkillRating.TryParseSkillId(skillId, out string patternId)
                 && EzManiaRCAxisExtensions.TryParse(patternId, out var patternAxis))
             {
                 return patternAxis.Meta().DisplayName;

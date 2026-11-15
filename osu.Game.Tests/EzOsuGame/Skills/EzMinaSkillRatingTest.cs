@@ -11,7 +11,7 @@ using osu.Game.EzOsuGame.Skills.Pattern;
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
     [TestFixture]
-    public class EzPatternRatingsTest
+    public class EzMinaSkillRatingTest
     {
         [Test]
         public void Aggregate_requires_min_plays_and_uses_overall()
@@ -25,12 +25,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             plays.Add((10, new[] { "delay" }));
             plays.Add((12, new[] { "delay" })); // delay only 2 → dropped
 
-            var ratings = EzPatternRatings.AggregateModePatternRatings(plays);
+            var ratings = EzMinaSkillRating.AggregateModeSkillRatings(plays);
 
             Assert.That(ratings.Count, Is.EqualTo(1));
-            Assert.That(ratings[0].Id, Is.EqualTo("tech"));
-            Assert.That(ratings[0].Plays, Is.EqualTo(4));
-            Assert.That(ratings[0].Rating, Is.GreaterThan(10));
+            Assert.That(ratings[0].SkillId, Is.EqualTo("tech"));
+            Assert.That(ratings[0].PlayCount, Is.EqualTo(4));
+            Assert.That(ratings[0].SkillRating, Is.GreaterThan(10));
         }
 
         [Test]
@@ -45,16 +45,16 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var patterns = new[]
             {
-                new EzPatternRating("tech", 22, 10),
-                new EzPatternRating("jack", 18, 8),
-                new EzPatternRating("delay", 16, 5),
+                new EzSkillRatingPlayData("tech", 22, 10),
+                new EzSkillRatingPlayData("jack", 18, 8),
+                new EzSkillRatingPlayData("delay", 16, 5),
             };
 
-            var entries = EzPatternRatings.SkillModeEntries(6, ssr, patterns);
+            var entries = EzMinaSkillRating.SkillModeEntries(6, ssr, patterns);
 
             Assert.That(entries.Count, Is.EqualTo(3));
-            Assert.That(entries.All(e => EzPatternRatings.TryParseSkillId(e.SkillId, out _)));
-            Assert.That(entries[0].SkillId, Is.EqualTo(EzPatternRatings.ToSkillId("tech")));
+            Assert.That(entries.All(e => EzMinaSkillRating.TryParseSkillId(e.SkillId, out _)));
+            Assert.That(entries[0].SkillId, Is.EqualTo(EzMinaSkillRating.ToSkillId("tech")));
             Assert.That(entries.Any(e => e.SkillId.Contains("tech", StringComparison.Ordinal)));
         }
 
@@ -67,10 +67,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 [EzMinaSkillAxis.Technical.ToMetaId()] = 0.2,
             };
 
-            var entries = EzPatternRatings.SkillModeEntries(4, ssr, Array.Empty<EzPatternRating>());
+            var entries = EzMinaSkillRating.SkillModeEntries(4, ssr, Array.Empty<EzSkillRatingPlayData>());
 
             Assert.That(entries.Any(e => e.SkillId == EzMinaSkillAxis.Stream.ToMetaId()));
-            Assert.That(entries.All(e => e.Value >= EzPatternRatings.DISPLAY_MIN));
+            Assert.That(entries.All(e => e.Value >= EzMinaSkillRating.DISPLAY_MIN));
         }
     }
 }
