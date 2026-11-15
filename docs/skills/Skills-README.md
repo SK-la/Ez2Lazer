@@ -35,16 +35,16 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
     The official pair is mirrored onto `BeatmapInfo.StarRating` / `PerformancePoints`, which stay the authority for
     upstream code.
   - `EzRatingWriter` — the only write path; finds the field through the producer declaration.
-  - `EzMinaRatingScale` — the engine's headline to star conversion, applied once when the Mina star is written and
+  - `EzMinaStarRatingScale` — the engine's headline to star conversion, applied once when the Mina star is written and
     again only for the live axis. `beatmap_msd.*` keeps the engine's own scale for the radar and the dan chain.
 - Player SSR aggregation:
-  - `EzPlayerMinaAggregator`
+  - `EzMinaPlayerSkillAggregator`
   - `EzDanPlaySsrIndex`
 - Pattern / motion / jack / LN helpers:
   - `EzManiaPatternAnalyzer`
   - `EzMotionFeaturesComputer`
-  - `EzFourKeyJackDemand`
-  - `EzLnSkillRadar`
+  - `EzMinaFourKeyJackDemand`
+  - `EzLnSkillRadar` (under `SkillTag/`)
 - Dan ladder / label helpers:
   - `Dan/`
   - `EzDanLadders`
@@ -199,7 +199,7 @@ This folder's code docs describe the skill computation pipeline used by Ez2Lazer
 
 | 系统 | 规则集 | 切片 | 轴来源 |
 |---|---|---|---|
-| Sunny / pattern / dan | 仅 mania | 每个 keymode 一个 | `EzManiaSkillAxis` / `EzPatternRatings` / `EzDanEngine` |
+| Sunny / pattern / dan | 仅 mania | 每个 keymode 一个 | `EzManiaSkillAxis` / `EzMinaPlayerSkillModeData` / `EzDanEngine` |
 | PP+ | osu / taiko / catch / mania（`EzPPPSkillCatalog.SupportedRulesets`） | mania 按 keymode，其他一个 | `EzPPPSkillCatalog.MetricsFor(ruleset)` |
 
 PP+ 是唯一横跨四个规则集的玩家系统，所以 `ComputeAsync` 会为每个受支持规则集各收集一次成绩、
@@ -262,7 +262,7 @@ CSI 行（那种行由 BDSP 的修复集改写为 stub）。否则"全部最新"
 - `EzChartSkillInfoComputer`: chart metadata, pattern tags, motion, LeoBlack cluster fallback.
 - `EzChartDanEstimator`: chart dan calculation and live snapshot flow.
 - `EzDanSkillsetFiling`: skillset bucketing and quorum logic.
-- `EzPlayerMinaAggregator` / `EzPlayerDanAggregator`: player-side folds. Both take `EzSkillPlayRow` sets plus a
+- `EzMinaPlayerSkillAggregator` / `EzPlayerDanAggregator`: player-side folds. Both take `EzSkillPlayRow` sets plus a
   resolver rather than scores, so a cached play folds straight from its cache row (no mods re-parse, no beatmap) and
   only the plays no cache answers are detached — in bounded windows, never a whole library.
 - `EzLocalProfileService` (`LocalProfile/`): the SQLite slice + Realm skill writer; `IngestSettledScore`

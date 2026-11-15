@@ -8,7 +8,7 @@ using osu.Game.EzOsuGame.Skills.SkillTag;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>Port of mania-hub <c>classifyFourKeyJackDemand</c> (jack-demand.ts).</summary>
-    public static class EzFourKeyJackDemand
+    public static class EzMinaFourKeyJackDemand
     {
         public const int VERSION = 20240102;
 

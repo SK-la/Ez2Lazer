@@ -205,18 +205,18 @@ namespace osu.Game.Tests.EzOsuGame.Skills
     }
 
     [TestFixture]
-    public class EzMinaPlayerSkillRatingMathTest
+    public class EzMinaPlayerSkillMathTest
     {
         [Test]
         public void Aggregate_empty_returns_zero()
         {
-            Assert.That(EzMinaPlayerSkillRatingMath.Aggregate(Array.Empty<double>()), Is.EqualTo(0));
+            Assert.That(EzMinaPlayerSkillMath.Aggregate(Array.Empty<double>()), Is.EqualTo(0));
         }
 
         [Test]
         public void Aggregate_single_value_near_input()
         {
-            double rating = EzMinaPlayerSkillRatingMath.Aggregate(new[] { 20.0 });
+            double rating = EzMinaPlayerSkillMath.Aggregate(new[] { 20.0 });
             Assert.That(rating, Is.GreaterThan(10));
             Assert.That(rating, Is.LessThan(25));
             // Etterna AggregateSunnySRs with a single sample sits slightly below the raw SunnySR after scaler/rounding.
@@ -232,7 +232,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 new EzMinaSkillAxisData(12, 11, 10, 9, 8, 7, 6, 5),
             };
 
-            var result = EzMinaPlayerSkillRatingMath.AggregateVectors(plays);
+            var result = EzMinaPlayerSkillMath.AggregateVectors(plays);
             Assert.That(result.Overall, Is.GreaterThan(0));
             Assert.That(result.Stream, Is.GreaterThan(0));
             Assert.That(result.Technical, Is.GreaterThan(0));

@@ -10,7 +10,6 @@ using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.Pattern;
 
 namespace osu.Game.EzOsuGame.Skills
 {
@@ -104,7 +103,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// Aggregated player Mina rating skills (MinaCalc rating axes). Stored under <see cref="EzAnalysisSystem.Mina"/>,
         /// not chart <see cref="EzAnalysisSystem.SSR"/> (Sunny).
         /// </summary>
-        public EzMinaPlayerSkillRating GetPlayerMinaSkillAxisSnapshot(string username, int keyCount, int? algorithmVersion = null)
+        public EzMinaPlayerSkillSnapshot GetPlayerMinaSkillAxisSnapshot(string username, int keyCount, int? algorithmVersion = null)
         {
             int version = algorithmVersion ?? EzMinaEngine.VERSION;
 
@@ -114,11 +113,11 @@ namespace osu.Game.EzOsuGame.Skills
                 var values = readValues(c, query);
 
                 if (values.Count == 0)
-                    return new EzMinaPlayerSkillRating();
+                    return new EzMinaPlayerSkillSnapshot();
 
                 var (plays, provisional) = readMeta(c, query);
 
-                return new EzMinaPlayerSkillRating
+                return new EzMinaPlayerSkillSnapshot
                 {
                     Values = values,
                     AnalyzedPlays = plays,
@@ -244,7 +243,7 @@ namespace osu.Game.EzOsuGame.Skills
             int analyzedPlays,
             bool provisional,
             IReadOnlyList<(DateTimeOffset RecordedAt, EzMinaSkillAxisData Vector)> historySamples,
-            IReadOnlyList<EzSkillRatingPlayData> skillRatings)
+            IReadOnlyList<EzMinaPlayerSkillTagPlayData> skillRatings)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(username);
             ArgumentNullException.ThrowIfNull(historySamples);
@@ -265,9 +264,9 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
-        public IReadOnlyList<EzSkillRatingPlayData> GetPlayerSkillRatings(string username, int keyCount, int? algorithmVersion = null)
+        public IReadOnlyList<EzMinaPlayerSkillTagPlayData> GetPlayerSkillRatings(string username, int keyCount, int? algorithmVersion = null)
         {
-            int version = algorithmVersion ?? EzMinaSkillRating.VERSION;
+            int version = algorithmVersion ?? EzMinaPlayerSkillModeData.VERSION;
 
             return database.Read(c =>
             {
@@ -283,18 +282,18 @@ namespace osu.Game.EzOsuGame.Skills
                 cmd.Parameters.AddWithValue("$system", EzAnalysisSystem.Pattern.ToStorageId());
                 cmd.Parameters.AddWithValue("$version", version);
 
-                var list = new List<EzSkillRatingPlayData>();
+                var list = new List<EzMinaPlayerSkillTagPlayData>();
                 using var reader = cmd.ExecuteReader();
 
                 while (reader.Read())
                 {
-                    if (!EzMinaSkillRating.TryParseSkillId(reader.GetString(0), out string patternId))
+                    if (!EzMinaPlayerSkillModeData.TryParseSkillId(reader.GetString(0), out string patternId))
                         continue;
 
-                    list.Add(new EzSkillRatingPlayData(patternId, reader.GetDouble(1), reader.GetInt32(2)));
+                    list.Add(new EzMinaPlayerSkillTagPlayData(patternId, reader.GetDouble(1), reader.GetInt32(2)));
                 }
 
-                return (IReadOnlyList<EzSkillRatingPlayData>)list;
+                return (IReadOnlyList<EzMinaPlayerSkillTagPlayData>)list;
             });
         }
 
@@ -866,12 +865,12 @@ namespace osu.Game.EzOsuGame.Skills
             return values;
         }
 
-        private static IReadOnlyDictionary<string, double> patternValues(IReadOnlyList<EzSkillRatingPlayData> ratings)
+        private static IReadOnlyDictionary<string, double> patternValues(IReadOnlyList<EzMinaPlayerSkillTagPlayData> ratings)
         {
             var values = new Dictionary<string, double>(ratings.Count, StringComparer.Ordinal);
 
             foreach (var rating in ratings)
-                values[EzMinaSkillRating.ToSkillId(rating.SkillId)] = rating.SkillRating;
+                values[EzMinaPlayerSkillModeData.ToSkillId(rating.SkillId)] = rating.SkillRating;
 
             return values;
         }

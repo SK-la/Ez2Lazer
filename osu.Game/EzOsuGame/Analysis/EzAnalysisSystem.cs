@@ -7,7 +7,6 @@ using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.Pattern;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SSR;
@@ -141,7 +140,7 @@ namespace osu.Game.EzOsuGame.Analysis
             EzAnalysisSystem.CSI => EzCSIEngine.VERSION,
             EzAnalysisSystem.Dan => EzDanEngine.VERSION,
             EzAnalysisSystem.PPP => EzPPPEngine.VERSION,
-            EzAnalysisSystem.Pattern => EzMinaSkillRating.VERSION,
+            EzAnalysisSystem.Pattern => EzMinaPlayerSkillModeData.VERSION,
             EzAnalysisSystem.SSR => EzSSRUnit.VERSION,
             _ => 0,
         };

@@ -7,9 +7,9 @@ using System.Collections.Generic;
 namespace osu.Game.EzOsuGame.Skills.Mina
 {
     /// <summary>
-    /// Detached player Mina rating snapshot for one username + keymode (values + row metadata; not chart SSR).
+    /// Detached player Mina skill axis snapshot for one username + keymode (values + row metadata; not chart SSR).
     /// </summary>
-    public sealed class EzMinaPlayerSkillRating
+    public sealed class EzMinaPlayerSkillSnapshot
     {
         public const int QUALIFYING_PLAYS = 3;
 

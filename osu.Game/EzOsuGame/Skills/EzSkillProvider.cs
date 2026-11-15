@@ -16,7 +16,6 @@ using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
-using osu.Game.EzOsuGame.Skills.Pattern;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets.Mods;
 
@@ -70,7 +69,7 @@ namespace osu.Game.EzOsuGame.Skills
         private readonly ConcurrentDictionary<(string Username, int KeyCount), PlayerRatingMemo> playerRatingSnapshotMemo
             = new ConcurrentDictionary<(string Username, int KeyCount), PlayerRatingMemo>();
 
-        private readonly record struct PlayerRatingMemo(EzMinaPlayerSkillRating Rating, long Timestamp);
+        private readonly record struct PlayerRatingMemo(EzMinaPlayerSkillSnapshot Rating, long Timestamp);
 
         /// <summary>Short-lived dan label/rating memo (see <see cref="GetDanDisplay"/>); plain values only.</summary>
         private readonly ConcurrentDictionary<(string Username, int KeyCount, string Side), DanDisplayMemo> danDisplayMemo
@@ -428,7 +427,7 @@ namespace osu.Game.EzOsuGame.Skills
         /// (once per bindable-driven DualPanel/radar refresh); the TTL collapses those into one Realm read.
         /// Mirrors the other session caches here — a fresh compute becomes visible within the TTL at worst.
         /// </summary>
-        public EzMinaPlayerSkillRating GetPlayerRatingSnapshot(string username, int keyCount)
+        public EzMinaPlayerSkillSnapshot GetPlayerRatingSnapshot(string username, int keyCount)
         {
             var key = (username, keyCount);
 
@@ -446,7 +445,7 @@ namespace osu.Game.EzOsuGame.Skills
             return snapshot;
         }
 
-        private EzMinaPlayerSkillRating loadPlayerRatingSnapshot(string username, int keyCount)
+        private EzMinaPlayerSkillSnapshot loadPlayerRatingSnapshot(string username, int keyCount)
         {
             var snapshot = PlayerStore.GetPlayerMinaSkillAxisSnapshot(username, keyCount);
             if (snapshot.Values.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
@@ -520,7 +519,7 @@ namespace osu.Game.EzOsuGame.Skills
             }
         }
 
-        public IReadOnlyList<EzSkillRatingPlayData> GetPlayerSkillRatings(string username, int keyCount)
+        public IReadOnlyList<EzMinaPlayerSkillTagPlayData> GetPlayerSkillRatings(string username, int keyCount)
         {
             var ratings = PlayerStore.GetPlayerSkillRatings(username, keyCount);
             if (ratings.Count > 0 || !EzLocalProfileConstants.IsGuestUsername(username))
@@ -530,11 +529,11 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>Hub <c>skillModeEntries</c> for LocalProfile Track / Skills HUD.</summary>
-        public IReadOnlyList<EzSkillModeEntry> GetSkillModeEntries(string username, int keyCount)
+        public IReadOnlyList<EzMinaPlayerSkillModeEntry> GetSkillModeEntries(string username, int keyCount)
         {
             var snapshot = GetPlayerRatingSnapshot(username, keyCount);
             var patterns = GetPlayerSkillRatings(username, keyCount);
-            return EzMinaSkillRating.SkillModeEntries(keyCount, snapshot.Values, patterns);
+            return EzMinaPlayerSkillModeData.SkillModeEntries(keyCount, snapshot.Values, patterns);
         }
 
         public IReadOnlyList<int> GetPlayerRatingKeyCounts(string username)
