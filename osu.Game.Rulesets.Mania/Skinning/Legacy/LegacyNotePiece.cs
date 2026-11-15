@@ -127,7 +127,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
         protected virtual Drawable? GetAnimation(ISkinSource skin) => GetAnimationFromLookup(skin, LegacyManiaSkinConfigurationLookups.NoteImage);
 
         protected Drawable? GetAnimationFromLookup(ISkin skin, LegacyManiaSkinConfigurationLookups lookup)
-            => skin.GetAnimation(GetNoteImageName(skin, lookup), WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true);
+            => skin.GetAnimation(GetNoteImageName(skin, lookup), WrapMode.ClampToEdge, WrapMode.ClampToEdge, true, true, colorize: true);
 
         protected override void Dispose(bool isDisposing)
         {

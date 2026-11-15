@@ -4,6 +4,7 @@
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Note;
 using osu.Game.EzOsuGame.Localization;
@@ -95,7 +96,14 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
                 },
             };
 
-            session.TrueColouring.Disabled = true;
+            session.ColouringMode.BindValueChanged(e => session.TrueColouring.Value = e.NewValue == EzColouringMode.True, true);
+            session.TrueColouring.BindValueChanged(e =>
+            {
+                if (e.NewValue)
+                    session.ColouringMode.Value = EzColouringMode.True;
+                else if (session.ColouringMode.Value == EzColouringMode.True)
+                    session.ColouringMode.Value = EzColouringMode.Direct;
+            });
             refreshVariants();
 
             session.Ruleset.BindValueChanged(_ => refreshVariants(), false);

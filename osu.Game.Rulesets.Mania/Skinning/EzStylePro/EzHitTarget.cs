@@ -9,6 +9,7 @@ using osu.Framework.Platform;
 using osu.Framework.Timing;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.Skinning;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens.Play;
 
@@ -80,11 +81,11 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
         {
             if (!hitTargetColouringEnabled.Value || noteDisplayTint == null)
             {
-                Colour = Colour4.White;
+                EzNoteRecolour.ApplyToDrawable(this, Colour4.White, EzColouringMode.Direct, EzColouringRange.All);
                 return;
             }
 
-            Colour = noteDisplayTint.GetDisplayColour(ManiaNoteDisplayColourPart.HitTarget, Column, 0);
+            noteDisplayTint.ApplyDisplayColour(this, ManiaNoteDisplayColourPart.HitTarget, Column, 0);
         }
 
         protected override void Update()

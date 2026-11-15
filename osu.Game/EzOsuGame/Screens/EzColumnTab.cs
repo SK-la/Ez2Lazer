@@ -178,6 +178,12 @@ namespace osu.Game.EzOsuGame.Screens
                         TooltipText = EzSkinStrings.COLOURING_MODE_TOOLTIP,
                         Current = ezSkinConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode),
                     },
+                    new SettingsEnumDropdown<EzColouringRange>
+                    {
+                        LabelText = EzSkinStrings.COLOURING_RANGE,
+                        TooltipText = EzSkinStrings.COLOURING_RANGE_TOOLTIP,
+                        Current = ezSkinConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange),
+                    },
                     baseColorsContainer = new FillFlowContainer
                     {
                         RelativeSizeAxes = Axes.X,

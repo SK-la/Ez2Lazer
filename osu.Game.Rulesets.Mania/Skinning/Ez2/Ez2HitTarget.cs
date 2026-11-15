@@ -73,7 +73,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Ez2
                 return;
             }
 
-            Colour = noteDisplayTint.GetDisplayColour(ManiaNoteDisplayColourPart.HitTarget, Column, 0);
+            noteDisplayTint.ApplyDisplayColour(this, ManiaNoteDisplayColourPart.HitTarget, Column, 0);
         }
 
         protected override void Update()

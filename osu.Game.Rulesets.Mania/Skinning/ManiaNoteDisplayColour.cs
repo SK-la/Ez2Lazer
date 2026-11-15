@@ -19,13 +19,15 @@ namespace osu.Game.Rulesets.Mania.Skinning
         /// </summary>
         public static Colour4 ForColumnNoteDisplayTint(Colour4 columnColour, EzColouringMode colouringMode)
         {
-            if (colouringMode == EzColouringMode.Direct)
-                return columnColour;
+            if (colouringMode == EzColouringMode.Tint)
+            {
+                return ManiaNoteDisplayTint.ApplyTo(
+                    columnColour,
+                    ManiaNoteDisplayTint.DEFAULT_TARGET_GRAYSCALE,
+                    ManiaNoteDisplayTint.DEFAULT_COLOUR_ALPHA);
+            }
 
-            return ManiaNoteDisplayTint.ApplyTo(
-                columnColour,
-                ManiaNoteDisplayTint.DEFAULT_TARGET_GRAYSCALE,
-                ManiaNoteDisplayTint.DEFAULT_COLOUR_ALPHA);
+            return columnColour;
         }
 
         /// <summary>
@@ -33,10 +35,10 @@ namespace osu.Game.Rulesets.Mania.Skinning
         /// </summary>
         public static Color4 ForBeatLineDisplayColour(int lineDivisor, OsuColour colours, ManiaEditorBeatLinePalette? palette, EzColouringMode colouringMode)
         {
-            if (colouringMode == EzColouringMode.Direct)
-                return ManiaEditorBeatLinePalette.LineColour(lineDivisor, colours, palette);
+            if (colouringMode == EzColouringMode.Tint)
+                return ManiaNoteDisplayTint.GetDivisorNoteColourFromLineDivisor(lineDivisor, colours, palette);
 
-            return ManiaNoteDisplayTint.GetDivisorNoteColourFromLineDivisor(lineDivisor, colours, palette);
+            return ManiaEditorBeatLinePalette.LineColour(lineDivisor, colours, palette);
         }
     }
 }

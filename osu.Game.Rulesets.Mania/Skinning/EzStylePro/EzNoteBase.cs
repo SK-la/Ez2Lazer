@@ -67,14 +67,20 @@ namespace osu.Game.Rulesets.Mania.Skinning.EzStylePro
             if (Column == null)
                 return;
 
-            // 节拍线色按 note 时刻区分，由 Drawable 外壳乘上去。这里只负责列色。
+            // 节拍线色按 note 时刻区分，由 Drawable 外壳写 ColorizeSprite。这里只负责列色。
             if (noteDisplayTint?.DivisorNoteColouringEnabled == true)
             {
                 Colour = Colour4.White;
                 return;
             }
 
-            Colour = noteDisplayTint?.GetDisplayColour(DisplayColourPart, Column, 0) ?? Colour4.White;
+            if (noteDisplayTint == null)
+            {
+                Colour = Colour4.White;
+                return;
+            }
+
+            noteDisplayTint.ApplyDisplayColour(this, DisplayColourPart, Column, 0);
         }
 
         protected Drawable? LoadEzProNoteComponent(EzManiaNotePart part)

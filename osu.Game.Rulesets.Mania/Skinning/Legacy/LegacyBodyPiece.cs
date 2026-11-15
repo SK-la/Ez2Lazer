@@ -82,7 +82,7 @@ namespace osu.Game.Rulesets.Mania.Skinning.Legacy
             isHitting.BindTo(holdNote.IsHolding);
             missingStartTime.BindTo(holdNote.MissingStartTime);
 
-            bodySprite = skin.GetAnimation(imageName, wrapMode, wrapMode, true, true, frameLength: 30)?.With(d =>
+            bodySprite = skin.GetAnimation(imageName, wrapMode, wrapMode, true, true, frameLength: 30, colorize: true)?.With(d =>
             {
                 if (d is TextureAnimation animation)
                     animation.IsPlaying = false;

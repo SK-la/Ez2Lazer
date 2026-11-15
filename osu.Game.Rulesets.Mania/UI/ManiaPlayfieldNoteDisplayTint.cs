@@ -10,6 +10,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.EzOsuGame.Layout;
+using osu.Game.EzOsuGame.Skinning;
 using osu.Game.Graphics;
 using osu.Game.Rulesets.Mania.Edit;
 using osu.Game.Rulesets.Mania.Skinning;
@@ -67,6 +68,10 @@ namespace osu.Game.Rulesets.Mania.UI
         /// </summary>
         public bool DisplayTintActive => DivisorNoteColouringEnabled || ColumnNoteColouringEnabled;
 
+        public EzColouringMode ColouringMode => colouringMode.Value;
+
+        public EzColouringRange ColouringRange => colouringRange.Value;
+
         public bool IsEditorCompose => editorBeatmap != null;
 
         [Resolved]
@@ -96,8 +101,10 @@ namespace osu.Game.Rulesets.Mania.UI
         private Bindable<bool> colorSettingsEnabled = null!;
         private Bindable<bool> builtInColourTemplate = null!;
         private Bindable<EzColouringMode> colouringMode = null!;
+        private Bindable<EzColouringRange> colouringRange = null!;
         private Action<ValueChangedEvent<bool>>? onDisplaySettingsChanged;
         private Action<ValueChangedEvent<EzColouringMode>>? onColouringModeChanged;
+        private Action<ValueChangedEvent<EzColouringRange>>? onColouringRangeChanged;
 
         private readonly Dictionary<long, int> lineDivisorBySnapMs = new Dictionary<long, int>();
         private readonly Dictionary<int, Color4> tintByLineDivisor = new Dictionary<int, Color4>();
@@ -125,6 +132,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
             return Color4.White;
         }
+
+        public void ApplyDisplayColour(Drawable target, ManiaNoteDisplayColourPart part, Column column, double startTime)
+            => EzNoteRecolour.ApplyToDrawable(target, GetDisplayColour(part, column, startTime), ColouringMode, ColouringRange);
 
         /// <summary>
         /// 列色或节拍线着色任一开着即用白底贴图乘色。命中靶贴图与此一致，但 <see cref="GetDisplayColour"/> 对靶不吃节拍线时刻色。
@@ -162,6 +172,7 @@ namespace osu.Game.Rulesets.Mania.UI
             colorSettingsEnabled = ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
             builtInColourTemplate = ezConfig.GetBindable<bool>(Ez2Setting.ManiaSkipEmptyEdgeColumns);
             colouringMode = ezConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode);
+            colouringRange = ezConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange);
             applyColumnNoteColouring();
             applyBuiltInLayoutTemplate();
 
@@ -171,6 +182,8 @@ namespace osu.Game.Rulesets.Mania.UI
 
             onColouringModeChanged = syncColouringMode;
             colouringMode.BindValueChanged(onColouringModeChanged);
+            onColouringRangeChanged = _ => Changed?.Invoke();
+            colouringRange.BindValueChanged(onColouringRangeChanged);
 
             paletteBinding = new ManiaEditorDivisorPaletteBinding(configStore);
             onPaletteChanged = invalidateTintColours;
@@ -204,6 +217,9 @@ namespace osu.Game.Rulesets.Mania.UI
 
                 if (onColouringModeChanged != null)
                     colouringMode.ValueChanged -= onColouringModeChanged;
+
+                if (onColouringRangeChanged != null)
+                    colouringRange.ValueChanged -= onColouringRangeChanged;
             }
 
             base.Dispose(isDisposing);

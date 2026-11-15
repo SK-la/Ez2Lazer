@@ -484,8 +484,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString NOTE_TRUE_COLOURING_LABEL = new EzLocalizationManager.EzLocalisableString("真着色", "True colouring");
 
         public static readonly LocalisableString NOTE_TRUE_COLOURING_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "TODO: EzNoteTrueColourProcessor",
-            "TODO: EzNoteTrueColourProcessor");
+            "打开后使用真着色（SetLum 保明度）。关闭则回到直接着色。范围仍用全局「着色范围」。",
+            "On: True colouring (SetLum, keeps luminance). Off: Direct. Range still follows the global colouring range.");
 
         public static readonly LocalisableString NOTE_WIDTH_LABEL = new EzLocalizationManager.EzLocalisableString("宽度", "Width");
 

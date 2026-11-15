@@ -193,7 +193,7 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 return;
             }
 
-            headPiece.Colour = noteDisplayTint.GetDisplayColour(DisplayColourPart, column, HitObject?.StartTime ?? 0);
+            noteDisplayTint.ApplyDisplayColour(headPiece, DisplayColourPart, column, HitObject?.StartTime ?? 0);
         }
 
         public bool CanRouteToKPoor => ManiaEzDrawableJudgement.CanRouteToKPoor(this);

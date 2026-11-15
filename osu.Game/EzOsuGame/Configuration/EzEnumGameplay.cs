@@ -34,6 +34,24 @@ namespace osu.Game.EzOsuGame.Configuration
         /// </summary>
         [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.COLOURING_MODE_TINT))]
         Tint = 1,
+
+        /// <summary>
+        /// Photoshop Color / PDF SetLum：按像素保留贴图明度，只换色相。
+        /// </summary>
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.COLOURING_MODE_TRUE))]
+        True = 2,
+    }
+
+    public enum EzColouringRange
+    {
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.COLOURING_RANGE_ALL))]
+        All = 0,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.COLOURING_RANGE_GRAY))]
+        Gray = 1,
+
+        [LocalisableDescription(typeof(EzEnumStrings), nameof(EzEnumStrings.COLOURING_RANGE_KEEP_WHITE))]
+        KeepWhite = 2,
     }
 
     public enum EzEnumJudgeMode

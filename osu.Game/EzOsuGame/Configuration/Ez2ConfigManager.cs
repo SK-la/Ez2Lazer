@@ -253,7 +253,8 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.ColumnBlur, 0.3, 0.0, 1, 0.01);
 
             SetDefault(Ez2Setting.ColorSettingsEnabled, true);
-            SetDefault(Ez2Setting.ColouringMode, EzColouringMode.Direct);
+            SetDefault(Ez2Setting.ColouringMode, EzColouringMode.True);
+            SetDefault(Ez2Setting.ColouringRange, EzColouringRange.Gray);
             SetDefault(Ez2Setting.ColumnTypeA, Colour4.FromHex("#F5F5F5"));
             SetDefault(Ez2Setting.ColumnTypeB, Colour4.FromHex("#648FFF"));
             SetDefault(Ez2Setting.ColumnTypeS, Colour4.FromHex("#FF4A4A"));
@@ -1437,6 +1438,11 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 着色算法。所有走列色 / 节拍线色的着色点共用；只改颜色计算，不改贴图选择。
         /// </summary>
         ColouringMode,
+
+        /// <summary>
+        /// 着色范围。与 <see cref="ColouringMode"/> 正交：全体 / 仅灰度 / 保白。
+        /// </summary>
+        ColouringRange,
 
         ColumnDim,
         ColumnBlur,

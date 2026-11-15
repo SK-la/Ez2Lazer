@@ -4,7 +4,8 @@
 using System;
 using NUnit.Framework;
 using osu.Framework.Graphics;
-using osu.Game.Rulesets.Mania.Skinning;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skinning;
 
 namespace osu.Game.Rulesets.Mania.Tests.Skinning
 {
@@ -19,19 +20,19 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         private static readonly Colour4 red = new Colour4(1f, 0f, 0f, 1f);
         private static readonly Colour4 premul_white_glow = new Colour4(0.4f, 0.4f, 0.4f, 0.4f);
 
-        private static readonly ManiaNoteRecolourAlgorithm[] preserve_algorithms =
+        private static readonly EzNoteRecolourAlgorithm[] preserve_algorithms =
         {
-            ManiaNoteRecolourAlgorithm.SetLum,
-            ManiaNoteRecolourAlgorithm.HslKeepL,
-            ManiaNoteRecolourAlgorithm.HspKeepP,
-            ManiaNoteRecolourAlgorithm.LumaNormMul,
+            EzNoteRecolourAlgorithm.SetLum,
+            EzNoteRecolourAlgorithm.HslKeepL,
+            EzNoteRecolourAlgorithm.HspKeepP,
+            EzNoteRecolourAlgorithm.LumaNormMul,
         };
 
         [Test]
         public void DirectDarkensDarkGrey()
         {
-            float sourceLuma = ManiaNoteRecolour.Luma(dark_grey);
-            float directLuma = ManiaNoteRecolour.Luma(ManiaNoteRecolour.Apply(dark_grey, red, ManiaNoteRecolourAlgorithm.Direct));
+            float sourceLuma = EzNoteRecolour.Luma(dark_grey);
+            float directLuma = EzNoteRecolour.Luma(EzNoteRecolour.Apply(dark_grey, red, EzNoteRecolourAlgorithm.Direct));
 
             Assert.That(directLuma, Is.LessThan(sourceLuma - 0.05f));
         }
@@ -39,9 +40,9 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         [Test]
         public void SetLumKeepsDarkGreyLumaCloserThanDirect()
         {
-            float sourceLuma = ManiaNoteRecolour.Luma(dark_grey);
-            float directError = Math.Abs(ManiaNoteRecolour.Luma(ManiaNoteRecolour.Apply(dark_grey, red, ManiaNoteRecolourAlgorithm.Direct)) - sourceLuma);
-            float setLumError = Math.Abs(ManiaNoteRecolour.Luma(ManiaNoteRecolour.Apply(dark_grey, red, ManiaNoteRecolourAlgorithm.SetLum)) - sourceLuma);
+            float sourceLuma = EzNoteRecolour.Luma(dark_grey);
+            float directError = Math.Abs(EzNoteRecolour.Luma(EzNoteRecolour.Apply(dark_grey, red, EzNoteRecolourAlgorithm.Direct)) - sourceLuma);
+            float setLumError = Math.Abs(EzNoteRecolour.Luma(EzNoteRecolour.Apply(dark_grey, red, EzNoteRecolourAlgorithm.SetLum)) - sourceLuma);
 
             Assert.That(setLumError, Is.LessThan(0.02f));
             Assert.That(setLumError, Is.LessThan(directError));
@@ -50,8 +51,8 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         [Test]
         public void SetLumDoesNotCrushWhiteHighlightUnlikeLumaNormMul()
         {
-            float setLumLuma = ManiaNoteRecolour.Luma(ManiaNoteRecolour.Apply(white, red, ManiaNoteRecolourAlgorithm.SetLum));
-            float lumaMulLuma = ManiaNoteRecolour.Luma(ManiaNoteRecolour.Apply(white, red, ManiaNoteRecolourAlgorithm.LumaNormMul));
+            float setLumLuma = EzNoteRecolour.Luma(EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.SetLum));
+            float lumaMulLuma = EzNoteRecolour.Luma(EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.LumaNormMul));
 
             Assert.That(setLumLuma, Is.GreaterThan(0.85f));
             Assert.That(lumaMulLuma, Is.LessThan(0.4f));
@@ -60,7 +61,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         [Test]
         public void HspKeepPCrushesWhiteHighlightAfterGamutClamp()
         {
-            float hspLuma = ManiaNoteRecolour.Luma(ManiaNoteRecolour.Apply(white, red, ManiaNoteRecolourAlgorithm.HspKeepP));
+            float hspLuma = EzNoteRecolour.Luma(EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.HspKeepP));
 
             Assert.That(hspLuma, Is.LessThan(0.4f));
         }
@@ -70,11 +71,11 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         {
             Colour4[] greys = { dark_grey, mid_grey, white };
 
-            float setLumMaxError = maxLumaError(greys, ManiaNoteRecolourAlgorithm.SetLum);
-            float hslMaxError = maxLumaError(greys, ManiaNoteRecolourAlgorithm.HslKeepL);
-            float hspMaxError = maxLumaError(greys, ManiaNoteRecolourAlgorithm.HspKeepP);
-            float lumaMulMaxError = maxLumaError(greys, ManiaNoteRecolourAlgorithm.LumaNormMul);
-            float directMaxError = maxLumaError(greys, ManiaNoteRecolourAlgorithm.Direct);
+            float setLumMaxError = maxLumaError(greys, EzNoteRecolourAlgorithm.SetLum);
+            float hslMaxError = maxLumaError(greys, EzNoteRecolourAlgorithm.HslKeepL);
+            float hspMaxError = maxLumaError(greys, EzNoteRecolourAlgorithm.HspKeepP);
+            float lumaMulMaxError = maxLumaError(greys, EzNoteRecolourAlgorithm.LumaNormMul);
+            float directMaxError = maxLumaError(greys, EzNoteRecolourAlgorithm.Direct);
 
             Assert.That(setLumMaxError, Is.LessThan(directMaxError));
             Assert.That(setLumMaxError, Is.LessThan(hspMaxError));
@@ -87,7 +88,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         {
             foreach (var algorithm in preserve_algorithms)
             {
-                Colour4 result = ManiaNoteRecolour.Apply(saturated_blue, red, algorithm, ManiaNoteRecolourRange.Gray);
+                Colour4 result = EzNoteRecolour.Apply(saturated_blue, red, algorithm, EzColouringRange.Gray);
                 assertColourEqual(result, saturated_blue);
             }
         }
@@ -95,16 +96,16 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         [Test]
         public void GrayRangeRecoloursMidGreyWithSetLum()
         {
-            Colour4 result = ManiaNoteRecolour.Apply(mid_grey, red, ManiaNoteRecolourAlgorithm.SetLum, ManiaNoteRecolourRange.Gray);
+            Colour4 result = EzNoteRecolour.Apply(mid_grey, red, EzNoteRecolourAlgorithm.SetLum, EzColouringRange.Gray);
 
             Assert.That(result.R, Is.GreaterThan(result.G));
-            Assert.That(Math.Abs(ManiaNoteRecolour.Luma(result) - ManiaNoteRecolour.Luma(mid_grey)), Is.LessThan(0.02f));
+            Assert.That(Math.Abs(EzNoteRecolour.Luma(result) - EzNoteRecolour.Luma(mid_grey)), Is.LessThan(0.02f));
         }
 
         [Test]
         public void GrayRangeLetsDirectColourPureWhite()
         {
-            Colour4 result = ManiaNoteRecolour.Apply(white, red, ManiaNoteRecolourAlgorithm.Direct, ManiaNoteRecolourRange.Gray);
+            Colour4 result = EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.Direct, EzColouringRange.Gray);
 
             Assert.That(result.R, Is.EqualTo(1f).Within(0.001f));
             Assert.That(result.G, Is.EqualTo(0f).Within(0.001f));
@@ -114,7 +115,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         [Test]
         public void SetLumCannotHueShiftPureWhite()
         {
-            Colour4 result = ManiaNoteRecolour.Apply(white, red, ManiaNoteRecolourAlgorithm.SetLum, ManiaNoteRecolourRange.Gray);
+            Colour4 result = EzNoteRecolour.Apply(white, red, EzNoteRecolourAlgorithm.SetLum, EzColouringRange.Gray);
 
             assertColourEqual(result, white);
         }
@@ -124,7 +125,7 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         {
             foreach (var source in new[] { white, near_white })
             {
-                Colour4 result = ManiaNoteRecolour.Apply(source, red, ManiaNoteRecolourAlgorithm.SetLum, ManiaNoteRecolourRange.KeepWhite);
+                Colour4 result = EzNoteRecolour.Apply(source, red, EzNoteRecolourAlgorithm.SetLum, EzColouringRange.KeepWhite);
                 assertColourEqual(result, source);
             }
         }
@@ -132,29 +133,29 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         [Test]
         public void KeepWhiteRecoloursSaturatedBlue()
         {
-            Colour4 result = ManiaNoteRecolour.Apply(saturated_blue, red, ManiaNoteRecolourAlgorithm.SetLum, ManiaNoteRecolourRange.KeepWhite);
+            Colour4 result = EzNoteRecolour.Apply(saturated_blue, red, EzNoteRecolourAlgorithm.SetLum, EzColouringRange.KeepWhite);
 
             Assert.That(result.R, Is.GreaterThan(result.B));
-            Assert.That(Math.Abs(ManiaNoteRecolour.Luma(result) - ManiaNoteRecolour.Luma(saturated_blue)), Is.LessThan(0.03f));
+            Assert.That(Math.Abs(EzNoteRecolour.Luma(result) - EzNoteRecolour.Luma(saturated_blue)), Is.LessThan(0.03f));
         }
 
         [Test]
         public void SetLumPremultipliedWhiteGlowKeepsStraightLuma()
         {
-            Colour4 result = ManiaNoteRecolour.Apply(premul_white_glow, red, ManiaNoteRecolourAlgorithm.SetLum);
+            Colour4 result = EzNoteRecolour.Apply(premul_white_glow, red, EzNoteRecolourAlgorithm.SetLum);
             Colour4 straight = unpremultiply(result);
 
             Assert.That(result.A, Is.EqualTo(premul_white_glow.A).Within(0.0001f));
-            Assert.That(ManiaNoteRecolour.Luma(straight), Is.GreaterThan(0.85f));
+            Assert.That(EzNoteRecolour.Luma(straight), Is.GreaterThan(0.85f));
         }
 
         [Test]
         public void DirectPremultipliedWhiteGlowLosesStraightLuma()
         {
-            Colour4 result = ManiaNoteRecolour.Apply(premul_white_glow, red, ManiaNoteRecolourAlgorithm.Direct);
+            Colour4 result = EzNoteRecolour.Apply(premul_white_glow, red, EzNoteRecolourAlgorithm.Direct);
             Colour4 straight = unpremultiply(result);
 
-            Assert.That(ManiaNoteRecolour.Luma(straight), Is.LessThan(0.4f));
+            Assert.That(EzNoteRecolour.Luma(straight), Is.LessThan(0.4f));
         }
 
         [Test]
@@ -162,19 +163,19 @@ namespace osu.Game.Rulesets.Mania.Tests.Skinning
         {
             foreach (var algorithm in preserve_algorithms)
             {
-                Colour4 result = ManiaNoteRecolour.Apply(mid_grey, red, algorithm);
+                Colour4 result = EzNoteRecolour.Apply(mid_grey, red, algorithm);
                 Assert.That(result.R, Is.GreaterThan(result.G));
                 Assert.That(result.R, Is.GreaterThan(result.B));
             }
         }
 
-        private static float maxLumaError(Colour4[] sources, ManiaNoteRecolourAlgorithm algorithm)
+        private static float maxLumaError(Colour4[] sources, EzNoteRecolourAlgorithm algorithm)
         {
             float max = 0f;
 
             foreach (var source in sources)
             {
-                float error = Math.Abs(ManiaNoteRecolour.Luma(ManiaNoteRecolour.Apply(source, red, algorithm)) - ManiaNoteRecolour.Luma(source));
+                float error = Math.Abs(EzNoteRecolour.Luma(EzNoteRecolour.Apply(source, red, algorithm)) - EzNoteRecolour.Luma(source));
                 max = Math.Max(max, error);
             }
 

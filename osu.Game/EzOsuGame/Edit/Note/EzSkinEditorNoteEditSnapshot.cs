@@ -20,6 +20,12 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         public Colour4 NoteColour { get; private set; }
 
+        public EzColouringMode ColouringMode { get; private set; }
+
+        public EzColouringRange ColouringRange { get; private set; }
+
+        public bool TrueColouring { get; private set; }
+
         public double Width { get; private set; }
 
         public double Height { get; private set; }
@@ -32,6 +38,9 @@ namespace osu.Game.EzOsuGame.Edit.Note
             Part = session.Part.Value;
             VariantId = session.VariantId.Value;
             NoteColour = session.NoteColour.Value;
+            ColouringMode = session.ColouringMode.Value;
+            ColouringRange = session.ColouringRange.Value;
+            TrueColouring = session.TrueColouring.Value;
             Width = session.Width.Value;
             Height = session.Height.Value;
             ExportName = session.ExportName.Value;
@@ -43,6 +52,9 @@ namespace osu.Game.EzOsuGame.Edit.Note
             session.Part.Value = Part;
             session.VariantId.Value = VariantId;
             session.NoteColour.Value = NoteColour;
+            session.ColouringMode.Value = ColouringMode;
+            session.ColouringRange.Value = ColouringRange;
+            session.TrueColouring.Value = TrueColouring;
             session.Width.Value = Width;
             session.Height.Value = Height;
             session.ExportName.Value = ExportName;
@@ -56,6 +68,8 @@ namespace osu.Game.EzOsuGame.Edit.Note
             Part = Part,
             VariantId = VariantId,
             NoteColour = NoteColour,
+            ColouringMode = ColouringMode,
+            ColouringRange = ColouringRange,
             Width = Width,
             Height = Height,
             ExportName = ExportName,

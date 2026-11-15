@@ -23,6 +23,10 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
         public Bindable<bool> TrueColouring { get; } = new Bindable<bool>();
 
+        public Bindable<EzColouringMode> ColouringMode { get; } = new Bindable<EzColouringMode>(EzColouringMode.True);
+
+        public Bindable<EzColouringRange> ColouringRange { get; } = new Bindable<EzColouringRange>(EzColouringRange.Gray);
+
         public BindableNumber<double> Width { get; } = new BindableDouble(100) { MinValue = 1, MaxValue = 512 };
 
         public BindableNumber<double> Height { get; } = new BindableDouble(100) { MinValue = 1, MaxValue = 512 };
@@ -37,6 +41,8 @@ namespace osu.Game.EzOsuGame.Edit.Note
             Part = Part.Value,
             VariantId = VariantId.Value,
             NoteColour = NoteColour.Value,
+            ColouringMode = ColouringMode.Value,
+            ColouringRange = ColouringRange.Value,
             Width = Width.Value,
             Height = Height.Value,
             ExportName = ExportName.Value,

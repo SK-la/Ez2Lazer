@@ -184,6 +184,7 @@ namespace osu.Game.EzOsuGame.Edit
                     or Ez2Setting.HitTargetColouringEnabled => typeof(bool),
                 Ez2Setting.ColumnWidthStyle => typeof(ColumnWidthStyle),
                 Ez2Setting.ColouringMode => typeof(EzColouringMode),
+                Ez2Setting.ColouringRange => typeof(EzColouringRange),
                 Ez2Setting.ColumnTypeListSelect => typeof(int),
                 Ez2Setting.StageBackgroundColour or Ez2Setting.ColumnTypeA or Ez2Setting.ColumnTypeB or Ez2Setting.ColumnTypeS or Ez2Setting.ColumnTypeE or Ez2Setting.ColumnTypeP => typeof(Colour4),
                 Ez2Setting.ColumnTypeOf4K or Ez2Setting.ColumnTypeOf5K or Ez2Setting.ColumnTypeOf6K or Ez2Setting.ColumnTypeOf7K or Ez2Setting.ColumnTypeOf8K

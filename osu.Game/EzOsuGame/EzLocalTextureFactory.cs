@@ -261,7 +261,7 @@ namespace osu.Game.EzOsuGame
         /// <param name="component"></param>
         /// <param name="isFlare">是否为光效</param>
         /// <returns>纹理 drawable；无资源时为 <c>null</c>。</returns>
-        public Drawable? CreateAnimation(string component, bool? isFlare = null)
+        public Drawable? CreateAnimation(string component, bool? isFlare = null, bool recolour = false)
         {
             bool isHit = isFlare is true;
 
@@ -281,24 +281,24 @@ namespace osu.Game.EzOsuGame
             // 1 帧即普通纹理，不按动画加载。
             if (frames.Count == 1)
             {
-                return new Sprite
-                {
-                    Anchor = anchor,
-                    Origin = Anchor.Centre,
-                    RelativeSizeAxes = relativeSizeAxes,
-                    FillMode = fillMode,
-                    Texture = frames[0],
-                };
+                Sprite sprite = recolour
+                    ? new ColorizeSprite { Algorithm = ColorizeAlgorithm.Multiply }
+                    : new Sprite();
+
+                sprite.Anchor = anchor;
+                sprite.Origin = Anchor.Centre;
+                sprite.RelativeSizeAxes = relativeSizeAxes;
+                sprite.FillMode = fillMode;
+                sprite.Texture = frames[0];
+                return sprite;
             }
 
-            var animation = new TextureAnimation
-            {
-                Anchor = anchor,
-                Origin = Anchor.Centre,
-                RelativeSizeAxes = relativeSizeAxes,
-                FillMode = fillMode,
-                Loop = !isHit
-            };
+            TextureAnimation animation = recolour ? new EzRecolourTextureAnimation() : new TextureAnimation();
+            animation.Anchor = anchor;
+            animation.Origin = Anchor.Centre;
+            animation.RelativeSizeAxes = relativeSizeAxes;
+            animation.FillMode = fillMode;
+            animation.Loop = !isHit;
 
             if (!isHit)
             {
@@ -320,7 +320,7 @@ namespace osu.Game.EzOsuGame
             if (useTintBaseTexture)
             {
                 resolvedPrefix = EzColumnResourceLookup.TINT_BASE_TEXTURE_AFFIX;
-                return CreateAnimation(EzColumnResourceLookup.FormatEzProNoteResource(resolvedPrefix, componentAfterPrefix));
+                return CreateAnimation(EzColumnResourceLookup.FormatEzProNoteResource(resolvedPrefix, componentAfterPrefix), recolour: true);
             }
 
             resolvedPrefix = EzColumnResourceLookup.EzProNoteTexturePrefix(columnType);
@@ -328,7 +328,7 @@ namespace osu.Game.EzOsuGame
             foreach (var type in EzColumnResourceLookup.EnumerateDegradeOrder(columnType))
             {
                 string prefix = EzColumnResourceLookup.EzProNoteTexturePrefix(type);
-                var drawable = CreateAnimation(EzColumnResourceLookup.FormatEzProNoteResource(prefix, componentAfterPrefix));
+                var drawable = CreateAnimation(EzColumnResourceLookup.FormatEzProNoteResource(prefix, componentAfterPrefix), recolour: true);
 
                 if (drawable == null)
                     continue;

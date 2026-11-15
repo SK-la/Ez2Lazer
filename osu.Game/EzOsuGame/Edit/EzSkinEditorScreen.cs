@@ -35,9 +35,9 @@ using osu.Game.IO;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Dialog;
+using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.OSD;
 using osu.Game.Overlays.SkinEditor;
-using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Screens;
 using osu.Game.Screens.Edit;
@@ -46,6 +46,7 @@ using osu.Game.Skinning;
 using osuTK;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using OfficialSkinEditor = osu.Game.Overlays.SkinEditor.SkinEditor;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -498,6 +499,8 @@ namespace osu.Game.EzOsuGame.Edit
         protected override void LoadComplete()
         {
             base.LoadComplete();
+            NoteSessionForTesting.ColouringMode.BindTo(ezSkinConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode));
+            NoteSessionForTesting.ColouringRange.BindTo(ezSkinConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange));
             hudLayer.LayoutWritten += onLayoutWritten;
             SkinEditorProviderResolver.EnsureDefaultProviderRegistered();
             beatmapPicker = new EzSkinEditorBeatmapPicker(realm, beatmapManager);

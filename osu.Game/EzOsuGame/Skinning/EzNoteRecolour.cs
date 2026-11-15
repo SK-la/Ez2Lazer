@@ -3,12 +3,15 @@
 
 using System;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Sprites;
+using osu.Framework.Testing;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
 using osuTK.Graphics;
 
-namespace osu.Game.Rulesets.Mania.Skinning
+namespace osu.Game.EzOsuGame.Skinning
 {
-    public enum ManiaNoteRecolourAlgorithm
+    public enum EzNoteRecolourAlgorithm
     {
         Direct = 0,
         Tint = 1,
@@ -18,18 +21,11 @@ namespace osu.Game.Rulesets.Mania.Skinning
         LumaNormMul = 5,
     }
 
-    public enum ManiaNoteRecolourRange
-    {
-        All = 0,
-        Gray = 1,
-        KeepWhite = 2,
-    }
-
     /// <summary>
-    /// CPU 像素着色原型：保明度算法与范围蒙版。量产 shader 只收这里锁死的公式。
+    /// CPU 像素着色：保明度算法与范围蒙版。GPU <see cref="ColorizeSprite"/> 与 PNG 导出走同一套公式。
     /// SetLum 在 luma 为 0 或 1 时无法带色相（只有黑/白能达到这两端）。
     /// </summary>
-    public static class ManiaNoteRecolour
+    public static class EzNoteRecolour
     {
         public const float LUMA_R = 0.299f;
         public const float LUMA_G = 0.587f;
@@ -52,16 +48,57 @@ namespace osu.Game.Rulesets.Mania.Skinning
         public static float PerceivedBrightness(Colour4 colour)
             => MathF.Sqrt(colour.R * colour.R * LUMA_R + colour.G * colour.G * LUMA_G + colour.B * colour.B * LUMA_B);
 
+        public static EzNoteRecolourAlgorithm ToAlgorithm(EzColouringMode mode) => mode switch
+        {
+            EzColouringMode.Tint => EzNoteRecolourAlgorithm.Tint,
+            EzColouringMode.True => EzNoteRecolourAlgorithm.SetLum,
+            _ => EzNoteRecolourAlgorithm.Direct,
+        };
+
+        public static ColorizeAlgorithm ToColorizeAlgorithm(EzColouringMode mode)
+            => mode == EzColouringMode.True ? ColorizeAlgorithm.SetLum : ColorizeAlgorithm.Multiply;
+
+        public static ColorizeRange ToColorizeRange(EzColouringRange range) => range switch
+        {
+            EzColouringRange.Gray => ColorizeRange.Gray,
+            EzColouringRange.KeepWhite => ColorizeRange.KeepWhite,
+            _ => ColorizeRange.All,
+        };
+
+        /// <summary>
+        /// 给 <see cref="ColorizeSprite"/> 写 Tint/算法/范围；没有着色 sprite 时退回父级乘色。
+        /// 父级 <see cref="Drawable.Colour"/> 保持白色，淡出仍走父级。
+        /// </summary>
+        public static void ApplyToDrawable(Drawable target, Colour4 tint, EzColouringMode mode, EzColouringRange range)
+        {
+            ColorizeAlgorithm algorithm = isIdentityTint(tint)
+                ? ColorizeAlgorithm.Multiply
+                : ToColorizeAlgorithm(mode);
+            ColorizeRange colorizeRange = ToColorizeRange(range);
+
+            bool found = false;
+
+            foreach (var sprite in target.ChildrenOfType<ColorizeSprite>())
+            {
+                sprite.Tint = tint;
+                sprite.Algorithm = algorithm;
+                sprite.Range = colorizeRange;
+                found = true;
+            }
+
+            target.Colour = found ? Colour4.White : tint;
+        }
+
         public static Colour4 Apply(
             Colour4 source,
             Colour4 tint,
-            ManiaNoteRecolourAlgorithm algorithm,
-            ManiaNoteRecolourRange range = ManiaNoteRecolourRange.All,
+            EzNoteRecolourAlgorithm algorithm,
+            EzColouringRange range = EzColouringRange.All,
             float chromaEpsilon = DEFAULT_CHROMA_EPSILON,
             float whiteLuma = DEFAULT_WHITE_LUMA,
             float whiteChroma = DEFAULT_WHITE_CHROMA)
         {
-            if (source.A <= 0f)
+            if (source.A <= 0f || isIdentityTint(tint))
                 return source;
 
             Colour4 straight = unpremultiply(source);
@@ -73,16 +110,40 @@ namespace osu.Game.Rulesets.Mania.Skinning
             return premultiply(recoloured);
         }
 
-        private static bool passesRange(Colour4 straight, ManiaNoteRecolourRange range, float chromaEpsilon, float whiteLuma, float whiteChroma)
+        /// <summary>
+        /// PNG 直通色（未预乘）。导出与 GPU 反预乘路径同一套算法。
+        /// </summary>
+        public static Colour4 ApplyStraight(
+            Colour4 source,
+            Colour4 tint,
+            EzNoteRecolourAlgorithm algorithm,
+            EzColouringRange range = EzColouringRange.All,
+            float chromaEpsilon = DEFAULT_CHROMA_EPSILON,
+            float whiteLuma = DEFAULT_WHITE_LUMA,
+            float whiteChroma = DEFAULT_WHITE_CHROMA)
+        {
+            if (source.A <= 0f || isIdentityTint(tint))
+                return source;
+
+            if (!passesRange(source, range, chromaEpsilon, whiteLuma, whiteChroma))
+                return source;
+
+            return applyAlgorithm(source, tint, algorithm);
+        }
+
+        private static bool isIdentityTint(Colour4 tint)
+            => tint.R >= 1f && tint.G >= 1f && tint.B >= 1f;
+
+        private static bool passesRange(Colour4 straight, EzColouringRange range, float chromaEpsilon, float whiteLuma, float whiteChroma)
         {
             float chroma = Chroma(straight);
 
             switch (range)
             {
-                case ManiaNoteRecolourRange.Gray:
+                case EzColouringRange.Gray:
                     return chroma <= chromaEpsilon;
 
-                case ManiaNoteRecolourRange.KeepWhite:
+                case EzColouringRange.KeepWhite:
                     return Luma(straight) < whiteLuma || chroma > whiteChroma;
 
                 default:
@@ -90,29 +151,42 @@ namespace osu.Game.Rulesets.Mania.Skinning
             }
         }
 
-        private static Colour4 applyAlgorithm(Colour4 straight, Colour4 tint, ManiaNoteRecolourAlgorithm algorithm)
+        private static Colour4 applyAlgorithm(Colour4 straight, Colour4 tint, EzNoteRecolourAlgorithm algorithm)
         {
             switch (algorithm)
             {
-                case ManiaNoteRecolourAlgorithm.Tint:
-                    tint = ManiaNoteDisplayTint.ApplyTo(tint, ManiaNoteDisplayTint.DEFAULT_TARGET_GRAYSCALE, ManiaNoteDisplayTint.DEFAULT_COLOUR_ALPHA);
+                case EzNoteRecolourAlgorithm.Tint:
+                    // 与 ManiaNoteDisplayTint.ApplyTo 同一套灰度目标混合（1.5 @ 0.8）。
+                    tint = fadeTint(tint);
                     return multiply(straight, tint);
 
-                case ManiaNoteRecolourAlgorithm.SetLum:
+                case EzNoteRecolourAlgorithm.SetLum:
                     return setLum(tint, Luma(straight), straight.A);
 
-                case ManiaNoteRecolourAlgorithm.HslKeepL:
+                case EzNoteRecolourAlgorithm.HslKeepL:
                     return hslKeepL(straight, tint);
 
-                case ManiaNoteRecolourAlgorithm.HspKeepP:
+                case EzNoteRecolourAlgorithm.HspKeepP:
                     return hspKeepP(straight, tint);
 
-                case ManiaNoteRecolourAlgorithm.LumaNormMul:
+                case EzNoteRecolourAlgorithm.LumaNormMul:
                     return lumaNormMul(straight, tint);
 
                 default:
                     return multiply(straight, tint);
             }
+        }
+
+        private static Colour4 fadeTint(Colour4 tint)
+        {
+            const float target = 1.5f;
+            const float alpha = 0.8f;
+
+            return new Colour4(
+                target + (tint.R - target) * alpha,
+                target + (tint.G - target) * alpha,
+                target + (tint.B - target) * alpha,
+                tint.A);
         }
 
         private static Colour4 multiply(Colour4 source, Colour4 tint)
