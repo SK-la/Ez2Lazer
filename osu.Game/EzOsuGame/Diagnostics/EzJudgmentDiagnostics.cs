@@ -74,6 +74,7 @@ namespace osu.Game.EzOsuGame.Diagnostics
                 return;
 
             tCheckStart = Stopwatch.GetTimestamp();
+            tApplyStart = tApplyEnd = 0;
         }
 
         /// <summary>
@@ -82,32 +83,31 @@ namespace osu.Game.EzOsuGame.Diagnostics
         /// </summary>
         public static void ChainExitCheckForResult(bool judged)
         {
-            if (!ChainWanted || !judged)
+            if (!ChainWanted)
                 return;
 
+            if (!judged)
+            {
+                tEnter = tCheckStart = tApplyStart = tApplyEnd = 0;
+                return;
+            }
+
             tCheckEnd = Stopwatch.GetTimestamp();
+            commitChain();
         }
 
         /// <summary><c>ApplyResult</c> 入口。</summary>
         public static void ChainEnterApplyResult()
         {
-            if (!ChainWanted)
-                return;
-
-            if (tApplyStart == 0)
+            if (ChainWanted)
                 tApplyStart = Stopwatch.GetTimestamp();
         }
 
-        /// <summary><c>ApplyResult</c> 出口（<c>OnNewResult</c> 扇出之后）；在此提交整条链。</summary>
+        /// <summary><c>ApplyResult</c> 出口（<c>OnNewResult</c> 扇出之后）。</summary>
         public static void ChainExitApplyResult()
         {
-            if (!ChainWanted)
-                return;
-
-            if (tApplyEnd == 0)
+            if (ChainWanted)
                 tApplyEnd = Stopwatch.GetTimestamp();
-
-            commitChain();
         }
 
         private static void commitChain()
