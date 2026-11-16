@@ -1,7 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
@@ -66,6 +69,29 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
             return holdRatio >= LnPrimaryMinRatioFor(keyCount);
         }
+
+        /// <summary>
+        /// LN presentation / nomod credit gate from beatmap object counts only (<c>EndTimeObjectCount / TotalObjectCount</c>),
+        /// not from a stored ChartDan row.
+        /// </summary>
+        public static bool PrefersLnChartFromBeatmap(BeatmapInfo beatmapInfo, int keyCount = 0)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            if (keyCount <= 0)
+                keyCount = EzHoldMetrics.ResolveKeyCount(beatmapInfo);
+
+            double holdRatio = EzHoldMetrics.HoldRatio(beatmapInfo);
+
+            if (double.IsNaN(holdRatio))
+                holdRatio = 0;
+
+            int holdCount = EzHoldMetrics.TryHoldCountFromBeatmapInfo(beatmapInfo);
+            return AllowsPersistedChartLnHalf(keyCount, holdRatio, holdCount);
+        }
+
+        public static EzDanSide PreferredPresentationSide(BeatmapInfo beatmapInfo, int keyCount = 0)
+            => PrefersLnChartFromBeatmap(beatmapInfo, keyCount) ? EzDanSide.Ln : EzDanSide.Rc;
 
         public static double AccuracyBarFor(EzDanSide side, int keyCount)
         {

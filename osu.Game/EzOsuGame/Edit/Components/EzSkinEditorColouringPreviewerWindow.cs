@@ -33,6 +33,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// Draggable colouring previewer. Same chrome and horizontal drag as
     /// <see cref="EzSkinEditorComponentPickerWindow"/>; the body is a 3×5 grid of the current note
     /// set (algorithms × ranges). Clicking a cell writes that combination into the colouring settings.
+    /// 预览网格乘色由用户选择的 <see cref="EzColumnType"/> 决定，不按贴图 affix 反推类型。
     /// </summary>
     public partial class EzSkinEditorColouringPreviewerWindow : CompositeDrawable
     {
@@ -63,22 +64,24 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Bindable<float> RememberedX { get; }
 
-        private readonly Bindable<string> prefix = new Bindable<string>(EzColumnResourceLookup.TINT_BASE_TEXTURE_AFFIX);
+        private readonly Bindable<EzColumnType> previewColumnType = new Bindable<EzColumnType>(EzColumnType.B);
 
         private Box background = null!;
-        private SettingsDropdown<string> prefixDropdown = null!;
+        private SettingsEnumDropdown<EzColumnType> columnTypeDropdown = null!;
         private Container gridHost = null!;
         private InputManager inputManager = null!;
         private OverlayColourProvider colourProvider = null!;
         private EzLocalTextureFactory factory = null!;
         private EzResourceStore resources = null!;
         private Bindable<string> noteSetName = null!;
-        private Bindable<Colour4> previewTint = null!;
+        private readonly Dictionary<EzColumnType, Bindable<Colour4>> columnTypeTints = new Dictionary<EzColumnType, Bindable<Colour4>>();
         private Bindable<EzColouringMode> colouringMode = null!;
         private Bindable<EzColouringRange> colouringRange = null!;
         private Bindable<double> colouringStrength = null!;
 
         private PreviewCell[] cells = Array.Empty<PreviewCell>();
+        private Action? onFactoryNoteColourChanged;
+        private Action? onFactoryNoteDrawableChanged;
         private bool dragging;
         private bool positionRestored;
 
@@ -107,7 +110,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
             this.resources = resources;
 
             noteSetName = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
-            previewTint = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
+
+            foreach (EzColumnType type in Enum.GetValues<EzColumnType>())
+                columnTypeTints[type] = ezConfig.GetColumnColorBindableByType(type);
+
             colouringMode = ezConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode);
             colouringRange = ezConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange);
             colouringStrength = ezConfig.GetBindable<double>(Ez2Setting.ColouringStrength);
@@ -169,7 +175,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                 AutoSizeAxes = Axes.Y,
                                 Depth = float.MinValue,
                                 Padding = new MarginPadding { Horizontal = 0, Top = 5 },
-                                Child = prefixDropdown = new SettingsDropdown<string>
+                                Child = columnTypeDropdown = new SettingsEnumDropdown<EzColumnType>
                                 {
                                     LabelText = EzEditorStrings.COLOURING_PREVIEWER_BASE,
                                     ShowsDefaultIndicator = false,
@@ -200,8 +206,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 },
             };
 
-            refreshPrefixItems();
-            prefixDropdown.Current = prefix;
+            columnTypeDropdown.Current = previewColumnType;
 
             Open.BindValueChanged(_ =>
             {
@@ -220,13 +225,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 updateExpandedState(v.NewValue);
                 requestRebuild();
             }, true);
-            noteSetName.BindValueChanged(_ =>
+            noteSetName.BindValueChanged(_ => requestRebuild(), true);
+            previewColumnType.BindValueChanged(_ =>
             {
-                refreshPrefixItems();
                 requestRebuild();
+                applyColours();
             }, true);
-            prefix.BindValueChanged(_ => requestRebuild());
-            previewTint.BindValueChanged(_ => applyColours());
+
+            foreach (var tint in columnTypeTints.Values)
+                tint.BindValueChanged(_ => applyColours());
+
+            onFactoryNoteColourChanged = applyColours;
+            factory.OnNoteColourChanged += onFactoryNoteColourChanged;
+            onFactoryNoteDrawableChanged = () => Scheduler.AddOnce(applyColours);
+            factory.OnNoteDrawableChanged += onFactoryNoteDrawableChanged;
+
             colouringMode.BindValueChanged(_ => updateSelection());
             colouringRange.BindValueChanged(_ => updateSelection());
             colouringStrength.BindValueChanged(_ =>
@@ -236,21 +249,21 @@ namespace osu.Game.EzOsuGame.Edit.Components
             });
         }
 
-        private void requestRebuild() => Scheduler.AddOnce(rebuildGrid);
-
-        private void refreshPrefixItems()
+        protected override void Dispose(bool isDisposing)
         {
-            var items = listPrefixes();
-            string next = items.Contains(prefix.Value, StringComparer.OrdinalIgnoreCase)
-                ? prefix.Value
-                : items[0];
+            if (isDisposing)
+            {
+                if (onFactoryNoteColourChanged != null)
+                    factory.OnNoteColourChanged -= onFactoryNoteColourChanged;
 
-            if (!items.Contains(next, StringComparer.OrdinalIgnoreCase))
-                items.Add(next);
+                if (onFactoryNoteDrawableChanged != null)
+                    factory.OnNoteDrawableChanged -= onFactoryNoteDrawableChanged;
+            }
 
-            prefixDropdown.Items = items;
-            prefix.Value = next;
+            base.Dispose(isDisposing);
         }
+
+        private void requestRebuild() => Scheduler.AddOnce(rebuildGrid);
 
         private List<string> listPrefixes()
         {
@@ -294,6 +307,25 @@ namespace osu.Game.EzOsuGame.Edit.Components
             return result;
         }
 
+        private string resolveNoteTexturePrefix()
+        {
+            string preferred = EzColumnResourceLookup.EzProNoteTexturePrefix(previewColumnType.Value);
+            var available = listPrefixes();
+
+            if (available.Contains(preferred, StringComparer.OrdinalIgnoreCase))
+                return preferred;
+
+            foreach (EzColumnType type in Enum.GetValues<EzColumnType>())
+            {
+                string candidate = EzColumnResourceLookup.EzProNoteTexturePrefix(type);
+
+                if (available.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+                    return candidate;
+            }
+
+            return available.Count > 0 ? available[0] : EzColumnResourceLookup.TINT_BASE_TEXTURE_AFFIX;
+        }
+
         private void rebuildGrid()
         {
             gridHost.Clear(true);
@@ -301,8 +333,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (!Open.Value || !Expanded.Value)
                 return;
-
-            refreshPrefixItems();
 
             float ratio = factory.GetRatio();
             float cellHeight = Math.Clamp(cell_width * (ratio > 0 ? ratio : 1f), cell_height_min, cell_height_max);
@@ -329,7 +359,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 };
             }
 
-            string component = EzColumnResourceLookup.FormatEzProNoteResource(prefix.Value, EzColumnResourceLookup.NOTE_COMPONENT);
+            string component = EzColumnResourceLookup.FormatEzProNoteResource(resolveNoteTexturePrefix(), EzColumnResourceLookup.NOTE_COMPONENT);
 
             for (int row = 0; row < 5; row++)
             {
@@ -430,7 +460,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         private void applyColours()
         {
-            Colour4 tint = previewTint.Value;
+            Colour4 tint = columnTypeTints[previewColumnType.Value].Value;
             float strength = (float)colouringStrength.Value;
 
             foreach (var cell in cells)

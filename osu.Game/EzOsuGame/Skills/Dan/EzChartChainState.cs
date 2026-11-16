@@ -55,7 +55,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             IReadOnlySet<string> settledCsi,
             IReadOnlySet<string> completeCsi,
             IReadOnlySet<string> completeDan,
-            IReadOnlySet<string> unresolvableDan)
+            IReadOnlySet<string> unresolvableDan,
+            bool danStale)
         {
             RateableBeatmapIds = rateableBeatmapIds;
             Facets = facets;
@@ -79,11 +80,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                                                .Union(completeCsi.Where(unrateableMsd.Contains), StringComparer.Ordinal)
                                                .ToHashSet(StringComparer.Ordinal);
 
-            // Dan has no settled-miss row form, so a chart the stored inputs cannot resolve a dan for has no row
-            // either: it is settled rather than owed, which is what stops the stage re-attempting and reporting the
-            // same charts on every launch.
-            ChartDanOwed = completeMsd.Where(h => !completeDan.Contains(h))
-                                      .Where(h => !unresolvableDan.Contains(h))
+            // Dan has no settled-miss row form. Owed means missing a row or inputs are stale — not "hide existing rows".
+            ChartDanOwed = completeMsd.Where(h => !unresolvableDan.Contains(h))
+                                      .Where(h => danStale || !completeDan.Contains(h))
                                       .ToHashSet(StringComparer.Ordinal);
 
             SettledChartDan = unrateableMsd.Union(unresolvableDan, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
@@ -112,7 +111,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <summary>Charts with a current CSI row that is a result rather than a stub.</summary>
         public IReadOnlySet<string> CompleteChartSkillInfo { get; }
 
-        /// <summary>Charts with a current ChartDan row.</summary>
+        /// <summary>Charts with a stored ChartDan row (readable even when <see cref="EzDataStateFacet.IsStale"/>).</summary>
         public IReadOnlySet<string> CompleteChartDan { get; }
 
         /// <summary>
@@ -261,9 +260,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             var completeCsi = csiStale
                 ? new HashSet<string>(StringComparer.Ordinal)
                 : csiRows.Where(static kv => !kv.Value.CurrentStub).Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
-            var completeDan = danStale
-                ? new HashSet<string>(StringComparer.Ordinal)
-                : danRows.Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
+            var completeDan = danRows.Select(static kv => kv.Key).ToHashSet(StringComparer.Ordinal);
 
             var unresolvableDan = deriveUnresolvableChartDan(completeMsdSkills, rateableChartMeta);
             var settledChartDan = unrateableMsd.Union(unresolvableDan, StringComparer.Ordinal).ToHashSet(StringComparer.Ordinal);
@@ -309,7 +306,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 settledCsi,
                 completeCsi,
                 completeDan,
-                unresolvableDan);
+                unresolvableDan,
+                danStale);
         }
 
         /// <summary>Whether a system has run at <paramref name="revision"/>; a missing stamp reads as out of date.</summary>

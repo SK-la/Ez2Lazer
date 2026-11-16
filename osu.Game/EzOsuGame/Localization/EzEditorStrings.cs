@@ -610,7 +610,7 @@ namespace osu.Game.EzOsuGame.Localization
             "着色预览器", "Colouring previewer");
 
         public static readonly LocalisableString COLOURING_PREVIEWER_BASE = new EzLocalizationManager.EzLocalisableString(
-            "底图", "Base texture");
+            "列类型", "Column type");
 
         public static readonly LocalisableString COLOURING_PREVIEWER_WHITE_MAX = new EzLocalizationManager.EzLocalisableString(
             "仅白·满", "White (max)");

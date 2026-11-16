@@ -7,6 +7,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.EzOsuGame.Layout;
@@ -83,6 +84,9 @@ namespace osu.Game.Rulesets.Mania.UI
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
+        private EzLocalTextureFactory ezTextureFactory { get; set; } = null!;
+
+        [Resolved]
         private OsuColour colours { get; set; } = null!;
 
         [Resolved(CanBeNull = true)]
@@ -109,6 +113,7 @@ namespace osu.Game.Rulesets.Mania.UI
         private Action<ValueChangedEvent<EzColouringMode>>? onColouringModeChanged;
         private Action<ValueChangedEvent<EzColouringRange>>? onColouringRangeChanged;
         private Action<ValueChangedEvent<double>>? onColouringStrengthChanged;
+        private Action? onFactoryNoteColourChanged;
 
         private readonly Dictionary<long, int> lineDivisorBySnapMs = new Dictionary<long, int>();
         private readonly Dictionary<int, Color4> tintByLineDivisor = new Dictionary<int, Color4>();
@@ -196,6 +201,9 @@ namespace osu.Game.Rulesets.Mania.UI
             onPaletteChanged = invalidateTintColours;
             paletteBinding.Changed += onPaletteChanged;
 
+            onFactoryNoteColourChanged = invalidateTintColours;
+            ezTextureFactory.OnNoteColourChanged += onFactoryNoteColourChanged;
+
             beatDivisor?.BindValueChanged(_ => invalidateLineDivisors(), true);
 
             editorBeatmap?.FixedGridEnabled.BindValueChanged(_ => invalidateLineDivisors(), true);
@@ -209,6 +217,9 @@ namespace osu.Game.Rulesets.Mania.UI
             {
                 if (onPaletteChanged != null)
                     paletteBinding.Changed -= onPaletteChanged;
+
+                if (onFactoryNoteColourChanged != null)
+                    ezTextureFactory.OnNoteColourChanged -= onFactoryNoteColourChanged;
 
                 if (onDivisorNoteColouringChanged != null)
                 {
