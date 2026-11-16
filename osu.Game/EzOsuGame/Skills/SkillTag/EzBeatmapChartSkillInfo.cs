@@ -28,7 +28,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public DateTimeOffset ComputedAt { get; set; }
 
         /// <summary>
-        /// Pattern tags joined with ASCII unit separator (U+001F). Closed filing vocabulary — not a JSON blob.
+        /// 谱面技能 Tag id，ASCII unit separator (U+001F) 拼接。列名历史遗留，不是 KeyPattern。
         /// </summary>
         public string PatternTagsJoined { get; set; } = string.Empty;
 

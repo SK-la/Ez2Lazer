@@ -32,8 +32,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 if (string.IsNullOrEmpty(row.BeatmapHash))
                     continue;
 
-                // Pattern ratings are not Mina play.values.
-                string tagPrefix = EzAnalysisSystem.Pattern.ToStorageId() + ".";
+                // Player skill-tag ratings are not Mina play.values.
+                string tagPrefix = EzAnalysisSystem.PlayerSkillTag.ToStorageId() + ".";
                 if (row.SkillId.StartsWith(tagPrefix, StringComparison.Ordinal))
                     continue;
 

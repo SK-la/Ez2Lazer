@@ -524,9 +524,7 @@ namespace osu.Game.Screens.Select
                     if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID)
                         break;
 
-                    //TODO: 需要接入Key Pattern技能轴。暂时先不显示。
-                    // foreach (var axis in EzPatternSkillAxisExtensions.RadarAxes)
-                    //     items.Add(new SkillAxisDropdownItem(EzAnalysisSystem.Pattern, axis.ToMetaId(), axis.Meta().DisplayName));
+                    // KeyPattern 轴落库与选歌项在后续 KeyPattern 系统 PR 接入 EzKeyPatternAxis。
                     break;
 
                 case EzAnalysisSystem.Mina:

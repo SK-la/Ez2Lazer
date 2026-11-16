@@ -221,7 +221,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 try
                 {
-                    return provider.TryGetOrComputeChartSkillInfo(detached)?.Patterns;
+                    return provider.TryGetOrComputeChartSkillInfo(detached)?.SkillTags;
                 }
                 catch
                 {

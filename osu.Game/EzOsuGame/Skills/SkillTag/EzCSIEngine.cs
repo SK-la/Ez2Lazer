@@ -133,7 +133,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
             return new EzChartSkillInfo
             {
-                Patterns = patternIds.ToArray(),
+                SkillTags = patternIds.ToArray(),
                 JackDemand = jackDemand.Detected,
                 JackShare = jackShare,
                 StreamShare = streamShare,

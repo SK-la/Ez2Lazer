@@ -450,7 +450,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var info = new EzChartSkillInfo
             {
-                Patterns = ["jack", "chordjack", "tech", "stream"],
+                SkillTags = ["jack", "chordjack", "tech", "stream"],
                 JackShare = 0.4,
                 StreamShare = 0.1,
                 TechScore = 0.5,

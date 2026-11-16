@@ -747,7 +747,7 @@ namespace osu.Game.EzOsuGame.Skills
                     BeatmapId = beatmapId,
                     InfoVersion = EzCSIEngine.VERSION,
                     ComputedAt = at,
-                    PatternTagsJoined = joinPatterns(info.Patterns),
+                    PatternTagsJoined = joinPatterns(info.SkillTags),
                     JackDemand = info.JackDemand,
                     JackShare = info.JackShare ?? -1,
                     StreamShare = info.StreamShare ?? -1,
@@ -1260,7 +1260,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             return new EzChartSkillInfo
             {
-                Patterns = splitPatterns(row.PatternTagsJoined),
+                SkillTags = splitPatterns(row.PatternTagsJoined),
                 JackDemand = row.JackDemand,
                 JackShare = optionalDouble(row.JackShare),
                 StreamShare = optionalDouble(row.StreamShare),

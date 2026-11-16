@@ -347,7 +347,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                     return share >= CLUSTER_SHARE_MIN;
             }
 
-            string[] patterns = chart?.Patterns ?? [];
+            string[] patterns = chart?.SkillTags ?? [];
             return patterns.Any(tag => bucket.Tags.Contains(tag, StringComparer.Ordinal));
         }
 
@@ -390,7 +390,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
             return new EzChartSkillInfo
             {
-                Patterns = inverse_mod_patterns,
+                SkillTags = inverse_mod_patterns,
                 JackDemand = false,
                 JackShare = null,
                 StreamShare = null,

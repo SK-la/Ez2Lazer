@@ -31,7 +31,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 var original = new EzChartSkillInfo
                 {
-                    Patterns = new[] { "chordjack", "delay" },
+                    SkillTags = new[] { "chordjack", "delay" },
                     JackDemand = true,
                     JackShare = 0.42,
                     StreamShare = null,
@@ -59,7 +59,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 Assert.That(store.TryGetChartSkillInfo(hash, out var loaded), Is.True);
                 Assert.That(loaded, Is.Not.Null);
-                Assert.That(loaded!.Patterns, Is.EquivalentTo(original.Patterns));
+                Assert.That(loaded!.SkillTags, Is.EquivalentTo(original.SkillTags));
                 Assert.That(loaded.JackDemand, Is.True);
                 Assert.That(loaded.JackShare, Is.EqualTo(0.42).Within(1e-9));
                 Assert.That(loaded.StreamShare, Is.Null);
@@ -230,7 +230,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.UpsertChartSkillInfo(real_hash, new EzChartSkillInfo
                 {
-                    Patterns = new[] { "jack" },
+                    SkillTags = new[] { "jack" },
                     DanEligible = true,
                     KeyCount = 4,
                 });
@@ -261,7 +261,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.UpsertChartSkillInfo(hash_a, new EzChartSkillInfo
                 {
-                    Patterns = new[] { "jack" },
+                    SkillTags = new[] { "jack" },
                     TechScore = 0.5,
                     ChordjackScore = 0.8,
                     LnRatio = 0.1,
@@ -276,7 +276,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 var chartBatch = store.GetChartSkillInfoForHashes(new[] { hash_a, hash_b, "missing" });
                 Assert.That(chartBatch.Keys, Is.EquivalentTo(new[] { hash_a }));
-                Assert.That(chartBatch[hash_a].Patterns, Is.EquivalentTo(new[] { "jack" }));
+                Assert.That(chartBatch[hash_a].SkillTags, Is.EquivalentTo(new[] { "jack" }));
                 Assert.That(chartBatch[hash_a].ChordjackScore, Is.EqualTo(0.8).Within(1e-9));
             });
         }
@@ -368,7 +368,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 store.SetAppliedVersion(EzAnalysisSystem.CSI, EzCSIEngine.VERSION);
 
                 // What an earlier pass stamped from the stub axis.
-                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = true });
                 store.WriteBeatmapMsdUnrateable(hash, id);
 
                 var beatmap = maniaBeatmap(hash, id);

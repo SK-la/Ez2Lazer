@@ -63,7 +63,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var info = EzCSIEngine.Compute(input);
             var builder = new StringBuilder();
 
-            builder.Append("csi patterns=").Append(string.Join(',', info.Patterns))
+            builder.Append("csi patterns=").Append(string.Join(',', info.SkillTags))
                    .Append(" jackDemand=").Append(info.JackDemand)
                    .Append(" jackShare=").Append(num(info.JackShare ?? -1))
                    .Append(" streamShare=").Append(num(info.StreamShare ?? -1))

@@ -49,7 +49,9 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("mina", "Mina", "Mina")]
         Mina = 1 << 3,
 
-        /// <summary>Chart structure vector. No rating of its own.</summary>
+        /// <summary>
+        /// ChartSkillInfo：谱面技能 Tag 产品（抽出的标签）以及同一次 pass 的结构轴表。不是 KeyPattern。
+        /// </summary>
         [EzSkillMeta("csi", "特点", "CSI")]
         CSI = 1 << 4,
 
@@ -57,8 +59,10 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("dan", "段位", "Dan")]
         Dan = 1 << 5,
 
-        /// <summary>Player SkillTag buckets derived from plays.</summary>
-        [EzSkillMeta("player_skill_tag", "键型", "Pattern")]
+        /// <summary>
+        /// 谱面 KeyPattern 技能轴。不是 SkillTag。Persist and Filter axes land in a later pass.
+        /// </summary>
+        [EzSkillMeta("ezpattern", "键型结构", "Key Pattern")]
         Pattern = 1 << 6,
 
         /// <summary>Lightweight chart tags. A data group, not a system.</summary>
@@ -69,9 +73,15 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("scores", "成绩", "Scores")]
         Scores = 1 << 8,
 
+        /// <summary>
+        /// 玩家技能 Tag：用谱面 SkillTag 给成绩分桶后的聚合。L2 id <c>player_skill_tag</c>。不是玩家技能轴，也不是 <see cref="Pattern"/>。
+        /// </summary>
+        [EzSkillMeta("player_skill_tag", "玩家技能标签", "Player Skill Tag")]
+        PlayerSkillTag = 1 << 9,
+
         /// <summary>Every system and data group.</summary>
         [EzSkillMeta("all", "全部", "All")]
-        All = Official | SSR | PPP | Mina | CSI | Dan | Pattern | MetadataTags | Scores,
+        All = Official | SSR | PPP | Mina | CSI | Dan | Pattern | MetadataTags | Scores | PlayerSkillTag,
     }
 
     /// <summary>
@@ -140,7 +150,8 @@ namespace osu.Game.EzOsuGame.Analysis
             EzAnalysisSystem.CSI => EzCSIEngine.VERSION,
             EzAnalysisSystem.Dan => EzDanEngine.VERSION,
             EzAnalysisSystem.PPP => EzPPPEngine.VERSION,
-            EzAnalysisSystem.Pattern => EzMinaPlayerSkillModeData.VERSION,
+            EzAnalysisSystem.Pattern => 0,
+            EzAnalysisSystem.PlayerSkillTag => EzMinaPlayerSkillModeData.VERSION,
             EzAnalysisSystem.SSR => EzSSRUnit.VERSION,
             _ => 0,
         };
