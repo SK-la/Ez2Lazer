@@ -31,6 +31,12 @@ using osu.Game.Utils;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
+    /// <summary>
+    /// L3 pass: one <see cref="EzAnalysisResult"/> for a chart + mods.
+    /// When mods allow, L1 Sunny star (Realm) is chosen before Dan and scalar ratings so those fields share the headline;
+    /// <see cref="EzAnalysisResult.SsrPatternRadar"/> stays the live snapshot.
+    /// KPS/KPC NoMod slices are <c>ComputePersistedSqliteSlice</c>, not this method.
+    /// </summary>
     // 不主动释放 workingCache，让框架自行决定。主动释放会频繁触发大量 Invalidating 日志。
     internal static class EzAnalysisComputation
     {
@@ -439,7 +445,7 @@ namespace osu.Game.EzOsuGame.Analysis
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Radar))
                 ssrAndRadar = computeSsrAndRadar(lookup, analysisBeatmap, measurements, cancellationToken);
 
-            double? sunnySR = ssrAndRadar.SunnySR;
+            double? sunnySR = persistedSunnyStar(lookup) ?? ssrAndRadar.SunnySR;
 
             MinaResult? mina;
 
@@ -478,8 +484,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Dan))
                 dan = computeDan(rulesetOnlineId, measurements, mina?.Axes, structure?.Info, sunnySR);
-
-            ratings = applyWedgeSsrHeadlineRatings(lookup, ratings);
 
             var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, ratings: ratings, dan: dan,
                 keyPatternRadar: ssrAndRadar.KeyPatternRadar, ssrPatternRadar: ssrAndRadar.SsrPatternRadar, chartSkillInfo: structure?.Info);
@@ -668,24 +672,19 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Wedge consumers (radar, readout merge): L1 Sunny from Realm when mods allow; L3 stays on <see cref="EzAnalysisResult.SsrPatternRadar"/>.
+        /// L1 Sunny star when this request may use the Realm baseline. Null means the live L3 star stays.
         /// </summary>
-        private static IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> applyWedgeSsrHeadlineRatings(
-            in EzAnalysisLookupCache lookup,
-            IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> ratings)
+        private static double? persistedSunnyStar(in EzAnalysisLookupCache lookup)
         {
             if (!EzModRate.CanUsePersistedSunnySR(lookup.OrderedMods))
-                return ratings;
+                return null;
 
             double stored = lookup.BeatmapInfo.EzRatingData.SunnySR;
 
             if (stored < 0 || !double.IsFinite(stored) || stored <= 0)
-                return ratings;
+                return null;
 
-            var next = new Dictionary<EzAnalysisSystem, EzScalarRating>(ratings);
-            ratings.TryGetValue(EzAnalysisSystem.SSR, out EzScalarRating existing);
-            next[EzAnalysisSystem.SSR] = new EzScalarRating(stored, existing.PerformancePoints);
-            return next;
+            return stored;
         }
 
         /// <summary>
@@ -704,8 +703,8 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Dan estimates for the sides this chart can be rated on, from the axis table and Sunny rating this pass
-        /// already measured.
+        /// Dan estimates for the sides this chart can be rated on, from the axis table and the Sunny headline
+        /// already resolved for this pass (L1 overlay when allowed).
         /// </summary>
         private static EzDanSet? computeDan(int rulesetOnlineId, EzChartMeasurements? measurements,
                                             IReadOnlyDictionary<string, double>? bareAxes, EzChartSkillInfo? chartInfo, double? sunnySR)
@@ -840,7 +839,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (chart.Notes.Count == 0)
                 return new SsrAndRadar(0, keyPatternRadar, null);
 
-            // L3 SunnySRSkill spokes always from this live snapshot; wedge L1 Sunny uses Realm on the HUD when allowed.
+            // L3 SunnySRSkill spokes always from this live snapshot; L1 Sunny star is resolved later in Compute.
             var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, analysisBeatmap.Difficulty.OverallDifficulty,
                 getRateAdjustMultiplier(lookup.OrderedMods));
 

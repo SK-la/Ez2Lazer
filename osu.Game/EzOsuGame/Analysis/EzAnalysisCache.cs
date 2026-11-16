@@ -28,9 +28,14 @@ namespace osu.Game.EzOsuGame.Analysis
     /// <summary>
     /// 选歌 Ez 分析前台缓存与派发点。调用方只描述要分析的谱面 / 规则集 / mods，不指定读哪一层。
     ///
+    /// 数据层：L1 Realm 基线列（星 / PP）；L2 主 SQLite NoMod KPS 切片与本会话 store；L3
+    /// <see cref="EzAnalysisComputation"/> 整段 live pass。合成发生在 L3 结果进入 session 之前
+    /// （Sunny 星可覆盖为 L1），以及 <see cref="ReadVariantValues"/>。
+    ///
     /// 派发顺序：本会话 store → 即时计算（受 <see cref="Ez2Setting.EzAnalysisRecEnabled"/>）→ 主 SQLite NoMod 切片
     /// （受 <see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>）→ 无结果。
-    /// 已存切片只描述本规则集 NoMod 请求，因此有 mod 或换规则集的请求没有已存答案，由即时计算回答。
+    /// 已存切片只描述本规则集 NoMod 的 kps/KPC，没有轴、Dan、<see cref="EzAnalysisResult.SsrPatternRadar"/>；
+    /// Rec 关闭时因此没有雷达多边形。有 mod 或换规则集的请求没有已存切片，由即时计算回答。
     /// 标量（星 / PP / 技能星）经 <see cref="ReadVariantValues"/> 按当前选中系统读取，缺失的半侧才回落到基线列。
     /// <para>
     /// 本 cache 是纯读组件：任何落盘（主 SQLite 切片、Realm 值行与基线列）都由 BDSP、<see cref="BeatmapUpdater"/> 或设置里的手动重算发起。
@@ -211,8 +216,9 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         /// <remarks>
         /// Dispatch order: this session's store, then a live pass when on-demand computation is enabled, then the
-        /// stored SQLite slice. A stored slice only describes a NoMod request for the beatmap's own ruleset, so a
-        /// modded or foreign-ruleset request is answered by the live pass.
+        /// stored SQLite slice. A stored slice is kps/KPC only (no radar). Rec off therefore yields no
+        /// <see cref="EzAnalysisResult.SsrPatternRadar"/>. A stored slice only describes a NoMod request for the
+        /// beatmap's own ruleset, so a modded or foreign-ruleset request is answered by the live pass.
         /// </remarks>
         public virtual Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo = null, IEnumerable<Mod>? mods = null,
                                                                 CancellationToken cancellationToken = default, int computationDelay = 0)
