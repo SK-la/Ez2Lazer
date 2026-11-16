@@ -122,6 +122,8 @@ namespace osu.Game.Rulesets.Mania.Scoring
         {
             refreshStableAvailability();
 
+            beatmap = WorkingBeatmap.DetachFromSharedPlayableCache(beatmap);
+
             // Tail/Tick 的 Ignore 系 Judgement 必须在全谱模拟前绑定，否则 EZ2AC/Malody 会把官方尾 Perfect 计入 MaximumBaseScore。
             ManiaBeatmapBinding.BindJudgements(beatmap, judgeMode);
             base.ApplyBeatmap(beatmap);

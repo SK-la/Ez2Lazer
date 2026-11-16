@@ -982,7 +982,7 @@ namespace osu.Game.Screens.Select
                 {
                     if (token.IsCancellationRequested) return;
 
-                    var playable = workingBeatmap.GetPlayableBeatmap(ruleset, selectedMods, token);
+                    var playable = workingBeatmap.GetMutablePlayableBeatmap(ruleset, selectedMods, token);
 
                     Schedule(() => ezBeatmapPreviewOverlay.UpdateSelection(playable, ruleset, forceReload));
                 }

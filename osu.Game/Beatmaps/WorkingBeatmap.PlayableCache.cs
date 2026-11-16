@@ -40,6 +40,15 @@ namespace osu.Game.Beatmaps
             => beatmap != null && cached_read_only_markers.TryGetValue(beatmap, out _);
 
         /// <summary>
+        /// Returns a beatmap safe for in-place mutation. Shared-cache entries are detached via <see cref="IBeatmap.Clone"/>.
+        /// </summary>
+        public static IBeatmap DetachFromSharedPlayableCache(IBeatmap beatmap)
+        {
+            ArgumentNullException.ThrowIfNull(beatmap);
+            return IsCachedReadOnlyPlayableInstance(beatmap) ? beatmap.Clone() : beatmap;
+        }
+
+        /// <summary>
         /// Returns <paramref name="candidate"/> when it is not from the shared playable cache; otherwise converts a fresh mutable copy.
         /// Use before any in-place mutation (Mania judgement binding, ApplyDefaults, etc.).
         /// </summary>
@@ -53,7 +62,8 @@ namespace osu.Game.Beatmaps
             if (!IsCachedReadOnlyPlayableInstance(candidate))
                 return candidate;
 
-            return working.GetMutablePlayableBeatmap(ruleset, mods, cancellationToken);
+            IBeatmap converted = working.GetMutablePlayableBeatmap(ruleset, mods, cancellationToken);
+            return DetachFromSharedPlayableCache(converted);
         }
 
         internal static void ClearCachedReadOnlyMarkersForTesting()
@@ -99,7 +109,7 @@ namespace osu.Game.Beatmaps
 
             lock (playableConversionGate)
             {
-                IBeatmap converted = convertPlayableBeatmapWithPerf(ruleset, snapshot, token);
+                IBeatmap converted = DetachFromSharedPlayableCache(convertPlayableBeatmapWithPerf(ruleset, snapshot, token));
                 postConvert?.Invoke(converted);
                 return converted;
             }
