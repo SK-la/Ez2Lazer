@@ -65,7 +65,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(secondInfo.TechScore, Is.EqualTo(firstInfo.TechScore).Within(tolerance));
             Assert.That(secondInfo.ChordjackScore, Is.EqualTo(firstInfo.ChordjackScore).Within(tolerance));
             Assert.That(secondInfo.LnRatio, Is.EqualTo(firstInfo.LnRatio).Within(tolerance));
-            Assert.That(secondInfo.Patterns, Is.EqualTo(firstInfo.Patterns));
+            Assert.That(secondInfo.SkillTags, Is.EqualTo(firstInfo.SkillTags));
 
             var msd = computeMsd(input, 4);
             int holdCount = countHolds(input);
@@ -99,7 +99,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             Assert.That(second.TechScore, Is.EqualTo(first.TechScore).Within(tolerance));
             Assert.That(second.JackShare ?? 0, Is.EqualTo(first.JackShare ?? 0).Within(tolerance));
-            Assert.That(second.Patterns, Is.EqualTo(first.Patterns));
+            Assert.That(second.SkillTags, Is.EqualTo(first.SkillTags));
         }
 
         private static void assertSameAxes(IReadOnlyDictionary<string, double> expected, IReadOnlyDictionary<string, double> actual, string label)
