@@ -17,7 +17,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         [TestCase(EzDataRebuildAction.RealmCSI, EzAnalysisSystem.CSI)]
         [TestCase(EzDataRebuildAction.RealmDan, EzAnalysisSystem.Dan)]
         [TestCase(EzDataRebuildAction.RealmPPP, EzAnalysisSystem.PPP)]
-        [TestCase(EzDataRebuildAction.RealmPattern, EzAnalysisSystem.Pattern)]
+        [TestCase(EzDataRebuildAction.RealmKeyPattern, EzAnalysisSystem.KeyPattern)]
         [TestCase(EzDataRebuildAction.RealmAll, EzAnalysisSystem.All)]
         public void TestRealmTargetsDispatchWithCorrectScope(EzDataRebuildAction action, EzAnalysisSystem expectedScope)
         {

@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Framework.Localisation;
@@ -58,12 +59,11 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
     {
         public static EzKeyPatternAxis[] All => EzEnumMetaCache<EzKeyPatternAxis>.ALL;
 
-        /// <summary>Axes the KeyPattern radar persist and Filter currently compute.</summary>
+        /// <summary>Axes EKP persists and Filter reads. LN% is not stored.</summary>
         public static EzKeyPatternAxis[] RadarAxes { get; } =
         {
             EzKeyPatternAxis.Bracket,
             EzKeyPatternAxis.Chord,
-            EzKeyPatternAxis.LnPercent,
             EzKeyPatternAxis.Jack,
             EzKeyPatternAxis.Delay,
             EzKeyPatternAxis.Dump,
@@ -98,24 +98,59 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         }
     }
 
-    /// <summary>Builds the KeyPattern radar from persisted Pattern rows. Axis keys are wire ids.</summary>
+    /// <summary>Builds the EKP radar: five persisted quantified axes plus LN% from hold ratio.</summary>
     public static class EzKeyPatternRadar
     {
-        public static EzRadarChartData<string>? TryCreateFromStored(IReadOnlyDictionary<string, double> skills)
+        public static EzRadarChartData<string>? TryCreateFromStored(IReadOnlyDictionary<string, double> skills, double holdRatio)
         {
             if (!EzKeyPatternAxisExtensions.HasCompleteRadarSkills(skills))
                 return null;
 
-            var axes = new EzRadarAxisValue<string>[EzKeyPatternAxisExtensions.RadarAxes.Length];
+            double lnPercent = double.IsFinite(holdRatio)
+                ? Math.Round(Math.Clamp(holdRatio, 0, 1) * 100, 2, MidpointRounding.AwayFromZero)
+                : 0;
 
-            for (int i = 0; i < axes.Length; i++)
+            return EzRadarChartData<string>.Create(
+                axis(EzKeyPatternAxis.Bracket, skills),
+                axis(EzKeyPatternAxis.Chord, skills),
+                new EzRadarAxisValue<string>(EzKeyPatternAxis.LnPercent.ToMetaId(), lnPercent, "0.00"),
+                axis(EzKeyPatternAxis.Jack, skills),
+                axis(EzKeyPatternAxis.Delay, skills),
+                axis(EzKeyPatternAxis.Dump, skills));
+        }
+
+        public static EzRadarChartData<string> WithHoldRatio(in EzRadarChartData<string> quantified, double holdRatio)
+        {
+            double lnPercent = double.IsFinite(holdRatio)
+                ? Math.Round(Math.Clamp(holdRatio, 0, 1) * 100, 2, MidpointRounding.AwayFromZero)
+                : 0;
+
+            return EzRadarChartData<string>.Create(
+                valueOf(quantified, EzKeyPatternAxis.Bracket),
+                valueOf(quantified, EzKeyPatternAxis.Chord),
+                new EzRadarAxisValue<string>(EzKeyPatternAxis.LnPercent.ToMetaId(), lnPercent, "0.00"),
+                valueOf(quantified, EzKeyPatternAxis.Jack),
+                valueOf(quantified, EzKeyPatternAxis.Delay),
+                valueOf(quantified, EzKeyPatternAxis.Dump));
+        }
+
+        private static EzRadarAxisValue<string> axis(EzKeyPatternAxis patternAxis, IReadOnlyDictionary<string, double> skills)
+        {
+            string id = patternAxis.ToMetaId();
+            return new EzRadarAxisValue<string>(id, skills[id], "0.00");
+        }
+
+        private static EzRadarAxisValue<string> valueOf(in EzRadarChartData<string> radar, EzKeyPatternAxis patternAxis)
+        {
+            string id = patternAxis.ToMetaId();
+
+            for (int i = 0; i < radar.Count; i++)
             {
-                var axis = EzKeyPatternAxisExtensions.RadarAxes[i];
-                string id = axis.ToMetaId();
-                axes[i] = new EzRadarAxisValue<string>(id, skills[id], "0.00");
+                if (radar[i].Axis == id)
+                    return radar[i];
             }
 
-            return EzRadarChartData<string>.Create(axes);
+            return new EzRadarAxisValue<string>(id, 0, "0.00");
         }
     }
 }

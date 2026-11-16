@@ -467,7 +467,7 @@ namespace osu.Game.EzOsuGame.Skills
                     ClearRatings(EzAnalysisSystem.SSR);
                     break;
 
-                case EzAnalysisSystem.Pattern:
+                case EzAnalysisSystem.KeyPattern:
                     ClearBeatmapPatternSkills();
                     break;
             }
@@ -974,7 +974,7 @@ namespace osu.Game.EzOsuGame.Skills
             return realmAccess.Run(r =>
             {
                 const int revision = EzKeyPatternUnit.VERSION;
-                string systemId = EzAnalysisSystem.Pattern.ToStorageId();
+                string systemId = EzAnalysisSystem.KeyPattern.ToStorageId();
                 var required = EzKeyPatternAxisExtensions.RadarAxisIds;
 
                 var presentByHash = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
@@ -995,6 +995,16 @@ namespace osu.Game.EzOsuGame.Skills
                         continue;
 
                     if (!EzKeyPatternUnit.SupportsRuleset(beatmap.Ruleset.OnlineID))
+                        continue;
+
+                    double sunnySR = beatmap.EzRatingData.SunnySR;
+
+                    // EKP waits for a real Sunny star. 0 with objects is the N/A stamp, not a rating.
+                    // Empty charts still owe a zero EKP row once Sunny has settled at 0.
+                    if (sunnySR < 0)
+                        continue;
+
+                    if (!EzKeyPatternUnit.IsQuantifiableSunny(sunnySR) && beatmap.TotalObjectCount > 0)
                         continue;
 
                     if (!presentByHash.TryGetValue(beatmap.Hash, out var have))
@@ -1126,7 +1136,7 @@ namespace osu.Game.EzOsuGame.Skills
 
         public void ClearBeatmapPatternSkills()
         {
-            string systemId = EzAnalysisSystem.Pattern.ToStorageId();
+            string systemId = EzAnalysisSystem.KeyPattern.ToStorageId();
 
             realmAccess.Write(r =>
             {

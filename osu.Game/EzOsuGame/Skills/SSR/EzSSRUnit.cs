@@ -106,7 +106,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                 storeSunnySrSkillAxes(beatmapInfo, combined.PatternSnapshot);
             }
 
-            EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, EzHoldMetrics.ComputeHoldRatio(playable), cancellationToken);
+            EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, star, cancellationToken);
 
             if (!double.IsFinite(star) || star < 0)
                 return false;
@@ -165,13 +165,13 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             if (playable.HitObjects.Count == 0)
             {
                 storeEmptySunnySrSkillAxes(beatmapInfo);
-                EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, 0, cancellationToken);
+                EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
                 return true;
             }
 
             var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, playable.Difficulty.OverallDifficulty);
             storeSunnySrSkillAxes(beatmapInfo, combined.PatternSnapshot);
-            EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, EzHoldMetrics.ComputeHoldRatio(playable), cancellationToken);
+            EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
             return true;
         }
 

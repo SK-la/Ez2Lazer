@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
         RealmDan = (int)EzAnalysisSystem.Dan,
 
-        RealmPattern = (int)EzAnalysisSystem.Pattern,
+        RealmKeyPattern = (int)EzAnalysisSystem.KeyPattern,
 
         RealmMetadataTags = (int)EzAnalysisSystem.MetadataTags,
 
@@ -66,7 +66,7 @@ namespace osu.Game.EzOsuGame.Analysis
                                                           | EzDataRebuildAction.RealmMina
                                                           | EzDataRebuildAction.RealmCSI
                                                           | EzDataRebuildAction.RealmDan
-                                                          | EzDataRebuildAction.RealmPattern
+                                                          | EzDataRebuildAction.RealmKeyPattern
                                                           | EzDataRebuildAction.RealmMetadataTags;
 
         public static EzAnalysisSystem? RealmScopeOf(EzDataRebuildAction action)
@@ -140,8 +140,9 @@ namespace osu.Game.EzOsuGame.Analysis
                 EzEnumStrings.DATA_REBUILD_ACTION_PPP_NAME, EzEnumStrings.DATA_REBUILD_ACTION_PPP_DETAIL),
             node(EzDataRebuildAction.RealmSSR, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_SSR_NAME, EzEnumStrings.DATA_REBUILD_ACTION_SSR_DETAIL),
-            node(EzDataRebuildAction.RealmPattern, false,
-                EzEnumStrings.DATA_REBUILD_ACTION_PATTERN_NAME, EzEnumStrings.DATA_REBUILD_ACTION_PATTERN_DETAIL),
+            node(EzDataRebuildAction.RealmKeyPattern, true,
+                EzEnumStrings.DATA_REBUILD_ACTION_PATTERN_NAME, EzEnumStrings.DATA_REBUILD_ACTION_PATTERN_DETAIL,
+                EzDataRebuildAction.RealmSSR),
             node(EzDataRebuildAction.RealmOfficial, false,
                 EzEnumStrings.DATA_REBUILD_ACTION_OFFICIAL_NAME, EzEnumStrings.DATA_REBUILD_ACTION_OFFICIAL_DETAIL),
             node(EzDataRebuildAction.RealmMetadataTags, false,

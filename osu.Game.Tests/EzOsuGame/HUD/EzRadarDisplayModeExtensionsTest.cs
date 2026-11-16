@@ -12,7 +12,7 @@ namespace osu.Game.Tests.EzOsuGame.HUD
     {
         [TestCase(EzRadarDisplayMode.SunnySRSkill, EzAnalysisSystem.SSR)]
         [TestCase(EzRadarDisplayMode.MSDSkillDual, EzAnalysisSystem.Mina)]
-        [TestCase(EzRadarDisplayMode.KeyPattern, EzAnalysisSystem.Pattern)]
+        [TestCase(EzRadarDisplayMode.KeyPattern, EzAnalysisSystem.KeyPattern)]
         public void Skill_axis_system_maps_radar_mode(EzRadarDisplayMode mode, EzAnalysisSystem expected)
             => Assert.That(mode.SkillAxisSystem(), Is.EqualTo(expected));
     }

@@ -711,8 +711,8 @@ namespace osu.Game.Database
         {
             EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
 
-            if (scope.HasFlag(EzAnalysisSystem.Pattern) && skillStore.IsExpired(EzAnalysisSystem.Pattern))
-                Logger.Log($"Retiring KeyPattern axes for recomputation: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Pattern, includeDownstream: false))}.");
+            if (scope.HasFlag(EzAnalysisSystem.KeyPattern) && skillStore.IsExpired(EzAnalysisSystem.KeyPattern))
+                Logger.Log($"Retiring KeyPattern axes for recomputation: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.KeyPattern, includeDownstream: false))}.");
 
             bool sunnyFillFinished = true;
 
@@ -746,7 +746,7 @@ namespace osu.Game.Database
                     Logger.Log("Sunny SR4 skill axis pass did not finish; remaining charts are picked up next launch.");
             }
 
-            if (scope.HasFlag(EzAnalysisSystem.Pattern) && !populateMissingKeyPatternAxes())
+            if (scope.HasFlag(EzAnalysisSystem.KeyPattern) && !populateMissingKeyPatternAxes())
                 Logger.Log("KeyPattern axis pass did not finish; remaining charts are picked up next launch.");
 
             if (scope.HasFlag(EzAnalysisSystem.Official))
@@ -889,8 +889,8 @@ namespace osu.Game.Database
                 skillProvider.InvalidateLiveMetrics();
             }
 
-            if (scope.HasFlag(EzAnalysisSystem.Pattern))
-                Logger.Log($"Retiring KeyPattern axes: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Pattern))}");
+            if (scope.HasFlag(EzAnalysisSystem.KeyPattern))
+                Logger.Log($"Retiring KeyPattern axes: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.KeyPattern))}");
 
             bool clearBeatmapInfoFields = scope.HasFlag(EzAnalysisSystem.MetadataTags)
                                           || scope.HasFlag(EzAnalysisSystem.Official);
@@ -1075,8 +1075,7 @@ namespace osu.Game.Database
                 if (!ezSSRUnit.BackfillChartSkillAxes(beatmap, CancellationToken.None))
                     return false;
 
-                if (beatmap.Hash != null)
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
 
                 return true;
             }
@@ -1111,8 +1110,7 @@ namespace osu.Game.Database
                 if (!ezKeyPatternUnit.ComputeAndStore(beatmap, CancellationToken.None))
                     return false;
 
-                if (beatmap.Hash != null)
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
 
                 return true;
             }

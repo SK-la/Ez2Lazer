@@ -213,8 +213,10 @@ namespace osu.Game.EzOsuGame.Analysis
             if (CommonSummary is not KpsSummary commonSummary)
                 return this;
 
-            var axes = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(Axes);
-            axes[EzAnalysisSystem.Pattern] = patternAxes;
+            var axes = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(Axes)
+            {
+                [EzAnalysisSystem.KeyPattern] = patternAxes,
+            };
 
             return new EzAnalysisResult(commonSummary, ManiaSummary, TagSummary, axes, Ratings, Dan, radar, SsrPatternRadar, ChartSkillInfo);
         }

@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Analysis
     /// 派发顺序：本会话 store → 即时计算（受 <see cref="Ez2Setting.EzAnalysisRecEnabled"/>）→ 主 SQLite NoMod 切片
     /// （受 <see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>）→ 无结果。
     /// 已存切片只描述本规则集 NoMod 的 kps/KPC，没有轴、Dan、<see cref="EzAnalysisResult.SsrPatternRadar"/>；
-    /// Rec 关闭时 <see cref="EzAnalysisResult.SsrPatternRadar"/> 仍为空，KeyPattern 多边形可从 L1 Pattern 行合成。有 mod 或换规则集的请求没有已存切片，由即时计算回答。
+    /// Rec 关闭时 <see cref="EzAnalysisResult.SsrPatternRadar"/> 仍为空，EKP 多边形可从 L1 五轴加 hold 比合成。有 mod 或换规则集的请求没有已存切片，由即时计算回答。
     /// 标量（星 / PP / 技能星）经 <see cref="ReadVariantValues"/> 按当前选中系统读取，缺失的半侧才回落到基线列。
     /// <para>
     /// 本 cache 是纯读组件：任何落盘（主 SQLite 切片、Realm 值行与基线列）都由 BDSP、<see cref="BeatmapUpdater"/> 或设置里的手动重算发起。
@@ -369,12 +369,12 @@ namespace osu.Game.EzOsuGame.Analysis
             string axisId,
             int rulesetOnlineId = -1)
             => skillProvider?.GetBeatmapSkillAxisForHashes(beatmapHashes, system, axisId, rulesetOnlineId)
-               ?? (IReadOnlyDictionary<string, double>)new Dictionary<string, double>(StringComparer.Ordinal);
+               ?? new Dictionary<string, double>(StringComparer.Ordinal);
 
         /// <summary>Stored CSI pattern tags for many hashes. L1 rows only.</summary>
         public IReadOnlyDictionary<string, string[]> GetChartSkillTagsForHashes(IEnumerable<string> beatmapHashes)
             => skillProvider?.GetChartSkillTagsForHashes(beatmapHashes)
-               ?? (IReadOnlyDictionary<string, string[]>)new Dictionary<string, string[]>(StringComparer.Ordinal);
+               ?? new Dictionary<string, string[]>(StringComparer.Ordinal);
 
         private EzAnalysisResult overlayPersistedKeyPattern(BeatmapInfo beatmap, EzAnalysisResult slice, int rulesetOnlineId)
         {
@@ -384,8 +384,9 @@ namespace osu.Game.EzOsuGame.Analysis
                 || !EzKeyPatternUnit.SupportsRuleset(rulesetOnlineId))
                 return slice;
 
-            var skills = skillProvider.ChartStore.GetBeatmapSkills(beatmap.Hash, EzAnalysisSystem.Pattern, rulesetOnlineId);
-            var radar = EzKeyPatternRadar.TryCreateFromStored(skills);
+            var skills = skillProvider.ChartStore.GetBeatmapSkills(beatmap.Hash, EzAnalysisSystem.KeyPattern, rulesetOnlineId);
+            double holdRatio = EzHoldMetrics.HoldRatio(beatmap);
+            var radar = EzKeyPatternRadar.TryCreateFromStored(skills, double.IsNaN(holdRatio) ? 0 : holdRatio);
 
             return radar == null ? slice : slice.WithPersistedKeyPattern(radar.Value, skills);
         }

@@ -21,6 +21,7 @@ using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
@@ -72,7 +73,6 @@ namespace osu.Game.EzOsuGame.HUD
         private const float axis_label_alpha = 1f;
 
         // Data normalization constants
-        private const float key_pattern_full_score = 10f;
         private const float long_note_ratio_max = 100f;
 
         private float[] parameterRatios = new float[6];
@@ -883,27 +883,22 @@ namespace osu.Game.EzOsuGame.HUD
 
         private EzRadarChartData<string> createDisplayedRulesetRadarData(EzRadarChartData<string> sourceRadarData, double? sunnySR)
         {
-            if (RadarDisplayMode.Value == EzRadarDisplayMode.SunnySRSkill)
+            if (RadarDisplayMode.Value != EzRadarDisplayMode.KeyPattern || UseAbsoluteValue.Value || sunnySR is not double sunny || sunny <= 0)
                 return sourceRadarData;
 
-            if (!UseAbsoluteValue.Value || sunnySR is not double sunny || sunny <= 0)
-                return sourceRadarData;
-
-            bool preserveLongNotePercentage = RadarDisplayMode.Value == EzRadarDisplayMode.KeyPattern;
             var axes = new EzRadarAxisValue<string>[sourceRadarData.Count];
 
             for (int i = 0; i < sourceRadarData.Count; i++)
             {
                 EzRadarAxisValue<string> axis = sourceRadarData[i];
 
-                if (preserveLongNotePercentage && axis.Axis == "LN%")
+                if (axis.Axis == "LN%")
                 {
                     axes[i] = axis;
                     continue;
                 }
 
-                double absoluteValue = Math.Round(axis.Value / key_pattern_full_score * sunny, 2, MidpointRounding.AwayFromZero);
-                axes[i] = new EzRadarAxisValue<string>(axis.Axis, absoluteValue, "0.00");
+                axes[i] = new EzRadarAxisValue<string>(axis.Axis, EzKeyPatternUnit.ToRelative(axis.Value, sunny), "0.00");
             }
 
             return EzRadarChartData<string>.Create(axes);

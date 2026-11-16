@@ -521,12 +521,12 @@ namespace osu.Game.Screens.Select
 
             switch (rightRadarMode.SkillAxisSystem())
             {
-                case EzAnalysisSystem.Pattern:
+                case EzAnalysisSystem.KeyPattern:
                     if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID)
                         break;
 
                     foreach (var axis in EzKeyPatternAxisExtensions.RadarAxes)
-                        items.Add(new SkillAxisDropdownItem(EzAnalysisSystem.Pattern, axis.ToMetaId(), axis.Meta().DisplayName));
+                        items.Add(new SkillAxisDropdownItem(EzAnalysisSystem.KeyPattern, axis.ToMetaId(), axis.Meta().DisplayName));
                     break;
 
                 case EzAnalysisSystem.Mina:

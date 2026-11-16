@@ -475,10 +475,19 @@ namespace osu.Game.EzOsuGame.Analysis
             IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> ratings;
             EzDanSet? dan;
 
+            EzRadarChartData<string>? quantifiedKeyPattern = ssrAndRadar.KeyPatternRadar;
+
+            if (quantifiedKeyPattern is { } relativeRadar && sunnySR is double quantifiedSunny && EzKeyPatternUnit.IsQuantifiableSunny(quantifiedSunny))
+                quantifiedKeyPattern = EzKeyPatternUnit.Quantify(relativeRadar, quantifiedSunny);
+
+            EzRadarChartData<string>? keyPatternRadar = quantifiedKeyPattern is { } persistable
+                ? EzKeyPatternRadar.WithHoldRatio(persistable, measurements?.HoldRatio ?? 0)
+                : null;
+
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Axes))
             {
                 var computed = computeAxes(lookup, playable, analysisBeatmap, mina, structure?.Axes, ppp, sunnySR, cancellationToken);
-                axes = withKeyPatternAxes(computed.Axes, ssrAndRadar.KeyPatternRadar);
+                axes = withKeyPatternAxes(computed.Axes, quantifiedKeyPattern);
                 ratings = computed.Ratings;
             }
 
@@ -486,7 +495,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 dan = computeDan(rulesetOnlineId, measurements, mina?.Axes, structure?.Info, sunnySR);
 
             var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, ratings: ratings, dan: dan,
-                keyPatternRadar: ssrAndRadar.KeyPatternRadar, ssrPatternRadar: ssrAndRadar.SsrPatternRadar, chartSkillInfo: structure?.Info);
+                keyPatternRadar: keyPatternRadar, ssrPatternRadar: ssrAndRadar.SsrPatternRadar, chartSkillInfo: structure?.Info);
 
             EzAnalysisPassPerf.RecordPass(succeeded: true);
             EzAnalysisPassPerf.MaybeLog();
@@ -541,8 +550,10 @@ namespace osu.Game.EzOsuGame.Analysis
             if (keyPatternRadar == null)
                 return axes;
 
-            var copy = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(axes);
-            copy[EzAnalysisSystem.Pattern] = EzKeyPatternUnit.ToSkills(keyPatternRadar.Value);
+            var copy = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(axes)
+            {
+                [EzAnalysisSystem.KeyPattern] = EzKeyPatternUnit.ToSkills(keyPatternRadar.Value),
+            };
             return copy;
         }
 
@@ -843,7 +854,7 @@ namespace osu.Game.EzOsuGame.Analysis
             var chart = measured.Chart;
             int keyCount = measured.KeyCount;
 
-            EzRadarChartData<string>? keyPatternRadar = EzKeyPatternUnit.ComputeRadar(chart, measured.HoldRatio, cancellationToken);
+            EzRadarChartData<string>? keyPatternRadar = EzKeyPatternUnit.ComputeRadar(chart, cancellationToken);
 
             if (!EzSSREngine.IsPatternSupported(keyCount))
                 return new SsrAndRadar(null, keyPatternRadar, null);

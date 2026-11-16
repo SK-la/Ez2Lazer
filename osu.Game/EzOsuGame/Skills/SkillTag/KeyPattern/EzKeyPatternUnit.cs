@@ -12,7 +12,8 @@ using osu.Game.EzOsuGame.LocalProfile;
 namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
 {
     /// <summary>
-    /// Chart KeyPattern structure: measure the six radar axes and persist them under <see cref="EzAnalysisSystem.Pattern"/>.
+    /// EzKeyPattern (EKP): measure the five persistable radar axes and write them under
+    /// <see cref="EzAnalysisSystem.KeyPattern"/>. LN% is not persisted.
     /// </summary>
     public sealed class EzKeyPatternUnit
     {
@@ -20,6 +21,9 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
         private readonly EzChartSkillStore skillStore;
 
         public const int VERSION = 20261116;
+
+        /// <summary>Relative full score. 10 means that feature is the chart's clearest axis.</summary>
+        public const double RELATIVE_FULL_SCORE = 10;
 
         public EzKeyPatternUnit(BeatmapManager beatmapManager, EzChartSkillStore skillStore)
         {
@@ -29,14 +33,31 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
 
         public static bool SupportsRuleset(int rulesetOnlineId) => rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
 
+        public static bool IsQuantifiableSunny(double sunnySR)
+            => double.IsFinite(sunnySR) && sunnySR > 0;
+
+        public static double ToQuantified(double relative, double sunnySR)
+            => Math.Round(relative / RELATIVE_FULL_SCORE * sunnySR, 2, MidpointRounding.AwayFromZero);
+
+        public static double ToRelative(double quantified, double sunnySR)
+            => sunnySR > 0
+                ? Math.Round(quantified / sunnySR * RELATIVE_FULL_SCORE, 2, MidpointRounding.AwayFromZero)
+                : quantified;
+
         /// <summary>
-        /// Rates one chart and writes its KeyPattern axes. Returns false when the chart could not be loaded.
+        /// Rates one chart and writes its EKP axes. Returns false when the chart could not be loaded.
+        /// Missing Sunny star leaves the debt for a later pass. Sunny's 0 N/A stamp is not a real star.
         /// </summary>
         public bool ComputeAndStore(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
             if (!SupportsRuleset(beatmapInfo.Ruleset.OnlineID) || string.IsNullOrEmpty(beatmapInfo.Hash))
+                return true;
+
+            double sunnySR = beatmapInfo.EzRatingData.SunnySR;
+
+            if (!double.IsFinite(sunnySR) || sunnySR < 0)
                 return true;
 
             IBeatmap playable;
@@ -51,7 +72,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
             }
 
             var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
-            Write(skillStore, beatmapInfo, chart, EzHoldMetrics.ComputeHoldRatio(playable), cancellationToken);
+            Write(skillStore, beatmapInfo, chart, sunnySR, cancellationToken);
             return true;
         }
 
@@ -59,7 +80,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
             EzChartSkillStore skillStore,
             BeatmapInfo beatmapInfo,
             EzManiaChartInput chart,
-            double holdRatio,
+            double sunnySR,
             CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(skillStore);
@@ -69,25 +90,32 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
             if (string.IsNullOrEmpty(beatmapInfo.Hash))
                 return;
 
-            var radar = ComputeRadar(chart, holdRatio, cancellationToken);
+            var relative = ComputeRadar(chart, cancellationToken);
+            bool emptyChart = chart.Notes.Count == 0;
+
+            if (!emptyChart && !IsQuantifiableSunny(sunnySR))
+                return;
+
+            var stored = emptyChart ? relative : Quantify(relative, sunnySR);
 
             skillStore.WriteBeatmapSystemSkills(
                 beatmapInfo.Hash,
-                EzAnalysisSystem.Pattern,
-                ToSkills(radar),
+                EzAnalysisSystem.KeyPattern,
+                ToSkills(stored),
                 beatmapInfo.ID,
                 algorithmVersion: VERSION,
                 rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
         }
 
-        public static EzRadarChartData<string> ComputeRadar(EzManiaChartInput chart, double holdRatio, CancellationToken cancellationToken)
+        /// <summary>Relative 0–10 scores for the five persistable axes. No LN%.</summary>
+        public static EzRadarChartData<string> ComputeRadar(EzManiaChartInput chart, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(chart);
 
             var notes = EzManiaKeyPatternHelper.NotesInTimeOrder(chart);
 
             if (notes.Count == 0)
-                return createRadar(0, 0, 0, 0, 0, 0);
+                return createRadar(0, 0, 0, 0, 0);
 
             int totalColumns = 0;
 
@@ -95,15 +123,28 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
                 totalColumns = Math.Max(totalColumns, notes[i].Column + 1);
 
             var rows = EzManiaKeyPatternHelper.BuildRows(notes, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken);
-            double longNoteRatio = Math.Round(holdRatio * 100, 2, MidpointRounding.AwayFromZero);
 
             return createRadar(
                 EzManiaKeyPatternBracket.Compute(rows, totalColumns, cancellationToken),
                 EzManiaKeyPatternChord.Compute(rows, cancellationToken),
-                longNoteRatio,
                 EzManiaKeyPatternJack.Compute(notes, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken),
                 EzManiaKeyPatternDelay.Compute(rows, totalColumns, cancellationToken),
                 EzManiaKeyPatternDump.Compute(rows, totalColumns, cancellationToken));
+        }
+
+        public static EzRadarChartData<string> Quantify(in EzRadarChartData<string> relative, double sunnySR)
+        {
+            string lnId = EzKeyPatternAxis.LnPercent.ToMetaId();
+            var axes = new EzRadarAxisValue<string>[relative.Count];
+
+            for (int i = 0; i < relative.Count; i++)
+            {
+                var axis = relative[i];
+                double value = axis.Axis == lnId ? axis.Value : ToQuantified(axis.Value, sunnySR);
+                axes[i] = new EzRadarAxisValue<string>(axis.Axis, value, "0.00");
+            }
+
+            return EzRadarChartData<string>.Create(axes);
         }
 
         public static IReadOnlyDictionary<string, double> ToSkills(in EzRadarChartData<string> radar)
@@ -111,16 +152,23 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
             var values = new Dictionary<string, double>(EzKeyPatternAxisExtensions.RadarAxes.Length, StringComparer.Ordinal);
 
             for (int i = 0; i < radar.Count; i++)
-                values[radar[i].Axis] = radar[i].Value;
+            {
+                string id = radar[i].Axis;
+
+                if (id == EzKeyPatternAxis.LnPercent.ToMetaId())
+                    continue;
+
+                values[id] = radar[i].Value;
+            }
 
             return values;
         }
 
-        private static EzRadarChartData<string> createRadar(double bracket, double chord, double longNoteRatio, double jack, double delay, double dump)
+        private static EzRadarChartData<string> createRadar(double bracket, double chord, double jack, double delay, double dump)
             => EzRadarChartData<string>.Create(
                 new EzRadarAxisValue<string>(EzKeyPatternAxis.Bracket.ToMetaId(), bracket, "0.00"),
                 new EzRadarAxisValue<string>(EzKeyPatternAxis.Chord.ToMetaId(), chord, "0.00"),
-                new EzRadarAxisValue<string>(EzKeyPatternAxis.LnPercent.ToMetaId(), longNoteRatio, "0.00"),
+                new EzRadarAxisValue<string>(EzKeyPatternAxis.LnPercent.ToMetaId(), 0, "0.00"),
                 new EzRadarAxisValue<string>(EzKeyPatternAxis.Jack.ToMetaId(), jack, "0.00"),
                 new EzRadarAxisValue<string>(EzKeyPatternAxis.Delay.ToMetaId(), delay, "0.00"),
                 new EzRadarAxisValue<string>(EzKeyPatternAxis.Dump.ToMetaId(), dump, "0.00"));
