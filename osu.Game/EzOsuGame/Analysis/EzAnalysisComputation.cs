@@ -667,7 +667,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             ScoreProcessor scoreProcessor = ruleset.CreateScoreProcessor();
             scoreProcessor.Mods.Value = lookup.OrderedMods;
-            scoreProcessor.ApplyBeatmap(analysisBeatmap);
+            IBeatmap scoreProcessorBeatmap = WorkingBeatmap.EnsureMutablePlayable(playable, analysisBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            scoreProcessor.ApplyBeatmap(scoreProcessorBeatmap);
             cancellationToken.ThrowIfCancellationRequested();
 
             ScoreInfo perfectScore = new ScoreInfo(lookup.BeatmapInfo, ruleset.RulesetInfo)

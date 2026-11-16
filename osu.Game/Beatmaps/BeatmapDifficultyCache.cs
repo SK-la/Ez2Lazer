@@ -334,7 +334,8 @@ namespace osu.Game.Beatmaps
 
                 ScoreProcessor scoreProcessor = ruleset.CreateScoreProcessor();
                 scoreProcessor.Mods.Value = key.OrderedMods;
-                scoreProcessor.ApplyBeatmap(playableBeatmap);
+                IBeatmap scoreProcessorBeatmap = WorkingBeatmap.EnsureMutablePlayable(workingBeatmap, playableBeatmap, ruleset.RulesetInfo, key.OrderedMods, cancellationToken);
+                scoreProcessor.ApplyBeatmap(scoreProcessorBeatmap);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 ScoreInfo perfectScore = new ScoreInfo(key.BeatmapInfo, ruleset.RulesetInfo)

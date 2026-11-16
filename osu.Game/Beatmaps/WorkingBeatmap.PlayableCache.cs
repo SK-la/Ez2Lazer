@@ -39,6 +39,23 @@ namespace osu.Game.Beatmaps
         public static bool IsCachedReadOnlyPlayableInstance(IBeatmap? beatmap)
             => beatmap != null && cached_read_only_markers.TryGetValue(beatmap, out _);
 
+        /// <summary>
+        /// Returns <paramref name="candidate"/> when it is not from the shared playable cache; otherwise converts a fresh mutable copy.
+        /// Use before any in-place mutation (Mania judgement binding, ApplyDefaults, etc.).
+        /// </summary>
+        public static IBeatmap EnsureMutablePlayable(IWorkingBeatmap working, IBeatmap candidate, IRulesetInfo ruleset, IReadOnlyList<Mod> mods,
+                                                     CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(working);
+            ArgumentNullException.ThrowIfNull(candidate);
+            ArgumentNullException.ThrowIfNull(ruleset);
+
+            if (!IsCachedReadOnlyPlayableInstance(candidate))
+                return candidate;
+
+            return working.GetMutablePlayableBeatmap(ruleset, mods, cancellationToken);
+        }
+
         internal static void ClearCachedReadOnlyMarkersForTesting()
         {
             // Markers are weakly held; tests that need a clean slate should call InvalidatePlayableCache on the working instance.
