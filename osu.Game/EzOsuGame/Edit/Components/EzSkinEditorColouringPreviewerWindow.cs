@@ -79,6 +79,8 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private Bindable<double> colouringStrength = null!;
 
         private PreviewCell[] cells = Array.Empty<PreviewCell>();
+        private Action? onFactoryNoteColourChanged;
+        private Action? onFactoryNoteDrawableChanged;
         private bool dragging;
         private bool positionRestored;
 
@@ -237,6 +239,11 @@ namespace osu.Game.EzOsuGame.Edit.Components
             foreach (var tint in columnTypeTints.Values)
                 tint.BindValueChanged(_ => applyColours());
 
+            onFactoryNoteColourChanged = applyColours;
+            factory.OnNoteColourChanged += onFactoryNoteColourChanged;
+            onFactoryNoteDrawableChanged = () => Scheduler.AddOnce(applyColours);
+            factory.OnNoteDrawableChanged += onFactoryNoteDrawableChanged;
+
             colouringMode.BindValueChanged(_ => updateSelection());
             colouringRange.BindValueChanged(_ => updateSelection());
             colouringStrength.BindValueChanged(_ =>
@@ -244,6 +251,20 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 applyColours();
                 updateSelection();
             });
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            if (isDisposing)
+            {
+                if (onFactoryNoteColourChanged != null)
+                    factory.OnNoteColourChanged -= onFactoryNoteColourChanged;
+
+                if (onFactoryNoteDrawableChanged != null)
+                    factory.OnNoteDrawableChanged -= onFactoryNoteDrawableChanged;
+            }
+
+            base.Dispose(isDisposing);
         }
 
         private void requestRebuild() => Scheduler.AddOnce(rebuildGrid);

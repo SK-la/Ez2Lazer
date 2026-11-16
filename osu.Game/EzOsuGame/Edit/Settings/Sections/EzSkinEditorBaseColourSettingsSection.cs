@@ -40,11 +40,11 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             columnColorEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled);
             divisorColorEnabled = ezSkinConfig.GetBindable<bool>(Ez2Setting.GameplayDivisorNoteColouring);
 
-            colorBindables[Ez2Setting.ColumnTypeA] = createColorBindable(Ez2Setting.ColumnTypeA);
-            colorBindables[Ez2Setting.ColumnTypeB] = createColorBindable(Ez2Setting.ColumnTypeB);
-            colorBindables[Ez2Setting.ColumnTypeS] = createColorBindable(Ez2Setting.ColumnTypeS);
-            colorBindables[Ez2Setting.ColumnTypeE] = createColorBindable(Ez2Setting.ColumnTypeE);
-            colorBindables[Ez2Setting.ColumnTypeP] = createColorBindable(Ez2Setting.ColumnTypeP);
+            colorBindables[Ez2Setting.ColumnTypeA] = wrapColumnTypeColour(EzColumnType.A);
+            colorBindables[Ez2Setting.ColumnTypeB] = wrapColumnTypeColour(EzColumnType.B);
+            colorBindables[Ez2Setting.ColumnTypeS] = wrapColumnTypeColour(EzColumnType.S);
+            colorBindables[Ez2Setting.ColumnTypeE] = wrapColumnTypeColour(EzColumnType.E);
+            colorBindables[Ez2Setting.ColumnTypeP] = wrapColumnTypeColour(EzColumnType.P);
 
             Children = new Drawable[]
             {
@@ -114,10 +114,10 @@ namespace osu.Game.EzOsuGame.Edit.Settings.Sections
             }, true);
         }
 
-        private BindableColour4 createColorBindable(Ez2Setting setting)
+        private BindableColour4 wrapColumnTypeColour(EzColumnType type)
         {
             var result = new BindableColour4();
-            ezSkinConfig.BindWith(setting, result);
+            result.BindTo(ezSkinConfig.GetColumnColorBindableByType(type));
             return result;
         }
     }
