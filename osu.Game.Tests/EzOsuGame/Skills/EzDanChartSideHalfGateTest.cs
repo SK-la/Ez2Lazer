@@ -56,6 +56,38 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
+        public void Presentation_ln_side_uses_beatmap_object_counts_not_chart_dan_row()
+        {
+            using (new HoldThresholdScope(100))
+            {
+                var info = new BeatmapInfo
+                {
+                    TotalObjectCount = 1000,
+                    EndTimeObjectCount = 200,
+                    Difficulty = new BeatmapDifficulty { CircleSize = 4 },
+                };
+
+                Assert.That(EzDanAlgorithm.PrefersLnChartFromBeatmap(info), Is.True);
+                Assert.That(EzDanAlgorithm.PreferredPresentationSide(info), Is.EqualTo(EzDanSide.Ln));
+
+                var persisted = new EzPersistedChartDan
+                {
+                    KeyCount = 4,
+                    HoldRatio = 0.1,
+                    LnRawDan = 8,
+                    LnLabel = "LnLabel",
+                    RcRawDan = 7,
+                    RcLabel = "RcLabel",
+                };
+
+                var verdict = persisted.ToPresentationVerdict(info);
+                Assert.That(verdict, Is.Not.Null);
+                Assert.That(verdict!.Side, Is.EqualTo(EzDanSide.Ln));
+                Assert.That(verdict.Label, Is.EqualTo("LnLabel"));
+            }
+        }
+
+        [Test]
         public void Persisted_ln_half_uses_configurable_hold_threshold()
         {
             var config = GlobalConfigStore.EzConfig;

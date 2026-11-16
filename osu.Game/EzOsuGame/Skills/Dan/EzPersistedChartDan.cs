@@ -4,6 +4,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 
@@ -102,6 +104,19 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 HoldRatio = HoldRatio,
                 AlgorithmVersion = AlgorithmVersion,
             };
+        }
+
+        /// <summary>
+        /// Side and LN gate from beatmap object counts (ChartDan / radar / player nomod), not from this row's
+        /// stored <see cref="HoldRatio"/>.
+        /// </summary>
+        public EzChartDanVerdict? ToPresentationVerdict(BeatmapInfo beatmapInfo)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            int keyCount = KeyCount > 0 ? KeyCount : EzHoldMetrics.ResolveKeyCount(beatmapInfo);
+            var side = EzDanAlgorithm.PreferredPresentationSide(beatmapInfo, keyCount);
+            return ToVerdict(side) ?? ToVerdict(side == EzDanSide.Ln ? EzDanSide.Rc : EzDanSide.Ln);
         }
 
         /// <summary>

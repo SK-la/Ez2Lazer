@@ -138,7 +138,7 @@ namespace osu.Game.EzOsuGame.UI
             if (keyCount <= 0 && info.Difficulty.CircleSize > 0)
                 keyCount = (int)Math.Round(info.Difficulty.CircleSize);
 
-            EzDanSide side = chartDan?.HasSide(EzDanSide.Ln) == true ? EzDanSide.Ln : EzDanSide.Rc;
+            EzDanSide side = EzDanAlgorithm.PreferredPresentationSide(info, keyCount);
             setBadge(badge, tryLoadBadge(keyCount, side, chartDan?.LabelFor(side)));
         }
 
