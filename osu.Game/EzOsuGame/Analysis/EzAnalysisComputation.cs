@@ -11,6 +11,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -317,7 +318,10 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        public static EzAnalysisResult Compute(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
+        public static EzAnalysisResult Compute(
+            BeatmapManager beatmapManager,
+            in EzAnalysisLookupCache lookup,
+            CancellationToken cancellationToken = default)
             => Compute(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup, cancellationToken);
 
         /// <summary>
@@ -372,7 +376,10 @@ namespace osu.Game.EzOsuGame.Analysis
             return new EzAnalysisResult(commonSummary, maniaSummary);
         }
 
-        public static EzAnalysisResult Compute(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
+        public static EzAnalysisResult Compute(
+            WorkingBeatmap workingBeatmap,
+            in EzAnalysisLookupCache lookup,
+            CancellationToken cancellationToken = default)
         {
             // The engines that produce skill axes are independent of a ruleset exposing an analysis provider, so
             // the pass always measures them. Products that do need the provider (official performance, the Sunny
@@ -471,6 +478,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Dan))
                 dan = computeDan(rulesetOnlineId, measurements, mina?.Axes, structure?.Info, sunnySR);
+
+            ratings = applyWedgeSsrHeadlineRatings(lookup, ratings);
 
             var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, ratings: ratings, dan: dan,
                 keyPatternRadar: ssrAndRadar.KeyPatternRadar, ssrPatternRadar: ssrAndRadar.SsrPatternRadar, chartSkillInfo: structure?.Info);
@@ -659,6 +668,27 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
+        /// Wedge consumers (radar, readout merge): L1 Sunny from Realm when mods allow; L3 stays on <see cref="EzAnalysisResult.SsrPatternRadar"/>.
+        /// </summary>
+        private static IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> applyWedgeSsrHeadlineRatings(
+            in EzAnalysisLookupCache lookup,
+            IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> ratings)
+        {
+            if (!EzModRate.CanUsePersistedSunnySR(lookup.OrderedMods))
+                return ratings;
+
+            double stored = lookup.BeatmapInfo.EzRatingData.SunnySR;
+
+            if (stored < 0 || !double.IsFinite(stored) || stored <= 0)
+                return ratings;
+
+            var next = new Dictionary<EzAnalysisSystem, EzScalarRating>(ratings);
+            ratings.TryGetValue(EzAnalysisSystem.SSR, out EzScalarRating existing);
+            next[EzAnalysisSystem.SSR] = new EzScalarRating(stored, existing.PerformancePoints);
+            return next;
+        }
+
+        /// <summary>
         /// Sunny star rating and the pp it implies for the current mods. A star is one number, not an axis.
         /// </summary>
         private static void addSsr(double? sunnySR, OfficialResult? official, Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
@@ -790,8 +820,11 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The rating and its pattern breakdown come from one engine call, so asking for both does not run the
         /// difficulty core twice for the same chart and mods.
         /// </remarks>
-        private static SsrAndRadar computeSsrAndRadar(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, EzChartMeasurements? measurements,
-                                                      CancellationToken cancellationToken)
+        private static SsrAndRadar computeSsrAndRadar(
+            in EzAnalysisLookupCache lookup,
+            IBeatmap analysisBeatmap,
+            EzChartMeasurements? measurements,
+            CancellationToken cancellationToken)
         {
             if (!EzSSRUnit.SupportsRuleset(lookup.Ruleset.OnlineID) || measurements is not { } measured)
                 return default;
@@ -807,6 +840,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (chart.Notes.Count == 0)
                 return new SsrAndRadar(0, keyPatternRadar, null);
 
+            // L3 SunnySRSkill spokes always from this live snapshot; wedge L1 Sunny uses Realm on the HUD when allowed.
             var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, analysisBeatmap.Difficulty.OverallDifficulty,
                 getRateAdjustMultiplier(lookup.OrderedMods));
 

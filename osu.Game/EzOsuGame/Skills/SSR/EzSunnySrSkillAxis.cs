@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.SSR.SR4Pattern;
 
 namespace osu.Game.EzOsuGame.Skills.SSR
@@ -44,6 +45,41 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
         public static bool TryParse(string? axisId, out EzSunnySrSkillAxis axis)
             => EzEnumMetaCache<EzSunnySrSkillAxis>.TryParseIgnoreCase(axisId, out axis);
+
+        public static bool HasCompleteChartSkills(IReadOnlyDictionary<string, double> skills)
+        {
+            if (skills.Count == 0)
+                return false;
+
+            foreach (string axisId in ChartAxisIds)
+            {
+                if (!skills.TryGetValue(axisId, out double value) || !double.IsFinite(value))
+                    return false;
+            }
+
+            return true;
+        }
+    }
+
+    /// <summary>Builds the Sunny SR skill radar from persisted chart rows.</summary>
+    public static class EzSunnySrSkillRadar
+    {
+        public static EzRadarChartData<string>? TryCreateFromStored(IReadOnlyDictionary<string, double> skills)
+        {
+            if (!EzSunnySrSkillAxisExtensions.HasCompleteChartSkills(skills))
+                return null;
+
+            var axes = new EzRadarAxisValue<string>[EzSunnySrSkillAxisExtensions.ChartAxes.Length];
+
+            for (int i = 0; i < axes.Length; i++)
+            {
+                var axis = EzSunnySrSkillAxisExtensions.ChartAxes[i];
+                string label = axis.Meta().DisplayName.ToString();
+                axes[i] = new EzRadarAxisValue<string>(label, skills[axis.ToMetaId()], "0.00");
+            }
+
+            return EzRadarChartData<string>.Create(axes);
+        }
     }
 
     /// <summary>Maps one SR4 pattern snapshot to chart skill axis values (wire ids from <see cref="EzSunnySrSkillAxis"/>).</summary>
