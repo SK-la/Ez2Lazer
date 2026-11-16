@@ -203,6 +203,42 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
+        public void Invalidating_ssr_upstream_only_keeps_chart_dan_until_downstream_retire()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-ssr-staged";
+
+                seedChart(realm, hash);
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "Keep",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                store.Invalidate(EzAnalysisSystem.SSR, includeDownstream: false);
+
+                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+
+                store.InvalidateDownstream(EzAnalysisSystem.SSR);
+
+                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+            });
+        }
+
+        [Test]
         public void Invalidating_ssr_cascades_to_dan_and_owes_recompute()
         {
             RunTestWithRealm((realm, _) =>

@@ -362,25 +362,57 @@ namespace osu.Game.EzOsuGame.Skills
         public bool IsExpired(EzAnalysisSystem system) => GetAppliedVersion(system) != system.CurrentVersion();
 
         /// <summary>
-        /// Retires persisted rows for <paramref name="system"/> only. Downstream consumers may still read their own
-        /// stored rows until a pass overwrites them; whether to recompute from fresher inputs is
-        /// <see cref="EzChartChainState.ChartDanOwed"/> / maintenance, not a cascade delete on invalidate.
+        /// Retires <paramref name="system"/> and every system derived from it, so the next pass recomputes them.
+        /// The dependency edges are the ones the rebuild catalog already declares.
         /// </summary>
         /// <remarks>
         /// The rows are deleted and the current revision is recorded in the same step. Pairing "nothing stored" with
         /// "at this revision" is what makes a pass resumable: the next launch fills whatever is still missing instead
-        /// of retiring the whole library again.
+        /// of retiring the whole library again. Rows carry a revision, but the passes select on row presence, so a
+        /// bump that only moved a stamp would leave the old rows looking settled.
         /// </remarks>
         public IReadOnlyList<EzAnalysisSystem> Invalidate(EzAnalysisSystem system)
+            => Invalidate(system, includeDownstream: true);
+
+        /// <summary>
+        /// Retires <paramref name="system"/> and, when requested, every system that reads it.
+        /// </summary>
+        /// <param name="includeDownstream">
+        /// When false, only upstream rows are cleared so a pass can refill them before derived rows are retired.
+        /// </param>
+        public IReadOnlyList<EzAnalysisSystem> Invalidate(EzAnalysisSystem system, bool includeDownstream)
         {
-            clearRows(system);
+            var invalidated = new List<EzAnalysisSystem> { system };
 
-            int version = system.CurrentVersion();
+            if (includeDownstream)
+                invalidated.AddRange(DownstreamOf(system));
 
-            if (version > 0)
-                SetAppliedVersion(system, version);
+            retireRows(invalidated);
+            return invalidated;
+        }
 
-            return new[] { system };
+        /// <summary>
+        /// Retires every system that reads <paramref name="system"/>, after that system's own refill pass has finished.
+        /// </summary>
+        public IReadOnlyList<EzAnalysisSystem> InvalidateDownstream(EzAnalysisSystem system)
+        {
+            var downstream = DownstreamOf(system);
+            retireRows(downstream);
+            return downstream;
+        }
+
+        private void retireRows(IReadOnlyList<EzAnalysisSystem> systems)
+        {
+            foreach (var affected in systems)
+                clearRows(affected);
+
+            foreach (var affected in systems)
+            {
+                int version = affected.CurrentVersion();
+
+                if (version > 0)
+                    SetAppliedVersion(affected, version);
+            }
         }
 
         private void clearRows(EzAnalysisSystem system)

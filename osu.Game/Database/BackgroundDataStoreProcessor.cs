@@ -707,6 +707,9 @@ namespace osu.Game.Database
         {
             EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
 
+            bool sunnyFillFinished = true;
+            bool sunnyRetiredUpstream = false;
+
             if (scope.HasFlag(EzAnalysisSystem.SSR))
             {
                 // A tuning edit never bumps the revision, so the stored rows look current while having been produced
@@ -715,14 +718,24 @@ namespace osu.Game.Database
                 // what is still missing.
                 if (skillStore.IsExpired(EzAnalysisSystem.SSR) || EzSSRTuningSnapshot.IsPending)
                 {
-                    Logger.Log($"Retiring Sunny ratings for recomputation: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR))}.");
+                    // Drop Sunny columns first; ChartDan stays until the Sunny pass finishes so one maintenance run
+                    // can refill upstream then retire downstream in order.
+                    Logger.Log($"Retiring Sunny ratings for recomputation: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR, includeDownstream: false))}.");
+                    sunnyRetiredUpstream = true;
 
                     if (EzSSRTuningSnapshot.IsPending)
                         EzSSRTuningSnapshot.Record();
                 }
 
-                if (!populateMissingSunnyStarRatings())
-                    Logger.Log("Sunny rating pass did not finish; the remaining charts stay missing and are picked up next launch.");
+                sunnyFillFinished = populateMissingSunnyStarRatings();
+
+                if (!sunnyFillFinished)
+                    Logger.Log("Sunny rating pass did not finish; downstream chart skills stay until Sunny finishes.");
+
+                if (sunnyRetiredUpstream && sunnyFillFinished)
+                {
+                    Logger.Log($"Sunny fill finished; retiring downstream of SSR: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.SSR))}.");
+                }
             }
 
             if (scope.HasFlag(EzAnalysisSystem.Official))
@@ -748,6 +761,9 @@ namespace osu.Game.Database
             }
 
             EzChartChainBackfillScope.Resolve(scope, out bool runMsd, out bool runCsi, out bool runDan, out bool runPpp, out bool needsChartChain);
+
+            if (scope.HasFlag(EzAnalysisSystem.SSR) && !sunnyFillFinished)
+                runDan = false;
 
             if (needsChartChain)
             {
