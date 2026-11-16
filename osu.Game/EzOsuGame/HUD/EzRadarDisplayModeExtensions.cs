@@ -9,6 +9,7 @@ namespace osu.Game.EzOsuGame.HUD
     {
         /// <summary>
         /// Analysis system whose skill axes match the given wedge radar mode, or <see cref="EzAnalysisSystem.None"/> when the mode is not skill-based.
+        /// KeyPattern maps to <see cref="EzAnalysisSystem.Pattern"/> (chart structure), not player skill tags.
         /// </summary>
         public static EzAnalysisSystem SkillAxisSystem(this EzRadarDisplayMode mode) => mode switch
         {
