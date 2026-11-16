@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 using osu.Game.EzOsuGame.Skills.SSR;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -34,8 +35,8 @@ namespace osu.Game.EzOsuGame.Analysis
         None = 0,
 
         /// <summary>Official star rating and pp. Mirrored onto the beatmap's own columns.</summary>
-        [EzSkillMeta("official", "官方", "Official")]
-        Official = 1 << 0,
+        [EzSkillMeta("official", "上游原版", "Original")]
+        Official = 1 << 0, // TODO：在下次发布前修正名称到 "Original"，无法让玩家理解到底谁才算官方。需要统一将所有的所谓“官方”都改为 Original，避免误导玩家。以前写的官方是上游，而不是 Ez2Lazer。
 
         /// <summary>Sunny chart star. The algorithm lives in a ruleset assembly; the rating is one number per chart.</summary>
         [EzSkillMeta("ssr", "Sunny", "Sunny")]
@@ -59,11 +60,9 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("dan", "段位", "Dan")]
         Dan = 1 << 5,
 
-        /// <summary>
-        /// 谱面 KeyPattern 技能轴。不是 SkillTag。Persist and Filter axes land in a later pass.
-        /// </summary>
-        [EzSkillMeta("ezpattern", "键型结构", "Key Pattern")]
-        Pattern = 1 << 6,
+        /// <summary>EzKeyPattern（EKP）：谱面键型技能轴。不是 SkillTag。L2 id 仍为 <c>ezpattern</c>。</summary>
+        [EzSkillMeta("ezpattern", "Ez键型", "EKP")]
+        KeyPattern = 1 << 6,
 
         /// <summary>Lightweight chart tags. A data group, not a system.</summary>
         [EzSkillMeta("metadata_tags", "标签", "Tags")]
@@ -74,14 +73,14 @@ namespace osu.Game.EzOsuGame.Analysis
         Scores = 1 << 8,
 
         /// <summary>
-        /// 玩家技能 Tag：用谱面 SkillTag 给成绩分桶后的聚合。L2 id <c>player_skill_tag</c>。不是玩家技能轴，也不是 <see cref="Pattern"/>。
+        /// 玩家技能 Tag：用谱面 SkillTag 给成绩分桶后的聚合。L2 id <c>player_skill_tag</c>。不是玩家技能轴，也不是 <see cref="KeyPattern"/>。
         /// </summary>
         [EzSkillMeta("player_skill_tag", "玩家技能标签", "Player Skill Tag")]
         PlayerSkillTag = 1 << 9,
 
         /// <summary>Every system and data group.</summary>
         [EzSkillMeta("all", "全部", "All")]
-        All = Official | SSR | PPP | Mina | CSI | Dan | Pattern | MetadataTags | Scores | PlayerSkillTag,
+        All = Official | SSR | PPP | Mina | CSI | Dan | KeyPattern | MetadataTags | Scores | PlayerSkillTag,
     }
 
     /// <summary>
@@ -150,7 +149,7 @@ namespace osu.Game.EzOsuGame.Analysis
             EzAnalysisSystem.CSI => EzCSIEngine.VERSION,
             EzAnalysisSystem.Dan => EzDanEngine.VERSION,
             EzAnalysisSystem.PPP => EzPPPEngine.VERSION,
-            EzAnalysisSystem.Pattern => 0,
+            EzAnalysisSystem.KeyPattern => EzKeyPatternUnit.VERSION,
             EzAnalysisSystem.PlayerSkillTag => EzMinaPlayerSkillModeData.VERSION,
             EzAnalysisSystem.SSR => EzSSRUnit.VERSION,
             _ => 0,

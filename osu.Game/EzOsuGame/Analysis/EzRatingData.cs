@@ -51,20 +51,22 @@ namespace osu.Game.EzOsuGame.Analysis
         };
 
         /// <summary>Reads one system's star rating, or <c>-1</c> when it has none.</summary>
+        /// <remarks>KeyPattern has no column of its own; it reads the Sunny star.</remarks>
         public double GetStar(EzAnalysisSystem system) => system switch
         {
             EzAnalysisSystem.Official => OfficialSR,
-            EzAnalysisSystem.SSR => SunnySR,
+            EzAnalysisSystem.SSR or EzAnalysisSystem.KeyPattern => SunnySR,
             EzAnalysisSystem.PPP => PppSR,
             EzAnalysisSystem.Mina => MinaSR,
             _ => -1,
         };
 
         /// <summary>Reads one system's perfect-play performance points, or <c>-1</c> when it has none.</summary>
+        /// <remarks>KeyPattern has no column of its own; it reads the Sunny pp.</remarks>
         public double GetPerformance(EzAnalysisSystem system) => system switch
         {
             EzAnalysisSystem.Official => OfficialPP,
-            EzAnalysisSystem.SSR => SunnyPP,
+            EzAnalysisSystem.SSR or EzAnalysisSystem.KeyPattern => SunnyPP,
             EzAnalysisSystem.PPP => PppPP,
             EzAnalysisSystem.Mina => MinaPP,
             _ => -1,

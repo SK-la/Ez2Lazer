@@ -202,10 +202,39 @@ namespace osu.Game.EzOsuGame.Analysis
         public IReadOnlyDictionary<string, double> AxesOf(EzAnalysisSystem system) => Axes.GetValueOrDefault(system, no_axis_values);
 
         /// <summary>Star rating and pp of one system, absent when this pass produced neither.</summary>
-        public EzScalarRating RatingOf(EzAnalysisSystem system) => Ratings.GetValueOrDefault(system);
+        /// <remarks>KeyPattern has no rating of its own; it reads the Sunny pair.</remarks>
+        public EzScalarRating RatingOf(EzAnalysisSystem system)
+            => system == EzAnalysisSystem.KeyPattern
+                ? Ratings.GetValueOrDefault(EzAnalysisSystem.SSR)
+                : Ratings.GetValueOrDefault(system);
 
         public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary) => CommonSummary is KpsSummary commonSummary
             ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary, Axes, Ratings, Dan, KeyPatternRadar, SsrPatternRadar, ChartSkillInfo)
             : this;
+
+        public EzAnalysisResult WithPersistedKeyPattern(EzRadarChartData<string> radar, IReadOnlyDictionary<string, double> patternAxes,
+                                                        double? sunnySR = null, double? sunnyPP = null)
+        {
+            if (CommonSummary is not KpsSummary commonSummary)
+                return this;
+
+            var axes = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(Axes)
+            {
+                [EzAnalysisSystem.KeyPattern] = patternAxes,
+            };
+
+            IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> ratings = Ratings;
+
+            if (sunnySR is double star && double.IsFinite(star) && star > 0)
+            {
+                double? performance = sunnyPP is double points && double.IsFinite(points) && points > 0 ? points : null;
+                ratings = new Dictionary<EzAnalysisSystem, EzScalarRating>(Ratings)
+                {
+                    [EzAnalysisSystem.SSR] = new EzScalarRating(star, performance),
+                };
+            }
+
+            return new EzAnalysisResult(commonSummary, ManiaSummary, TagSummary, axes, ratings, Dan, radar, SsrPatternRadar, ChartSkillInfo);
+        }
     }
 }

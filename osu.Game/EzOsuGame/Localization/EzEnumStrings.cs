@@ -82,6 +82,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "独立评级，不依赖其他系统", "Independent rating; depends on nothing else");
 
+        public static readonly LocalisableString DATA_REBUILD_ACTION_PATTERN_NAME = new EzLocalizationManager.EzLocalisableString("Ez键型", "Ez KeyPattern");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_PATTERN_DETAIL = new EzLocalizationManager.EzLocalisableString(
+            "EzKeyPattern 五轴，量化依赖 Sunny 星", "EzKeyPattern five axes, quantified from Sunny star");
+
         public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_NAME = new EzLocalizationManager.EzLocalisableString("官方 PP 基线", "Official PP baseline");
         public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "Perfect 成绩的 PP 列，读官方难度", "Perfect-play PP column; reads official difficulty");

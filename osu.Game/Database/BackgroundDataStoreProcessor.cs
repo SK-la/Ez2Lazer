@@ -31,6 +31,7 @@ using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Online.API;
@@ -125,6 +126,9 @@ namespace osu.Game.Database
 
         [Resolved]
         private EzSSRUnit ezSSRUnit { get; set; } = null!;
+
+        [Resolved]
+        private EzKeyPatternUnit ezKeyPatternUnit { get; set; } = null!;
 
         [Resolved]
         private EzCSIUnit ezCSIUnit { get; set; } = null!;
@@ -707,6 +711,9 @@ namespace osu.Game.Database
         {
             EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
 
+            if (scope.HasFlag(EzAnalysisSystem.KeyPattern) && skillStore.IsExpired(EzAnalysisSystem.KeyPattern))
+                Logger.Log($"Retiring KeyPattern axes for recomputation: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.KeyPattern, includeDownstream: false))}.");
+
             bool sunnyFillFinished = true;
 
             if (scope.HasFlag(EzAnalysisSystem.SSR))
@@ -738,6 +745,9 @@ namespace osu.Game.Database
                 if (sunnyFillFinished && !populateMissingSunnySrSkillAxes())
                     Logger.Log("Sunny SR4 skill axis pass did not finish; remaining charts are picked up next launch.");
             }
+
+            if (scope.HasFlag(EzAnalysisSystem.KeyPattern) && !populateMissingKeyPatternAxes())
+                Logger.Log("KeyPattern axis pass did not finish; remaining charts are picked up next launch.");
 
             if (scope.HasFlag(EzAnalysisSystem.Official))
                 populateOfficialBaselines();
@@ -878,6 +888,9 @@ namespace osu.Game.Database
                 Logger.Log($"Retiring Sunny ratings: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR))}");
                 skillProvider.InvalidateLiveMetrics();
             }
+
+            if (scope.HasFlag(EzAnalysisSystem.KeyPattern))
+                Logger.Log($"Retiring KeyPattern axes: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.KeyPattern))}");
 
             bool clearBeatmapInfoFields = scope.HasFlag(EzAnalysisSystem.MetadataTags)
                                           || scope.HasFlag(EzAnalysisSystem.Official);
@@ -1062,8 +1075,42 @@ namespace osu.Game.Database
                 if (!ezSSRUnit.BackfillChartSkillAxes(beatmap, CancellationToken.None))
                     return false;
 
-                if (beatmap.Hash != null)
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+
+                return true;
+            }
+        }
+
+        private bool populateMissingKeyPatternAxes()
+        {
+            IReadOnlyList<Guid> beatmapIds = skillStore.CollectKeyPatternSkillDebt();
+
+            if (beatmapIds.Count == 0)
+                return true;
+
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require KeyPattern axis backfill.");
+
+            var notification = showProgressNotification(beatmapIds.Count,
+                EzAnalysisNotificationStrings.KEYPATTERN_RUNNING,
+                EzAnalysisNotificationStrings.KEYPATTERN_COMPLETED);
+
+            ChartBatchResult batch = runChartBatch(beatmapIds.ToList(), processKeyPatternAxes, notification);
+
+            completeNotification(notification, batch.Processed, beatmapIds.Count, batch.Failed);
+
+            return !batch.Aborted && notification?.State != ProgressNotificationState.Cancelled;
+
+            bool processKeyPatternAxes(Guid id)
+            {
+                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                if (beatmap == null)
+                    return false;
+
+                if (!ezKeyPatternUnit.ComputeAndStore(beatmap, CancellationToken.None))
+                    return false;
+
+                ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
 
                 return true;
             }

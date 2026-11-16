@@ -475,10 +475,19 @@ namespace osu.Game.EzOsuGame.Analysis
             IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> ratings;
             EzDanSet? dan;
 
+            EzRadarChartData<string>? quantifiedKeyPattern = ssrAndRadar.KeyPatternRadar;
+
+            if (quantifiedKeyPattern is { } relativeRadar && sunnySR is double quantifiedSunny && EzKeyPatternUnit.IsQuantifiableSunny(quantifiedSunny))
+                quantifiedKeyPattern = EzKeyPatternUnit.Quantify(relativeRadar, quantifiedSunny);
+
+            EzRadarChartData<string>? keyPatternRadar = quantifiedKeyPattern is { } persistable
+                ? EzKeyPatternRadar.WithHoldRatio(persistable, measurements?.HoldRatio ?? 0)
+                : null;
+
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Axes))
             {
                 var computed = computeAxes(lookup, playable, analysisBeatmap, mina, structure?.Axes, ppp, sunnySR, cancellationToken);
-                axes = computed.Axes;
+                axes = withKeyPatternAxes(computed.Axes, quantifiedKeyPattern);
                 ratings = computed.Ratings;
             }
 
@@ -486,7 +495,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 dan = computeDan(rulesetOnlineId, measurements, mina?.Axes, structure?.Info, sunnySR);
 
             var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, ratings: ratings, dan: dan,
-                keyPatternRadar: ssrAndRadar.KeyPatternRadar, ssrPatternRadar: ssrAndRadar.SsrPatternRadar, chartSkillInfo: structure?.Info);
+                keyPatternRadar: keyPatternRadar, ssrPatternRadar: ssrAndRadar.SsrPatternRadar, chartSkillInfo: structure?.Info);
 
             EzAnalysisPassPerf.RecordPass(succeeded: true);
             EzAnalysisPassPerf.MaybeLog();
@@ -533,6 +542,20 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly record struct AxesResult(
             IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> Axes,
             IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> Ratings);
+
+        private static IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> withKeyPatternAxes(
+            IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> axes,
+            EzRadarChartData<string>? keyPatternRadar)
+        {
+            if (keyPatternRadar == null)
+                return axes;
+
+            var copy = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(axes)
+            {
+                [EzAnalysisSystem.KeyPattern] = EzKeyPatternUnit.ToSkills(keyPatternRadar.Value),
+            };
+            return copy;
+        }
 
         /// <summary>
         /// The PP+ chart vector, with its star separated out: the engine reports the star beside the vector axes,
@@ -831,7 +854,7 @@ namespace osu.Game.EzOsuGame.Analysis
             var chart = measured.Chart;
             int keyCount = measured.KeyCount;
 
-            EzRadarChartData<string>? keyPatternRadar = computeKeyPatternRadar(chart, measured.HoldRatio, cancellationToken);
+            EzRadarChartData<string>? keyPatternRadar = EzKeyPatternUnit.ComputeRadar(chart, cancellationToken);
 
             if (!EzSSREngine.IsPatternSupported(keyCount))
                 return new SsrAndRadar(null, keyPatternRadar, null);
@@ -847,44 +870,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
             return new SsrAndRadar(sunnySR, keyPatternRadar, EzManiaSR4PatternRadarBuilder.Create(combined.PatternSnapshot));
         }
-
-        /// <summary>
-        /// The structure view of a chart, measured from the same extraction the structure pass used.
-        /// </summary>
-        private static EzRadarChartData<string> computeKeyPatternRadar(EzManiaChartInput chart, double holdRatio, CancellationToken cancellationToken)
-        {
-            var notes = EzManiaKeyPatternHelper.NotesInTimeOrder(chart);
-
-            if (notes.Count == 0)
-                return createKeyPatternRadarData(0, 0, 0, 0, 0, 0);
-
-            int totalColumns = 0;
-
-            for (int i = 0; i < notes.Count; i++)
-                totalColumns = Math.Max(totalColumns, notes[i].Column + 1);
-
-            var rows = EzManiaKeyPatternHelper.BuildRows(notes, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken);
-
-            // The hold share is already measured for this pass; counting it again here was a second walk of the chart.
-            double longNoteRatio = Math.Round(holdRatio * 100, 2, MidpointRounding.AwayFromZero);
-
-            return createKeyPatternRadarData(
-                EzManiaKeyPatternBracket.Compute(rows, totalColumns, cancellationToken),
-                EzManiaKeyPatternChord.Compute(rows, cancellationToken),
-                longNoteRatio,
-                EzManiaKeyPatternJack.Compute(notes, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken),
-                EzManiaKeyPatternDelay.Compute(rows, totalColumns, cancellationToken),
-                EzManiaKeyPatternDump.Compute(rows, totalColumns, cancellationToken));
-        }
-
-        private static EzRadarChartData<string> createKeyPatternRadarData(double bracket, double chord, double longNoteRatio, double jack, double delay, double dump)
-            => EzRadarChartData<string>.Create(
-                new EzRadarAxisValue<string>("Bracket", bracket, "0.00"),
-                new EzRadarAxisValue<string>("Chord", chord, "0.00"),
-                new EzRadarAxisValue<string>("LN%", longNoteRatio, "0.00"),
-                new EzRadarAxisValue<string>("Jack", jack, "0.00"),
-                new EzRadarAxisValue<string>("Delay", delay, "0.00"),
-                new EzRadarAxisValue<string>("Dump", dump, "0.00"));
 
         /// <summary>
         /// 把稀疏列统计补 0 到真实列数（仅 Mania 分析路径；0 note 谱面的空字典不补）。

@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 using osu.Game.EzOsuGame.Skills.SSR.SR4Pattern;
 
 namespace osu.Game.EzOsuGame.Skills.SSR
@@ -105,6 +106,8 @@ namespace osu.Game.EzOsuGame.Skills.SSR
                 storeSunnySrSkillAxes(beatmapInfo, combined.PatternSnapshot);
             }
 
+            EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, star, cancellationToken);
+
             if (!double.IsFinite(star) || star < 0)
                 return false;
 
@@ -157,15 +160,18 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             if (!EzSSREngine.IsPatternSupported(keyCount))
                 return true;
 
+            var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
+
             if (playable.HitObjects.Count == 0)
             {
                 storeEmptySunnySrSkillAxes(beatmapInfo);
+                EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
                 return true;
             }
 
-            var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
             var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, playable.Difficulty.OverallDifficulty);
             storeSunnySrSkillAxes(beatmapInfo, combined.PatternSnapshot);
+            EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
             return true;
         }
 
