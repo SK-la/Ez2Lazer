@@ -70,6 +70,10 @@ namespace osu.Game.Screens.Select
         private readonly Bindable<string> configCollectionFilter = new Bindable<string>();
         private Bindable<string> configSkillSortAxis = null!;
         private Bindable<string> configSkillGroupAxis = null!;
+        /// <summary>
+        /// Relay for wedge right-radar mode. <see cref="SongSelect"/> sets <see cref="Bindable{T}.BindTarget"/> to <see cref="BeatmapDetailsArea.RightRadarMode"/>.
+        /// Only this control subscribes to changes for skill-axis refresh.
+        /// </summary>
         public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.MSDSkillDual);
 
         [Resolved]
@@ -226,12 +230,12 @@ namespace osu.Game.Screens.Select
                                     {
                                         new[]
                                         {
-                                            sortDropdown = new SortModeDropdown(SongSelectStrings.Sort)
+                                            sortDropdown = new SortModeDropdown(SongSelectStrings.Sort, RightRadarMode)
                                             {
                                                 RelativeSizeAxes = Axes.X,
                                             },
                                             Empty(),
-                                            groupDropdown = new GroupModeDropdown(SongSelectStrings.Group)
+                                            groupDropdown = new GroupModeDropdown(SongSelectStrings.Group, RightRadarMode)
                                             {
                                                 RelativeSizeAxes = Axes.X,
                                             },
@@ -362,6 +366,8 @@ namespace osu.Game.Screens.Select
             RightRadarMode.BindValueChanged(_ =>
             {
                 refreshSkillAxisDropdowns();
+                sortDropdown.NotifyRightRadarModeChanged();
+                groupDropdown.NotifyRightRadarModeChanged();
                 updateCriteria();
             });
             mods.BindValueChanged(m =>
@@ -808,14 +814,20 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
-            [Resolved]
-            private FilterControl filterControl { get; set; } = null!;
+            private readonly IBindable<EzRadarDisplayMode> rightRadarMode;
 
             private Bindable<SortMode> configSortMode { get; } = new Bindable<SortMode>();
 
-            public SortModeDropdown(LocalisableString label)
+            public SortModeDropdown(LocalisableString label, IBindable<EzRadarDisplayMode> rightRadarMode)
                 : base(label)
             {
+                this.rightRadarMode = rightRadarMode;
+            }
+
+            public void NotifyRightRadarModeChanged()
+            {
+                updateAvailableItems();
+                updateCurrentFromConfig();
             }
 
             [BackgroundDependencyLoader]
@@ -831,11 +843,6 @@ namespace osu.Game.Screens.Select
                     updateAvailableItems();
                     updateCurrentFromConfig();
                 }, true);
-                filterControl.RightRadarMode.BindValueChanged(_ =>
-                {
-                    updateAvailableItems();
-                    updateCurrentFromConfig();
-                });
                 configSortMode.BindValueChanged(_ => updateCurrentFromConfig());
                 Current.BindValueChanged(currentChanged);
 
@@ -844,7 +851,7 @@ namespace osu.Game.Screens.Select
 
             private void updateAvailableItems()
             {
-                bool hasSkillAxes = buildSkillAxisItems(ruleset.Value?.OnlineID ?? -1, filterControl.RightRadarMode.Value).Count > 0;
+                bool hasSkillAxes = buildSkillAxisItems(ruleset.Value?.OnlineID ?? -1, rightRadarMode.Value).Count > 0;
                 Items = Enum.GetValues<SortMode>().Where(m => m != SortMode.SkillAxis || hasSkillAxes).ToArray();
             }
 
@@ -912,14 +919,20 @@ namespace osu.Game.Screens.Select
             [Resolved]
             private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
-            [Resolved]
-            private FilterControl filterControl { get; set; } = null!;
+            private readonly IBindable<EzRadarDisplayMode> rightRadarMode;
 
             private Bindable<GroupMode> configGroupMode { get; } = new Bindable<GroupMode>();
 
-            public GroupModeDropdown(LocalisableString label)
+            public GroupModeDropdown(LocalisableString label, IBindable<EzRadarDisplayMode> rightRadarMode)
                 : base(label)
             {
+                this.rightRadarMode = rightRadarMode;
+            }
+
+            public void NotifyRightRadarModeChanged()
+            {
+                updateAvailableItems();
+                updateCurrentFromConfig();
             }
 
             [BackgroundDependencyLoader]
@@ -937,11 +950,6 @@ namespace osu.Game.Screens.Select
                     updateAvailableItems();
                     updateCurrentFromConfig();
                 }, true);
-                filterControl.RightRadarMode.BindValueChanged(_ =>
-                {
-                    updateAvailableItems();
-                    updateCurrentFromConfig();
-                });
                 configGroupMode.BindValueChanged(_ => updateCurrentFromConfig());
                 Current.BindValueChanged(currentChanged);
 
@@ -964,7 +972,7 @@ namespace osu.Game.Screens.Select
                             break;
 
                         case GroupMode.SkillAxis:
-                            if (buildSkillAxisItems(ruleset.Value?.OnlineID ?? -1, filterControl.RightRadarMode.Value).Count == 0)
+                            if (buildSkillAxisItems(ruleset.Value?.OnlineID ?? -1, rightRadarMode.Value).Count == 0)
                                 break;
 
                             items.Add(new GroupModeDropdownItem(GroupMode.SkillAxis, EzSongSelectStrings.SKILL_AXIS));

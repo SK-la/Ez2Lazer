@@ -340,6 +340,7 @@ namespace osu.Game.Screens.Select
                                                         Origin = Anchor.TopRight,
                                                         RelativeSizeAxes = Axes.X,
                                                         ScopedBeatmapSet = { BindTarget = ScopedBeatmapSet },
+                                                        RightRadarMode = { BindTarget = detailsArea.RightRadarMode },
                                                     },
                                                 }
                                             },
@@ -478,7 +479,6 @@ namespace osu.Game.Screens.Select
             inputManager = GetContainingInputManager()!;
 
             FilterControl.CriteriaChanged += criteriaChanged;
-            FilterControl.RightRadarMode.BindTo(detailsArea.RightRadarMode);
 
             // 全屏预览会铺满屏幕，隐藏游戏级 Ez 布局层的选歌 HUD 与桌宠（含 Live2D），避免被其遮挡。
             ezBeatmapPreviewOverlay.FullMapFocusState.BindValueChanged(e =>
