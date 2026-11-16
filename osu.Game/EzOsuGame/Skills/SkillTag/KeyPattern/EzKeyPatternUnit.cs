@@ -13,7 +13,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
 {
     /// <summary>
     /// EzKeyPattern (EKP): measure the five persistable radar axes and write them under
-    /// <see cref="EzAnalysisSystem.KeyPattern"/>. LN% is not persisted.
+    /// <see cref="EzAnalysisSystem.KeyPattern"/>. LN% is not persisted. Star and pp are Sunny's.
     /// </summary>
     public sealed class EzKeyPatternUnit
     {

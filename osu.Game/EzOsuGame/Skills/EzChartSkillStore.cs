@@ -482,6 +482,9 @@ namespace osu.Game.EzOsuGame.Skills
         /// </remarks>
         public void ClearRatings(EzAnalysisSystem system)
         {
+            if (system == EzAnalysisSystem.KeyPattern)
+                return;
+
             realmAccess.Write(r =>
             {
                 foreach (var beatmap in r.All<BeatmapInfo>())

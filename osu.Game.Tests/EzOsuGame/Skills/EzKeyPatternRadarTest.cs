@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 
@@ -74,6 +75,44 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(EzKeyPatternUnit.IsQuantifiableSunny(0), Is.False);
             Assert.That(EzKeyPatternUnit.IsQuantifiableSunny(-1), Is.False);
             Assert.That(EzKeyPatternUnit.IsQuantifiableSunny(0.01), Is.True);
+        }
+
+        [Test]
+        public void Live_keypattern_rating_reads_the_sunny_pair()
+        {
+            var ratings = new Dictionary<EzAnalysisSystem, EzScalarRating>
+            {
+                [EzAnalysisSystem.SSR] = new EzScalarRating(7, 250),
+            };
+
+            var result = new EzAnalysisResult(new KpsSummary(0, 0, null), ratings: ratings);
+
+            Assert.That(result.RatingOf(EzAnalysisSystem.KeyPattern).StarRating, Is.EqualTo(7));
+            Assert.That(result.RatingOf(EzAnalysisSystem.KeyPattern).PerformancePoints, Is.EqualTo(250));
+        }
+
+        [Test]
+        public void Persisted_keypattern_overlay_carries_the_sunny_pair()
+        {
+            var skills = new Dictionary<string, double>
+            {
+                ["Bracket"] = 1.25,
+                ["Chord"] = 2.5,
+                ["Jack"] = 0.4,
+                ["Delay"] = 0.8,
+                ["Dump"] = 3.1,
+            };
+
+            var radar = EzKeyPatternRadar.TryCreateFromStored(skills, 0);
+            Assert.That(radar, Is.Not.Null);
+
+            var slice = new EzAnalysisResult(new KpsSummary(1, 2, null));
+            var overlaid = slice.WithPersistedKeyPattern(radar!.Value, skills, 8, 300);
+
+            Assert.That(overlaid.RatingOf(EzAnalysisSystem.SSR).StarRating, Is.EqualTo(8));
+            Assert.That(overlaid.RatingOf(EzAnalysisSystem.SSR).PerformancePoints, Is.EqualTo(300));
+            Assert.That(overlaid.RatingOf(EzAnalysisSystem.KeyPattern).StarRating, Is.EqualTo(8));
+            Assert.That(overlaid.RatingOf(EzAnalysisSystem.KeyPattern).PerformancePoints, Is.EqualTo(300));
         }
     }
 }

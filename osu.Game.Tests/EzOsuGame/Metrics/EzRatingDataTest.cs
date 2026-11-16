@@ -44,6 +44,21 @@ namespace osu.Game.Tests.EzOsuGame.Metrics
         }
 
         [Test]
+        public void KeyPattern_reads_the_sunny_star_and_pp()
+        {
+            var data = new EzRatingData { SunnySR = 8.5, SunnyPP = 400 };
+
+            Assert.That(data.GetStar(EzAnalysisSystem.KeyPattern), Is.EqualTo(8.5));
+            Assert.That(data.GetPerformance(EzAnalysisSystem.KeyPattern), Is.EqualTo(400));
+
+            data.SetStar(EzAnalysisSystem.KeyPattern, 1);
+            data.SetPerformance(EzAnalysisSystem.KeyPattern, 2);
+
+            Assert.That(data.SunnySR, Is.EqualTo(8.5));
+            Assert.That(data.SunnyPP, Is.EqualTo(400));
+        }
+
+        [Test]
         public void Official_write_mirrors_onto_the_beatmap_columns()        {
             var beatmap = maniaBeatmap();
 

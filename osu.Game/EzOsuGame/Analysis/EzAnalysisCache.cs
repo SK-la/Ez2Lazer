@@ -388,7 +388,16 @@ namespace osu.Game.EzOsuGame.Analysis
             double holdRatio = EzHoldMetrics.HoldRatio(beatmap);
             var radar = EzKeyPatternRadar.TryCreateFromStored(skills, double.IsNaN(holdRatio) ? 0 : holdRatio);
 
-            return radar == null ? slice : slice.WithPersistedKeyPattern(radar.Value, skills);
+            if (radar == null)
+                return slice;
+
+            double sunnySR = beatmap.EzRatingData.SunnySR;
+            double sunnyPP = beatmap.EzRatingData.SunnyPP;
+            return slice.WithPersistedKeyPattern(
+                radar.Value,
+                skills,
+                double.IsFinite(sunnySR) && sunnySR > 0 ? sunnySR : null,
+                double.IsFinite(sunnyPP) && sunnyPP > 0 ? sunnyPP : null);
         }
 
         public IBindable<string?> ActiveSongsBranchDisplayName => analysisDatabase.ActiveSongsBranchDisplayName;
