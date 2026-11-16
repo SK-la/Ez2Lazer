@@ -405,17 +405,19 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
                 EzSSRTuningSnapshot.Record();
 
-                // Dan reads the Sunny rating, which has never run here, so the stored row is not a result yet.
+                // Sunny not stamped: dan facet is stale and owed, but the stored row stays readable.
                 var withoutSunny = store.CollectChartChainState();
 
-                Assert.That(withoutSunny.CompleteChartDan, Is.Empty, "a dan derived from an absent Sunny rating is not a result");
+                Assert.That(withoutSunny.CompleteChartDan, Does.Contain(hash));
                 Assert.That(withoutSunny.ChartDanOwed, Does.Contain(hash));
+                Assert.That(withoutSunny.Facets.Single(f => f.Id == "Dan").IsStale, Is.True);
 
                 store.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
 
-                // Once the upstream is current the same row counts again: nothing had to be re-stamped for Dan.
-                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
-                Assert.That(store.CollectChartChainState().ChartDanOwed, Does.Not.Contain(hash));
+                var withSunny = store.CollectChartChainState();
+                Assert.That(withSunny.CompleteChartDan, Does.Contain(hash));
+                Assert.That(withSunny.ChartDanOwed, Does.Not.Contain(hash));
+                Assert.That(withSunny.Facets.Single(f => f.Id == "Dan").IsStale, Is.False);
             });
         }
 
