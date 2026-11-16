@@ -234,13 +234,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 store.Invalidate(EzAnalysisSystem.Mina, includeDownstream: false);
 
                 Assert.That(store.GetBeatmapSkills(hash, EzAnalysisSystem.Mina), Is.Empty);
-                Assert.That(store.TryGetChartSkillInfo(hash, out _), Is.True);
-                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+                Assert.That(store.TryGetChartSkillInfo(hash, out EzChartSkillInfo? _), Is.True);
+                Assert.That(store.TryGetChartDan(hash, out EzPersistedChartDan? _), Is.True);
 
                 store.InvalidateDownstream(EzAnalysisSystem.Mina);
 
-                Assert.That(store.TryGetChartSkillInfo(hash, out _), Is.False);
-                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+                Assert.That(store.TryGetChartSkillInfo(hash, out EzChartSkillInfo? _), Is.False);
+                Assert.That(store.TryGetChartDan(hash, out EzPersistedChartDan? _), Is.False);
             });
         }
 
@@ -274,12 +274,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.Invalidate(EzAnalysisSystem.CSI, includeDownstream: false);
 
-                Assert.That(store.TryGetChartSkillInfo(hash, out _), Is.False);
-                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+                Assert.That(store.TryGetChartSkillInfo(hash, out EzChartSkillInfo? _), Is.False);
+                Assert.That(store.TryGetChartDan(hash, out EzPersistedChartDan? _), Is.True);
 
                 store.InvalidateDownstream(EzAnalysisSystem.CSI);
 
-                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+                Assert.That(store.TryGetChartDan(hash, out EzPersistedChartDan? _), Is.False);
             });
         }
 
@@ -311,14 +311,14 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 store.Invalidate(EzAnalysisSystem.SSR, includeDownstream: false);
 
-                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+                Assert.That(store.TryGetChartDan(hash, out EzPersistedChartDan? _), Is.True);
                 Assert.That(store.GetAppliedVersion(EzAnalysisSystem.Dan), Is.Zero);
                 Assert.That(store.DownstreamAwaitingReset(EzAnalysisSystem.SSR), Is.True);
                 Assert.That(store.CollectChartChainState().ChartDanOwed, Does.Contain(hash));
 
                 store.InvalidateDownstream(EzAnalysisSystem.SSR);
 
-                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+                Assert.That(store.TryGetChartDan(hash, out EzPersistedChartDan? _), Is.False);
             });
         }
 
@@ -354,7 +354,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var invalidated = store.Invalidate(EzAnalysisSystem.SSR);
 
                 Assert.That(invalidated, Does.Contain(EzAnalysisSystem.Dan));
-                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+                Assert.That(store.TryGetChartDan(hash, out EzPersistedChartDan? _), Is.False);
                 Assert.That(store.CollectChartChainState().ChartDanOwed, Does.Contain(hash));
             });
         }

@@ -4,7 +4,6 @@
 using System;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Skills;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
 {
