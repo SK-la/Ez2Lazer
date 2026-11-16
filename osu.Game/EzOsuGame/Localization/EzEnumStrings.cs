@@ -62,15 +62,15 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString IGNORE_BETTER = new EzLocalizationManager.EzLocalisableString("忽略更好", "Ignore Better");
         public static readonly LocalisableString IGNORE_WORSE = new EzLocalizationManager.EzLocalisableString("忽略更差", "Ignore Worse");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_MINA_NAME = new EzLocalizationManager.EzLocalisableString("Mina 技能评分", "Mina skill rating");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_MINA_NAME = new EzLocalizationManager.EzLocalisableString("Mina 技能", "Mina skills");
         public static readonly LocalisableString DATA_REBUILD_ACTION_MINA_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "引擎评级，喂养雷达与段位", "Engine rating; feeds the radar and dan");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_CSI_NAME = new EzLocalizationManager.EzLocalisableString("CSI 谱面结构", "CSI chart structure");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_CSI_NAME = new EzLocalizationManager.EzLocalisableString("谱面键型", "Chart Pattern");
         public static readonly LocalisableString DATA_REBUILD_ACTION_CSI_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "结构轴与谱面标签，读 Mina", "Structure axes and chart tags; reads Mina");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_DAN_NAME = new EzLocalizationManager.EzLocalisableString("段位（Dan）", "Dan rank");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_DAN_NAME = new EzLocalizationManager.EzLocalisableString("段位", "Dan");
         public static readonly LocalisableString DATA_REBUILD_ACTION_DAN_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "由 Mina 与 CSI 推导", "Derived from Mina and CSI");
 
@@ -78,7 +78,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_ACTION_PPP_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "四个模式各自的谱面向量，不依赖图表链", "Per-mode chart vector; independent of the chart chain");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_NAME = new EzLocalizationManager.EzLocalisableString("Sunny 星级", "Sunny star rating");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_NAME = new EzLocalizationManager.EzLocalisableString("Sunny 星级", "Sunny SR");
         public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "独立评级，不依赖其他系统", "Independent rating; depends on nothing else");
 
@@ -86,7 +86,7 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_ACTION_PATTERN_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "EzKeyPattern 五轴，量化依赖 Sunny 星", "EzKeyPattern five axes, quantified from Sunny star");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_NAME = new EzLocalizationManager.EzLocalisableString("官方 PP 基线", "Official PP baseline");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_NAME = new EzLocalizationManager.EzLocalisableString("原版 Max PP", "Original Max PP");
         public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "Perfect 成绩的 PP 列，读官方难度", "Perfect-play PP column; reads official difficulty");
 
