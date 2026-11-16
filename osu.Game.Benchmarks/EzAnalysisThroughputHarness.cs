@@ -561,7 +561,7 @@ namespace osu.Game.Benchmarks
 
             public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => playable;
 
-            public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken, Action<IBeatmap>? postConvert = null)
+            public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken, Action<IBeatmap> postConvert = null)
             {
                 postConvert?.Invoke(playable);
                 return playable;

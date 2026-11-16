@@ -968,7 +968,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => working.GetMutablePlayableBeatmap(ruleset, mods);
 
-            public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken, Action<IBeatmap>? postConvert = null)
+            public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken, Action<IBeatmap> postConvert = null)
                 => working.GetMutablePlayableBeatmap(ruleset, mods, cancellationToken, postConvert);
 
             IBeatmapInfo IWorkingBeatmap.BeatmapInfo => working.BeatmapInfo;

@@ -114,7 +114,7 @@ namespace osu.Game.Beatmaps
         /// </summary>
         IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods = null);
 
-        IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken, Action<IBeatmap>? postConvert = null);
+        IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken, Action<IBeatmap> postConvert = null);
 
         /// <summary>
         /// Load a new audio track instance for this beatmap. This should be called once before accessing <see cref="Track"/>.

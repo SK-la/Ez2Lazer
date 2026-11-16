@@ -53,7 +53,10 @@ namespace osu.Game.Beatmaps
                 sharedPlayableEntries.Clear();
         }
 
-        public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods = null, Action<IBeatmap>? postConvert = null)
+        public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods)
+            => GetMutablePlayableBeatmap(ruleset, mods, postConvert: null);
+
+        public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, Action<IBeatmap> postConvert)
         {
             try
             {
@@ -69,7 +72,7 @@ namespace osu.Game.Beatmaps
             }
         }
 
-        public virtual IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token, Action<IBeatmap>? postConvert = null)
+        public virtual IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token, Action<IBeatmap> postConvert = null)
         {
             Mod[] snapshot = EzModSignature.SnapshotForConversion(mods);
             token.ThrowIfCancellationRequested();

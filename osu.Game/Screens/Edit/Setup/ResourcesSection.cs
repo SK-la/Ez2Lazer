@@ -280,7 +280,7 @@ namespace osu.Game.Screens.Edit.Setup
                     // this is not a cheap operation and should be reconsidered in the future.
                     var beatmapWorking = beatmaps.GetWorkingBeatmap(b);
                     writeNewFilenameTo(beatmapWorking, newFilename);
-                    beatmaps.Save(b, beatmapWorking.GetPlayableBeatmap(b.Ruleset), beatmapWorking.GetSkin(), beatmapWorking.Storyboard);
+                    beatmaps.Save(b, beatmapWorking.GetMutablePlayableBeatmap(b.Ruleset), beatmapWorking.GetSkin(), beatmapWorking.Storyboard);
                 }
             }
 

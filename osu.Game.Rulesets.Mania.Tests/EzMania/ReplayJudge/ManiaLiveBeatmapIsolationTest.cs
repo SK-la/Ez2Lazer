@@ -258,7 +258,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayJudge
                 this.factory = factory;
             }
 
-            public override IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token) => factory();
+            protected override IBeatmap convertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token) => factory();
         }
     }
 }

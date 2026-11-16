@@ -145,7 +145,7 @@ namespace osu.Game.EzOsuGame.Edit.Screens
 
             try
             {
-                playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset);
+                playableBeatmap = workingBeatmap.GetMutablePlayableBeatmap(ruleset);
                 playableBeatmap.ControlPointInfo = playableBeatmap.ControlPointInfo.DeepClone();
             }
             catch

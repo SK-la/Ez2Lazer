@@ -287,7 +287,7 @@ namespace osu.Game.Screens.Edit
 
             try
             {
-                playableBeatmap = loadableBeatmap.GetPlayableBeatmap(loadableBeatmap.BeatmapInfo.Ruleset);
+                playableBeatmap = loadableBeatmap.GetMutablePlayableBeatmap(loadableBeatmap.BeatmapInfo.Ruleset);
 
                 // clone these locally for now to avoid incurring overhead on GetPlayableBeatmap usages.
                 // eventually we will want to improve how/where this is done as there are issues with *not* cloning it in all cases.
@@ -1173,7 +1173,7 @@ namespace osu.Game.Screens.Edit
                     try
                     {
                         var targetWorking = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                        var playable = targetWorking.GetPlayableBeatmap(beatmapInfo.Ruleset);
+                        var playable = targetWorking.GetMutablePlayableBeatmap(beatmapInfo.Ruleset);
 
                         if (syncBookmarks)
                             playable.Bookmarks = sourceBookmarks;

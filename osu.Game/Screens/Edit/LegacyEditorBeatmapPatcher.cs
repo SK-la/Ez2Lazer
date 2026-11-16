@@ -239,7 +239,7 @@ namespace osu.Game.Screens.Edit
             {
                 var decoded = Decoder.GetDecoder<Beatmap>(reader).Decode(reader);
                 decoded.BeatmapInfo.Ruleset = editorBeatmap.BeatmapInfo.Ruleset;
-                return new PassThroughWorkingBeatmap(decoded).GetPlayableBeatmap(editorBeatmap.BeatmapInfo.Ruleset);
+                return new PassThroughWorkingBeatmap(decoded).GetMutablePlayableBeatmap(editorBeatmap.BeatmapInfo.Ruleset);
             }
         }
 

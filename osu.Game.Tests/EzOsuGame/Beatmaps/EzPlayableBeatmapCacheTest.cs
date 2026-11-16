@@ -224,13 +224,7 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             {
             }
 
-            public override IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
-                => convertCounting(ruleset, mods, token, () => base.GetPlayableBeatmap(ruleset, mods, token));
-
-            public override IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token, Action<IBeatmap>? postConvert = null)
-                => convertCounting(ruleset, mods, token, () => base.GetMutablePlayableBeatmap(ruleset, mods, token, postConvert));
-
-            private IBeatmap convertCounting(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token, Func<IBeatmap> convert)
+            protected override IBeatmap convertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
             {
                 Conversions++;
 
@@ -240,7 +234,7 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
                     throw new OperationCanceledException();
                 }
 
-                return convert();
+                return base.convertPlayableBeatmapCore(ruleset, mods, token);
             }
         }
 
