@@ -46,6 +46,7 @@ using osu.Game.Extensions;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Audio;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Background.Pixiv;
 using osu.Game.EzOsuGame.Camera;
 using osu.Game.EzOsuGame.Configuration;
@@ -566,6 +567,8 @@ namespace osu.Game
 
             dependencies.CacheAs<IBindable<WorkingBeatmap>>(Beatmap);
             dependencies.CacheAs(Beatmap);
+
+            dependencies.CacheAs<ICurrentBeatmapPlayable>(new CurrentBeatmapPlayable(Beatmap, Ruleset, SelectedMods));
 
             dependencies.Cache(LeaderboardManager = new LeaderboardManager());
             base.Content.Add(LeaderboardManager);

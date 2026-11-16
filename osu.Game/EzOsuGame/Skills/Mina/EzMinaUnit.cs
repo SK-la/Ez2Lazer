@@ -51,7 +51,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 if (!working.BeatmapInfo.Ruleset.Available)
                     working.BeatmapInfo.Ruleset.Available = true;
 
-                playable = EzPlayableBeatmapCache.GetShared(working, working.BeatmapInfo.Ruleset);
+                playable = working.GetPlayableBeatmap(working.BeatmapInfo.Ruleset);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {

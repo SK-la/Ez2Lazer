@@ -3,7 +3,8 @@
 
 using System;
 using System.Collections.Generic;
-using System.Threading;using NUnit.Framework;
+using System.Threading;
+using NUnit.Framework;
 using osu.Framework.Bindables;
 using osu.Framework.Localisation;
 using osu.Game.Beatmaps;
@@ -35,8 +36,8 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             var working = createWorkingBeatmap();
             var mods = new Mod[] { new TestSeededMod() };
 
-            IBeatmap first = EzPlayableBeatmapCache.GetShared(working, working.BeatmapInfo.Ruleset, mods);
-            IBeatmap second = EzPlayableBeatmapCache.GetShared(working, working.BeatmapInfo.Ruleset, mods);
+            IBeatmap first = working.GetPlayableBeatmap(working.BeatmapInfo.Ruleset, mods);
+            IBeatmap second = working.GetPlayableBeatmap(working.BeatmapInfo.Ruleset, mods);
 
             Assert.That(second, Is.SameAs(first), "同一组输入必须复用同一份转换产物");
             Assert.That(working.Conversions, Is.EqualTo(1), "第二次查询不应再跑一次转换");
@@ -51,8 +52,8 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             var a = new TestSeededMod { Seed = { Value = 2 } };
             var b = new TestSeededMod { Seed = { Value = 3 } };
 
-            EzPlayableBeatmapCache.GetShared(working, ruleset, new Mod[] { a, b });
-            EzPlayableBeatmapCache.GetShared(working, ruleset, new Mod[] { b, a });
+            working.GetPlayableBeatmap(ruleset, new Mod[] { a, b });
+            working.GetPlayableBeatmap(ruleset, new Mod[] { b, a });
 
             Assert.That(working.Conversions, Is.EqualTo(2),
                 "顺序不同的两组 mod 是不同的转换输入（ApplyOrder 相同时按列表序生效），不能共用一个键");
@@ -65,10 +66,10 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             var ruleset = working.BeatmapInfo.Ruleset;
 
             var mod = new TestSeededMod { Seed = { Value = 1234 } };
-            EzPlayableBeatmapCache.GetShared(working, ruleset, new Mod[] { mod });
+            working.GetPlayableBeatmap(ruleset, new Mod[] { mod });
 
             mod.Seed.Value = 4321;
-            EzPlayableBeatmapCache.GetShared(working, ruleset, new Mod[] { mod });
+            working.GetPlayableBeatmap(ruleset, new Mod[] { mod });
 
             Assert.That(working.Conversions, Is.EqualTo(2), "设置变了就是另一种转换输入");
         }
@@ -79,8 +80,8 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             var working = createWorkingBeatmap();
             var ruleset = working.BeatmapInfo.Ruleset;
 
-            EzPlayableBeatmapCache.GetShared(working, ruleset, new Mod[] { new TestSeededMod() });
-            EzPlayableBeatmapCache.GetShared(working, new OsuRuleset().RulesetInfo, new Mod[] { new TestSeededMod() });
+            working.GetPlayableBeatmap(ruleset, new Mod[] { new TestSeededMod() });
+            working.GetPlayableBeatmap(new OsuRuleset().RulesetInfo, new Mod[] { new TestSeededMod() });
 
             Assert.That(working.Conversions, Is.EqualTo(2));
         }
@@ -91,13 +92,13 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             var working = createWorkingBeatmap();
             var ruleset = working.BeatmapInfo.Ruleset;
 
-            EzPlayableBeatmapCache.GetShared(working, ruleset);
+            working.GetPlayableBeatmap(ruleset);
 
             // 同一个 working beatmap 实例、内容变了（失效后仍被别的调用方持有，文件被重新导入）：
             // 只按实例缓存会拿旧谱面回答，所以内容哈希必须进键。
             working.BeatmapInfo.Hash = "changed-content";
 
-            EzPlayableBeatmapCache.GetShared(working, ruleset);
+            working.GetPlayableBeatmap(ruleset);
 
             Assert.That(working.Conversions, Is.EqualTo(2));
         }
@@ -115,8 +116,8 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
 
             Assert.That(mod.Seed.Value, Is.Null, "前置条件：种子未掷出");
 
-            EzPlayableBeatmapCache.GetShared(working, ruleset, new Mod[] { mod });
-            EzPlayableBeatmapCache.GetShared(working, ruleset, new Mod[] { mod });
+            working.GetPlayableBeatmap(ruleset, new Mod[] { mod });
+            working.GetPlayableBeatmap(ruleset, new Mod[] { mod });
 
             Assert.That(working.Conversions, Is.EqualTo(1), "同一次掷出必须给出同一个键");
         }
@@ -130,14 +131,14 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
 
             int bindCalls = 0;
 
-            IBeatmap shared = EzPlayableBeatmapCache.GetShared(working, ruleset, mods);
-            IBeatmap bound = EzPlayableBeatmapCache.GetBound(working, ruleset, mods, 1, _ => bindCalls++);
-            IBeatmap boundAgain = EzPlayableBeatmapCache.GetBound(working, ruleset, mods, 1, _ => bindCalls++);
+            IBeatmap shared = working.GetPlayableBeatmap(ruleset, mods);
+            IBeatmap bound = working.GetMutablePlayableBeatmap(ruleset, mods, CancellationToken.None, _ => bindCalls++);
+            IBeatmap boundAgain = working.GetMutablePlayableBeatmap(ruleset, mods, CancellationToken.None, _ => bindCalls++);
 
             Assert.That(bound, Is.Not.SameAs(shared), "共享作用域不能被就地绑定的调用方拿走");
-            Assert.That(boundAgain, Is.SameAs(bound));
-            Assert.That(bindCalls, Is.EqualTo(1), "绑定只在产生该副本的那一次转换上执行");
-            Assert.That(working.Conversions, Is.EqualTo(2));
+            Assert.That(boundAgain, Is.Not.SameAs(bound), "可改路径每次产生新实例");
+            Assert.That(bindCalls, Is.EqualTo(2), "每次可改转换都执行绑定");
+            Assert.That(working.Conversions, Is.EqualTo(3));
         }
 
         [Test]
@@ -147,10 +148,10 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             var ruleset = working.BeatmapInfo.Ruleset;
             var mods = new Mod[] { new TestSeededMod() };
 
-            IBeatmap first = EzPlayableBeatmapCache.GetBound(working, ruleset, mods, 1, static _ => { });
-            IBeatmap second = EzPlayableBeatmapCache.GetBound(working, ruleset, mods, 2, static _ => { });
+            IBeatmap first = working.GetMutablePlayableBeatmap(ruleset, mods);
+            IBeatmap second = working.GetMutablePlayableBeatmap(ruleset, mods);
 
-            Assert.That(second, Is.Not.SameAs(first), "两个 JudgeMode 不能落在同一份就地绑定的实例上");
+            Assert.That(second, Is.Not.SameAs(first), "两次可改转换不能落在同一份实例上");
             Assert.That(working.Conversions, Is.EqualTo(2));
         }
 
@@ -171,13 +172,13 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             var ruleset = working.BeatmapInfo.Ruleset;
 
             // 无 token 时走上游带 10s 有界等待的重载，它把取消翻译成私有的 BeatmapLoadTimeoutException（TimeoutException 子类）。
-            Exception? failure = Assert.Catch<Exception>(() => EzPlayableBeatmapCache.GetShared(working, ruleset));
+            Exception? failure = Assert.Catch<Exception>(() => working.GetPlayableBeatmap(ruleset));
 
             Assert.That(failure, Is.InstanceOf<OperationCanceledException>().Or.InstanceOf<TimeoutException>(),
                 "前置条件：这次转换必须以失败收场，否则用例测不到「失败不入缓存」");
 
             Assert.That(working.Conversions, Is.EqualTo(1));
-            Assert.DoesNotThrow(() => EzPlayableBeatmapCache.GetShared(working, ruleset));
+            Assert.DoesNotThrow(() => working.GetPlayableBeatmap(ruleset));
             Assert.That(working.Conversions, Is.EqualTo(2), "失败（含取消）不得进入缓存");
         }
 
@@ -188,8 +189,8 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             var ruleset = working.BeatmapInfo.Ruleset;
             var mods = new Mod[] { new TestSeededMod() };
 
-            Assert.That(EzPlayableBeatmapCache.IsSharedInstance(EzPlayableBeatmapCache.GetShared(working, ruleset, mods)), Is.True);
-            Assert.That(EzPlayableBeatmapCache.IsSharedInstance(EzPlayableBeatmapCache.GetBound(working, ruleset, mods, 1, static _ => { })), Is.False);
+            Assert.That(WorkingBeatmap.IsCachedReadOnlyPlayableInstance(working.GetPlayableBeatmap(ruleset, mods)), Is.True);
+            Assert.That(WorkingBeatmap.IsCachedReadOnlyPlayableInstance(working.GetMutablePlayableBeatmap(ruleset, mods)), Is.False);
         }
 
         [Test]
@@ -198,9 +199,9 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             var working = createWorkingBeatmap();
             var ruleset = working.BeatmapInfo.Ruleset;
 
-            EzPlayableBeatmapCache.GetShared(working, ruleset);
-            EzPlayableBeatmapCache.Reset();
-            EzPlayableBeatmapCache.GetShared(working, ruleset);
+            working.GetPlayableBeatmap(ruleset);
+            working.InvalidatePlayableCache();
+            working.GetPlayableBeatmap(ruleset);
 
             Assert.That(working.Conversions, Is.EqualTo(2));
         }
@@ -224,6 +225,12 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             }
 
             public override IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
+                => convertCounting(ruleset, mods, token, () => base.GetPlayableBeatmap(ruleset, mods, token));
+
+            public override IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token, Action<IBeatmap>? postConvert = null)
+                => convertCounting(ruleset, mods, token, () => base.GetMutablePlayableBeatmap(ruleset, mods, token, postConvert));
+
+            private IBeatmap convertCounting(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token, Func<IBeatmap> convert)
             {
                 Conversions++;
 
@@ -233,7 +240,7 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
                     throw new OperationCanceledException();
                 }
 
-                return base.GetPlayableBeatmap(ruleset, mods, token);
+                return convert();
             }
         }
 

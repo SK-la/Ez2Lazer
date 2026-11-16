@@ -25,7 +25,7 @@ using osu.Game.Storyboards;
 
 namespace osu.Game.Beatmaps
 {
-    public abstract class WorkingBeatmap : IWorkingBeatmap
+    public abstract partial class WorkingBeatmap : IWorkingBeatmap
     {
         public readonly BeatmapInfo BeatmapInfo;
         public readonly BeatmapSetInfo BeatmapSetInfo;
@@ -275,6 +275,12 @@ namespace osu.Game.Beatmaps
         }
 
         public virtual IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
+            => getSharedPlayableBeatmap(ruleset, mods, token);
+
+        /// <summary>
+        /// Performs ruleset conversion and mod application without consulting or updating the shared playable cache.
+        /// </summary>
+        protected virtual IBeatmap convertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
         {
             var rulesetInstance = ruleset.CreateInstance();
 

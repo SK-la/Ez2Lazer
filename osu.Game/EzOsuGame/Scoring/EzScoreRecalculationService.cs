@@ -210,7 +210,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private static int convertedKeyCount(IWorkingBeatmap working, ScoreInfo scoreInfo, CancellationToken cancellationToken)
         {
-            IBeatmap converted = EzPlayableBeatmapCache.GetShared(working, scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken);
+            IBeatmap converted = working.GetPlayableBeatmap(scoreInfo.Ruleset, scoreInfo.Mods, cancellationToken);
             return EzScoreBonusCalculator.KeyCountOf(converted);
         }
     }

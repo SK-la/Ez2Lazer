@@ -62,8 +62,11 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
             var mods = EzModCompatibility.StripUnknown(scoreInfo.Mods);
             EzEnumJudgeMode judgeMode = environment.JudgeMode;
 
-            return EzPlayableBeatmapCache.GetBound(workingBeatmap, scoreInfo.Ruleset, mods, bindingScopeFor(judgeMode),
-                playable => ManiaBeatmapBinding.BindForSimulation(playable, judgeMode, providerOwned: true), cancellationToken);
+            if (workingBeatmap is not WorkingBeatmap mutableWorking)
+                throw new InvalidOperationException($"Expected {nameof(WorkingBeatmap)}.");
+
+            return mutableWorking.GetMutablePlayableBeatmap(scoreInfo.Ruleset, mods, cancellationToken,
+                playable => ManiaBeatmapBinding.BindForSimulation(playable, judgeMode, providerOwned: true));
         }
 
         /// <remarks>

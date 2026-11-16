@@ -41,8 +41,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             var working = new TestWorkingBeatmap(beatmap);
             var engine = new EzPPPEngine();
 
-            var shared = EzPlayableBeatmapCache.GetShared(working, beatmap.BeatmapInfo.Ruleset, Array.Empty<Mod>());
-            var direct = working.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset, Array.Empty<Mod>());
+            var shared = working.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset, Array.Empty<Mod>());
+            var direct = working.GetMutablePlayableBeatmap(beatmap.BeatmapInfo.Ruleset, Array.Empty<Mod>());
 
             var sharedSkills = engine.CalculateChart(shared, Array.Empty<Mod>());
             var directSkills = engine.CalculateChart(direct, Array.Empty<Mod>());

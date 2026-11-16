@@ -99,7 +99,7 @@ namespace osu.Game.EzOsuGame.Audio
 
             playback.ResetPlaybackProgress();
 
-            var playableBeatmap = EzPlayableBeatmapCache.GetShared(beatmap, beatmap.BeatmapInfo.Ruleset);
+            var playableBeatmap = beatmap.GetPlayableBeatmap(beatmap.BeatmapInfo.Ruleset);
             previewHitSoundsEnabled = fastCheckShouldPreviewHitSounds(beatmap, hitsound_threshold);
             previewStoryboardEnabled = hasStoryboardSamples(beatmap.Storyboard);
 

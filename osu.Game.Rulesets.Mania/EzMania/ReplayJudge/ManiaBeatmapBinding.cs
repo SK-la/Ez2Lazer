@@ -118,7 +118,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// </remarks>
         private static void warnIfSharedInstanceBound(IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool owned)
         {
-            if (owned || !EzPlayableBeatmapCache.IsSharedInstance(beatmap))
+            if (owned || !WorkingBeatmap.IsCachedReadOnlyPlayableInstance(beatmap))
                 return;
 
             if (Interlocked.Increment(ref sharedBindingWarnCount) > 10)

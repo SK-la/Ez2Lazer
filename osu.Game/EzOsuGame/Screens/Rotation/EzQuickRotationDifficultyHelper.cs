@@ -48,7 +48,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
             if (UsesSunnyStarRating(ruleset))
             {
                 var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                var playable = EzPlayableBeatmapCache.GetShared(working, ruleset, mods, cancellationToken);
+                var playable = working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
 
                 int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
 

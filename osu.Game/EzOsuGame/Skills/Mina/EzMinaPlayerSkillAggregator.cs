@@ -143,7 +143,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                                 continue;
 
                             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                            var playable = EzPlayableBeatmapCache.GetShared(working, score.Ruleset, score.Mods);
+                            var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);
                             keyCount = EzHoldMetrics.ResolveKeyCount(playable);
 
                             double holdRatio = EzHoldMetrics.ComputeHoldRatio(playable);

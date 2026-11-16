@@ -327,7 +327,7 @@ namespace osu.Game.Beatmaps
                 var ruleset = rulesetInfo.CreateInstance();
                 Debug.Assert(ruleset != null);
 
-                PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(key.BeatmapInfo));
+                IWorkingBeatmap workingBeatmap = beatmapManager.GetWorkingBeatmap(key.BeatmapInfo);
                 IBeatmap playableBeatmap = workingBeatmap.GetPlayableBeatmap(ruleset.RulesetInfo, key.OrderedMods, cancellationToken);
 
                 var difficulty = ruleset.CreateDifficultyCalculator(workingBeatmap).Calculate(key.OrderedMods, cancellationToken);
@@ -461,41 +461,5 @@ namespace osu.Game.Beatmaps
             }
         }
 
-        /// <summary>
-        /// A working beatmap that caches its playable representation.
-        /// This is intended as single-use for when it is guaranteed that the playable beatmap can be reused.
-        /// </summary>
-        private class PlayableCachedWorkingBeatmap : IWorkingBeatmap
-        {
-            private readonly IWorkingBeatmap working;
-            private IBeatmap? playable;
-
-            public PlayableCachedWorkingBeatmap(IWorkingBeatmap working)
-            {
-                this.working = working;
-            }
-
-            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods)
-                => playable ??= working.GetPlayableBeatmap(ruleset, mods);
-
-            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken)
-                => playable ??= working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
-
-            IBeatmapInfo IWorkingBeatmap.BeatmapInfo => working.BeatmapInfo;
-            bool IWorkingBeatmap.BeatmapLoaded => working.BeatmapLoaded;
-            bool IWorkingBeatmap.TrackLoaded => working.TrackLoaded;
-            IBeatmap IWorkingBeatmap.Beatmap => working.Beatmap;
-            Texture IWorkingBeatmap.GetBackground() => working.GetBackground();
-            Texture IWorkingBeatmap.GetPanelBackground() => working.GetPanelBackground();
-            Waveform IWorkingBeatmap.Waveform => working.Waveform;
-            Storyboard IWorkingBeatmap.Storyboard => working.Storyboard;
-            ISkin IWorkingBeatmap.Skin => working.Skin;
-            Track IWorkingBeatmap.Track => working.Track;
-            Track IWorkingBeatmap.LoadTrack() => working.LoadTrack();
-            Stream IWorkingBeatmap.GetStream(string storagePath) => working.GetStream(storagePath);
-            void IWorkingBeatmap.BeginAsyncLoad() => working.BeginAsyncLoad();
-            void IWorkingBeatmap.CancelAsyncLoad() => working.CancelAsyncLoad();
-            void IWorkingBeatmap.PrepareTrackForPreview(bool looping, double? offsetFromPreviewPoint) => working.PrepareTrackForPreview(looping, offsetFromPreviewPoint);
-        }
     }
 }

@@ -80,7 +80,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                 {
                     var working = beatmapManager.GetWorkingBeatmap(score.BeatmapInfo);
                     var mods = score.Mods;
-                    var playable = EzPlayableBeatmapCache.GetShared(working, score.Ruleset, mods, cancellationToken);
+                    var playable = working.GetPlayableBeatmap(score.Ruleset, mods, cancellationToken);
 
                     var chartKey = (score.BeatmapInfo.Hash, EzAnalysisLookupCache.ComputeModsSignature(mods));
 

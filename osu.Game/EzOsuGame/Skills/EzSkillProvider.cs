@@ -1141,7 +1141,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (map == null && beatmapManager != null)
                 {
                     var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                    map = EzPlayableBeatmapCache.GetShared(working, beatmapInfo.Ruleset, mods);
+                    map = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
                 }
 
                 if (map == null)
@@ -1208,7 +1208,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (beatmapManager == null)
                     return false;
 
-                map = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(beatmapInfo), beatmapInfo.Ruleset);
+                map = beatmapManager.GetWorkingBeatmap(beatmapInfo).GetPlayableBeatmap(beatmapInfo.Ruleset);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {

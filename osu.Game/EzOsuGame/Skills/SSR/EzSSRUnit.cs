@@ -58,7 +58,6 @@ namespace osu.Game.EzOsuGame.Skills.SSR
         /// <see cref="Scoring.EzScoreRacePlayableResolver.SESSION_READY_SCOPE"/> (1000) and the Osu simulation band
         /// (2000+); the Mania simulation band is JudgeMode + 1.
         /// </remarks>
-        private const int BINDING_SCOPE = 3000;
 
         /// <summary>
         /// Rates one chart and writes its star and pp. Returns false when the chart could not be loaded, so a later
@@ -77,8 +76,10 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             {
                 // A default token stays null (no bound of its own) so the conversion keeps WorkingBeatmap's own
                 // bounded wait, exactly as the shared lookup did.
-                playable = EzPlayableBeatmapCache.GetBound(beatmapManager.GetWorkingBeatmap(beatmapInfo), beatmapInfo.Ruleset, null,
-                    BINDING_SCOPE, static _ => { }, cancellationToken == CancellationToken.None ? null : cancellationToken);
+                var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                playable = cancellationToken == CancellationToken.None
+                    ? working.GetPlayableBeatmap(beatmapInfo.Ruleset, null)
+                    : working.GetPlayableBeatmap(beatmapInfo.Ruleset, null, cancellationToken);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {
@@ -144,8 +145,10 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
             try
             {
-                playable = EzPlayableBeatmapCache.GetBound(beatmapManager.GetWorkingBeatmap(beatmapInfo), beatmapInfo.Ruleset, null,
-                    BINDING_SCOPE, static _ => { }, cancellationToken == CancellationToken.None ? null : cancellationToken);
+                var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                playable = cancellationToken == CancellationToken.None
+                    ? working.GetPlayableBeatmap(beatmapInfo.Ruleset, null)
+                    : working.GetPlayableBeatmap(beatmapInfo.Ruleset, null, cancellationToken);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {

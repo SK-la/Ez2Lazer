@@ -78,7 +78,7 @@ namespace osu.Game.Rulesets.Osu.Scoring
         {
             // 判定窗与 classic 滑条语义必须在全谱模拟（base.ApplyBeatmap 内部的 SimulateAutoplay）前绑定。
             // 共享 cache 实例对所有消费者只读：就地绑定会把本档窗口泄漏到其它判定档，故跳过（仿真走按档隔离的副本）。
-            if (isStableClassic && !EzPlayableBeatmapCache.IsSharedInstance(beatmap))
+            if (isStableClassic && !WorkingBeatmap.IsCachedReadOnlyPlayableInstance(beatmap))
                 OsuStableClassic.BindSemantics(beatmap);
 
             base.ApplyBeatmap(beatmap);
