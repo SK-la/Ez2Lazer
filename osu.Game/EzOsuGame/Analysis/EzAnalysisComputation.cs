@@ -9,7 +9,6 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills;
@@ -61,7 +60,7 @@ namespace osu.Game.EzOsuGame.Analysis
             sunnySR = 0;
 
             IBeatmap analysisBeatmap = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo)
-                .GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+                                                     .GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 

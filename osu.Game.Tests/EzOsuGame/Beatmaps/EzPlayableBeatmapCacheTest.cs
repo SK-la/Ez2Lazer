@@ -226,7 +226,7 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
             {
             }
 
-            protected override IBeatmap convertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
+            protected override IBeatmap ConvertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
             {
                 Conversions++;
 
@@ -236,7 +236,7 @@ namespace osu.Game.Tests.EzOsuGame.Beatmaps
                     throw new OperationCanceledException();
                 }
 
-                return base.convertPlayableBeatmapCore(ruleset, mods, token);
+                return base.ConvertPlayableBeatmapCore(ruleset, mods, token);
             }
         }
 

@@ -339,7 +339,7 @@ namespace osu.Game.Tests.EzOsuGame.Mods
             {
             }
 
-            protected override IBeatmap convertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
+            protected override IBeatmap ConvertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
             {
                 PlayableBeatmapRequests++;
                 return new Beatmap();

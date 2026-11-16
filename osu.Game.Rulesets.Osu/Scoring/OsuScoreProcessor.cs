@@ -4,7 +4,6 @@
 using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
 using osu.Game.Rulesets.Judgements;

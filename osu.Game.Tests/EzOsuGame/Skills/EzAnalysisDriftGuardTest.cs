@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;

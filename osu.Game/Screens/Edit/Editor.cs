@@ -703,7 +703,7 @@ namespace osu.Game.Screens.Edit
                 return;
 
             // Resolved lazily and only re-resolved when the bar rebuilds its items, to keep this off the per-frame path.
-            if (lastMenuBarItem == null || lastMenuBarItem.Parent == null)
+            if (lastMenuBarItem?.Parent == null)
                 lastMenuBarItem = menuBar.ChildrenOfType<EditorMenuBar.DrawableEditorBarMenuItem>().LastOrDefault();
 
             if (lastMenuBarItem == null)

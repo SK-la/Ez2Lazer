@@ -24,20 +24,20 @@ namespace osu.Game.Beatmaps
         /// </summary>
         public const long MAX_SHARED_PLAYABLE_HIT_OBJECTS = 40_000;
 
-        private readonly object playableConversionGate = new object();
-        private readonly object playableCacheGate = new object();
+        private readonly Lock playableConversionGate = new Lock();
+        private readonly Lock playableCacheGate = new Lock();
         private readonly Dictionary<SharedPlayableKey, SharedPlayableEntry> sharedPlayableEntries = new Dictionary<SharedPlayableKey, SharedPlayableEntry>();
         private long sharedPlayableAccessStamp;
 
-        private static readonly ConditionalWeakTable<IBeatmap, SharedPlayableMarker> cachedReadOnlyMarkers = new ConditionalWeakTable<IBeatmap, SharedPlayableMarker>();
+        private static readonly ConditionalWeakTable<IBeatmap, SharedPlayableMarker> cached_read_only_markers = new ConditionalWeakTable<IBeatmap, SharedPlayableMarker>();
 
-        private static long last_gauge_publish;
+        private static long lastGaugePublish;
 
         /// <summary>
         /// Whether <paramref name="beatmap"/> was returned from the shared playable cache on this working beatmap and is therefore read-only.
         /// </summary>
-        public static bool IsCachedReadOnlyPlayableInstance(IBeatmap beatmap)
-            => beatmap != null && cachedReadOnlyMarkers.TryGetValue(beatmap, out _);
+        public static bool IsCachedReadOnlyPlayableInstance(IBeatmap? beatmap)
+            => beatmap != null && cached_read_only_markers.TryGetValue(beatmap, out _);
 
         internal static void ClearCachedReadOnlyMarkersForTesting()
         {
@@ -59,7 +59,7 @@ namespace osu.Game.Beatmaps
         public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods)
             => GetMutablePlayableBeatmap(ruleset, mods, postConvert: null!);
 
-        public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, Action<IBeatmap>? postConvert)
+        public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod>? mods, Action<IBeatmap>? postConvert)
         {
             try
             {
@@ -133,7 +133,7 @@ namespace osu.Game.Beatmaps
             long start = EzModConversionPerf.Enabled ? Stopwatch.GetTimestamp() : 0;
             long allocatedBefore = EzModConversionPerf.Enabled ? EzModConversionPerf.CurrentThreadAllocatedBytes : 0;
 
-            IBeatmap converted = convertPlayableBeatmapCore(ruleset, snapshot, token);
+            IBeatmap converted = ConvertPlayableBeatmapCore(ruleset, snapshot, token);
 
             if (EzModConversionPerf.Enabled)
             {
@@ -202,7 +202,7 @@ namespace osu.Game.Beatmaps
         }
 
         private static void markAsCachedReadOnly(IBeatmap beatmap)
-            => cachedReadOnlyMarkers.TryAdd(beatmap, SharedPlayableMarker.Instance);
+            => cached_read_only_markers.TryAdd(beatmap, SharedPlayableMarker.INSTANCE);
 
         private void publishGauges()
         {
@@ -210,12 +210,12 @@ namespace osu.Game.Beatmaps
                 return;
 
             long now = Stopwatch.GetTimestamp();
-            long last = Volatile.Read(ref last_gauge_publish);
+            long last = Volatile.Read(ref lastGaugePublish);
 
             if (now - last < Stopwatch.Frequency)
                 return;
 
-            if (Interlocked.CompareExchange(ref last_gauge_publish, now, last) != last)
+            if (Interlocked.CompareExchange(ref lastGaugePublish, now, last) != last)
                 return;
 
             int shared = 0;
@@ -279,7 +279,7 @@ namespace osu.Game.Beatmaps
 
         private sealed class SharedPlayableMarker
         {
-            public static readonly SharedPlayableMarker Instance = new SharedPlayableMarker();
+            public static readonly SharedPlayableMarker INSTANCE = new SharedPlayableMarker();
 
             private SharedPlayableMarker()
             {

@@ -33,7 +33,7 @@ namespace osu.Game.Rulesets.BMS.UI.BmsSongSelect.Analytics
 
         protected override IBeatmap GetBeatmap() => maniaBeatmap;
 
-        protected override IBeatmap convertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token) => maniaBeatmap;
+        protected override IBeatmap ConvertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token) => maniaBeatmap;
 
         public override Texture? GetBackground() => null;
 

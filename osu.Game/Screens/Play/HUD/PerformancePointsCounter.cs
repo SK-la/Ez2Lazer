@@ -142,7 +142,7 @@ namespace osu.Game.Screens.Play.HUD
                 this.gameplayBeatmap = gameplayBeatmap;
             }
 
-            protected override IBeatmap convertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken)
+            protected override IBeatmap ConvertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken)
                 => gameplayBeatmap;
 
             protected override IBeatmap GetBeatmap() => gameplayBeatmap;

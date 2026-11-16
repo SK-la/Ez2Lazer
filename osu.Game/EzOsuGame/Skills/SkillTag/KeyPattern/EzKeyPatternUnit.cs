@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 
 namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern

@@ -13,7 +13,6 @@ using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Edit.Checks.Components;
 using osu.Game.Rulesets.Objects;
@@ -148,7 +147,7 @@ namespace osu.Game.EzOsuGame.Audio
             if (files == null)
                 return 0;
 
-            string? mainAudio = beatmap.BeatmapInfo.Metadata.AudioFile;
+            string mainAudio = beatmap.BeatmapInfo.Metadata.AudioFile;
             int count = 0;
 
             foreach (var file in files)

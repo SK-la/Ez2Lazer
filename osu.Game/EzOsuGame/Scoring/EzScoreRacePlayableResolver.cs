@@ -28,6 +28,7 @@ namespace osu.Game.EzOsuGame.Scoring
             ArgumentNullException.ThrowIfNull(ruleset);
 
             Mod[] stripped = mods == null ? Array.Empty<Mod>() : EzModCompatibility.StripUnknown(mods);
+
             if (working is WorkingBeatmap workingBeatmap)
             {
                 return workingBeatmap.GetMutablePlayableBeatmap(ruleset, stripped,

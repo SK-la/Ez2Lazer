@@ -280,7 +280,7 @@ namespace osu.Game.Beatmaps
         /// <summary>
         /// Performs ruleset conversion and mod application without consulting or updating the shared playable cache.
         /// </summary>
-        protected virtual IBeatmap convertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
+        protected virtual IBeatmap ConvertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
         {
             var rulesetInstance = ruleset.CreateInstance();
 

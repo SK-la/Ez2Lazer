@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring.Bonus;
 using osu.Game.Scoring;

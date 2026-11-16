@@ -4,15 +4,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
-using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
-using osu.Framework.Graphics.Textures;
 using osu.Framework.Lists;
 using osu.Framework.Logging;
 using osu.Framework.Threading;
@@ -25,8 +22,6 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
-using osu.Game.Skinning;
-using osu.Game.Storyboards;
 
 namespace osu.Game.Beatmaps
 {
@@ -460,6 +455,5 @@ namespace osu.Game.Beatmaps
                 CancellationToken = cancellationToken;
             }
         }
-
     }
 }

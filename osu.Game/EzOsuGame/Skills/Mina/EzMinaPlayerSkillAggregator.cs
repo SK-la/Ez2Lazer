@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;

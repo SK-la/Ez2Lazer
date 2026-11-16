@@ -32,8 +32,7 @@ namespace osu.Game.EzOsuGame.Beatmaps
                 : working.GetPlayableBeatmap(ruleset, mods);
         }
 
-        public static IBeatmap GetBound(IWorkingBeatmap working, IRulesetInfo ruleset, IReadOnlyList<Mod>? mods, int bindingScope, Action<IBeatmap> bind,
-                                       CancellationToken? token = null)
+        public static IBeatmap GetBound(IWorkingBeatmap working, IRulesetInfo ruleset, IReadOnlyList<Mod>? mods, int bindingScope, Action<IBeatmap> bind, CancellationToken? token = null)
         {
             ArgumentNullException.ThrowIfNull(working);
             ArgumentNullException.ThrowIfNull(ruleset);

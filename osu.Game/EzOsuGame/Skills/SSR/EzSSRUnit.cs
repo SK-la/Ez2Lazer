@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
@@ -59,7 +58,6 @@ namespace osu.Game.EzOsuGame.Skills.SSR
         /// <see cref="Scoring.EzScoreRacePlayableResolver.SESSION_READY_SCOPE"/> (1000) and the Osu simulation band
         /// (2000+); the Mania simulation band is JudgeMode + 1.
         /// </remarks>
-
         /// <summary>
         /// Rates one chart and writes its star and pp. Returns false when the chart could not be loaded, so a later
         /// pass retries it.

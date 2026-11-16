@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mods;
 
@@ -70,6 +69,7 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                 return null;
             }
         }
+
         private void writeRating(BeatmapInfo beatmapInfo, int rulesetId, IBeatmap playable, IReadOnlyList<Mod> mods, IReadOnlyDictionary<string, double> skills)
         {
             if (!skills.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star) || star <= 0)

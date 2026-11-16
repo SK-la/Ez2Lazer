@@ -136,7 +136,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
 
         protected override IBeatmap GetBeatmap() => maniaBeatmap;
 
-        protected override IBeatmap convertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
+        protected override IBeatmap ConvertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token)
             => CreatePlayableFromSource(SourceBeatmap.Beatmap, ruleset, mods, token);
 
         /// <summary>

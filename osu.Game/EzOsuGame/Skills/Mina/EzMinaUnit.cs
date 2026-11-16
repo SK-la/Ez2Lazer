@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Skills.Mina
