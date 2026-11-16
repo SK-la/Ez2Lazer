@@ -139,13 +139,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 });
 
                 Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.True, "no pass has recorded a revision for Dan");
-                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash));
+                Assert.That(store.TryGetChartDan(hash, out var readable), Is.True);
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash), "stored rows stay readable");
 
                 store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
-
-                // Dan's own stamp is not the whole answer: it reads the Sunny rating, so that system has to have run
-                // at its current revision too before a stored row counts as a result.
-                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash), "the upstreams have not run here");
 
                 stampWholeChain(store);
 
@@ -155,7 +152,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
-        public void Invalidating_a_system_also_retires_the_systems_derived_from_it()
+        public void Invalidating_csi_retires_csi_only_chart_dan_stays_readable_and_owed()
         {
             RunTestWithRealm((realm, _) =>
             {
@@ -188,21 +185,55 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 var invalidated = store.Invalidate(EzAnalysisSystem.CSI);
 
-                Assert.That(invalidated, Does.Contain(EzAnalysisSystem.CSI));
-                Assert.That(invalidated, Does.Contain(EzAnalysisSystem.Dan), "Dan reads CSI");
-                Assert.That(invalidated, Does.Not.Contain(EzAnalysisSystem.Mina), "Mina is upstream of CSI");
+                Assert.That(invalidated, Is.EqualTo(new[] { EzAnalysisSystem.CSI }));
 
                 var chain = store.CollectChartChainState();
 
                 Assert.That(chain.CompleteChartSkillInfo, Does.Not.Contain(hash), "the CSI row is retired");
-                Assert.That(chain.CompleteChartDan, Does.Not.Contain(hash), "the dan row is retired");
-                Assert.That(chain.MsdOwed, Does.Not.Contain(hash), "Mina is upstream of CSI and keeps its row");
+                Assert.That(chain.CompleteChartDan, Does.Contain(hash), "ChartDan rows are not cascade-deleted");
+                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+                Assert.That(chain.ChartDanOwed, Does.Contain(hash), "stale inputs schedule a recompute");
+                Assert.That(chain.MsdOwed, Does.Not.Contain(hash));
 
-                // The revision is recorded as part of the retirement, so the next pass fills what is missing instead
-                // of retiring the same rows again on every launch.
                 Assert.That(store.IsExpired(EzAnalysisSystem.CSI), Is.False);
-                Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.False);
-                Assert.That(store.IsExpired(EzAnalysisSystem.Mina), Is.False);
+                Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.False, "Dan stamp is untouched when only CSI invalidates");
+            });
+        }
+
+        [Test]
+        public void Invalidating_ssr_keeps_chart_dan_readable()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-ssr";
+
+                seedChart(realm, hash);
+                stampWholeChain(store);
+
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "StillHere",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                store.Invalidate(EzAnalysisSystem.SSR);
+
+                Assert.That(store.TryGetChartDan(hash, out var row), Is.True);
+                Assert.That(row!.RcLabel, Is.EqualTo("StillHere"));
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
             });
         }
 

@@ -25,7 +25,8 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// <summary>
         /// <see cref="EzDanEngine.VERSION"/> at compute time - the composed dan
         /// algorithm version plus its upstream facets (CSI, Mina). Filtered as an equality test by
-        /// <see cref="EzChartSkillStore.TryGetChartDan"/>, so any upstream bump reads old rows as a miss.
+        /// <see cref="EzChartSkillStore.TryGetChartDan"/> returns any stored row; recomputation is scheduled by the
+        /// chart chain, not by refusing reads when upstream is stale.
         /// </summary>
         public int AlgorithmVersion { get; set; }
 

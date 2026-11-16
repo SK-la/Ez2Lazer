@@ -803,7 +803,6 @@ namespace osu.Game.Database
 
             if (scope.HasFlag(EzAnalysisSystem.SSR))
             {
-                // Dan reads the Sunny rating, so the dependency edge retires it along with the ratings.
                 Logger.Log($"Retiring Sunny ratings: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR))}");
                 skillProvider.InvalidateLiveMetrics();
             }

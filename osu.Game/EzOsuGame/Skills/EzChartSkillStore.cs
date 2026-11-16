@@ -362,32 +362,25 @@ namespace osu.Game.EzOsuGame.Skills
         public bool IsExpired(EzAnalysisSystem system) => GetAppliedVersion(system) != system.CurrentVersion();
 
         /// <summary>
-        /// Retires <paramref name="system"/> and every system derived from it, so the next pass recomputes them.
-        /// The dependency edges are the ones the rebuild catalog already declares.
+        /// Retires persisted rows for <paramref name="system"/> only. Downstream consumers may still read their own
+        /// stored rows until a pass overwrites them; whether to recompute from fresher inputs is
+        /// <see cref="EzChartChainState.ChartDanOwed"/> / maintenance, not a cascade delete on invalidate.
         /// </summary>
         /// <remarks>
         /// The rows are deleted and the current revision is recorded in the same step. Pairing "nothing stored" with
         /// "at this revision" is what makes a pass resumable: the next launch fills whatever is still missing instead
-        /// of retiring the whole library again. Rows carry a revision, but the passes select on row presence, so a
-        /// bump that only moved a stamp would leave the old rows looking settled.
+        /// of retiring the whole library again.
         /// </remarks>
         public IReadOnlyList<EzAnalysisSystem> Invalidate(EzAnalysisSystem system)
         {
-            var invalidated = new List<EzAnalysisSystem> { system };
-            invalidated.AddRange(DownstreamOf(system));
+            clearRows(system);
 
-            foreach (var affected in invalidated)
-                clearRows(affected);
+            int version = system.CurrentVersion();
 
-            foreach (var affected in invalidated)
-            {
-                int version = affected.CurrentVersion();
+            if (version > 0)
+                SetAppliedVersion(system, version);
 
-                if (version > 0)
-                    SetAppliedVersion(affected, version);
-            }
-
-            return invalidated;
+            return new[] { system };
         }
 
         private void clearRows(EzAnalysisSystem system)
@@ -789,10 +782,7 @@ namespace osu.Game.EzOsuGame.Skills
                 r.Remove(row);
         }
 
-        /// <summary>
-        /// Typed Realm ChartDan (EZ>=10). Filtered on the current dan revision, so a bump
-        /// of the dan algorithm, CSI, or Mina reads as a miss and BDSP recomputes it.
-        /// </summary>
+        /// <summary>Typed Realm ChartDan (EZ>=10). Returns any stored row for the hash; staleness is backfill-only.</summary>
         public bool TryGetChartDan(string beatmapHash, out EzPersistedChartDan? chartDan)
         {
             chartDan = null;
