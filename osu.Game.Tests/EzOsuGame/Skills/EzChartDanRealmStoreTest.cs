@@ -203,6 +203,87 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         [Test]
+        public void Invalidating_mina_upstream_only_keeps_csi_and_dan_until_downstream_retire()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-mina-staged";
+
+                seedChart(realm, hash);
+                stampWholeChain(store);
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "Keep",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                store.Invalidate(EzAnalysisSystem.Mina, includeDownstream: false);
+
+                Assert.That(store.GetBeatmapSkills(hash, EzAnalysisSystem.Mina), Is.Empty);
+                Assert.That(store.TryGetChartSkillInfo(hash, out _), Is.True);
+                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+
+                store.InvalidateDownstream(EzAnalysisSystem.Mina);
+
+                Assert.That(store.TryGetChartSkillInfo(hash, out _), Is.False);
+                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+            });
+        }
+
+        [Test]
+        public void Invalidating_csi_upstream_only_keeps_chart_dan_until_downstream_retire()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-csi-staged";
+
+                seedChart(realm, hash);
+                stampWholeChain(store);
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "Keep",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                store.Invalidate(EzAnalysisSystem.CSI, includeDownstream: false);
+
+                Assert.That(store.TryGetChartSkillInfo(hash, out _), Is.False);
+                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+
+                store.InvalidateDownstream(EzAnalysisSystem.CSI);
+
+                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+            });
+        }
+
+        [Test]
         public void Invalidating_ssr_upstream_only_keeps_chart_dan_until_downstream_retire()
         {
             RunTestWithRealm((realm, _) =>
