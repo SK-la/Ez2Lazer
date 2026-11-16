@@ -372,22 +372,73 @@ namespace osu.Game.EzOsuGame.Skills
         /// bump that only moved a stamp would leave the old rows looking settled.
         /// </remarks>
         public IReadOnlyList<EzAnalysisSystem> Invalidate(EzAnalysisSystem system)
+            => Invalidate(system, includeDownstream: true);
+
+        /// <summary>
+        /// Retires <paramref name="system"/> and, when requested, every system that reads it.
+        /// </summary>
+        /// <param name="includeDownstream">
+        /// When false, only upstream rows are cleared so a pass can refill them before derived rows are retired.
+        /// </param>
+        public IReadOnlyList<EzAnalysisSystem> Invalidate(EzAnalysisSystem system, bool includeDownstream)
         {
             var invalidated = new List<EzAnalysisSystem> { system };
-            invalidated.AddRange(DownstreamOf(system));
 
-            foreach (var affected in invalidated)
+            if (includeDownstream)
+                invalidated.AddRange(DownstreamOf(system));
+
+            retireRows(invalidated);
+
+            // Sunny columns go to -1; Realm downstream keeps its rows but AppliedVersion=0 until the upstream pass
+            // finishes and BDSP calls <see cref="InvalidateDownstream"/> once (same contract as column -1 queuing).
+            if (!includeDownstream)
+                stampDownstreamAwaitingReset(system);
+
+            return invalidated;
+        }
+
+        /// <summary>
+        /// Downstream systems were left readable but stamped as owing a reset after an upstream-only invalidate.
+        /// </summary>
+        public bool DownstreamAwaitingReset(EzAnalysisSystem upstream)
+        {
+            foreach (var downstream in DownstreamOf(upstream))
+            {
+                if (GetAppliedVersion(downstream) == 0)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void stampDownstreamAwaitingReset(EzAnalysisSystem upstream)
+        {
+            foreach (var downstream in DownstreamOf(upstream))
+                SetAppliedVersion(downstream, 0);
+        }
+
+        /// <summary>
+        /// Retires every system that reads <paramref name="system"/>, after that system's own refill pass has finished.
+        /// </summary>
+        public IReadOnlyList<EzAnalysisSystem> InvalidateDownstream(EzAnalysisSystem system)
+        {
+            var downstream = DownstreamOf(system);
+            retireRows(downstream);
+            return downstream;
+        }
+
+        private void retireRows(IReadOnlyList<EzAnalysisSystem> systems)
+        {
+            foreach (var affected in systems)
                 clearRows(affected);
 
-            foreach (var affected in invalidated)
+            foreach (var affected in systems)
             {
                 int version = affected.CurrentVersion();
 
                 if (version > 0)
                     SetAppliedVersion(affected, version);
             }
-
-            return invalidated;
         }
 
         private void clearRows(EzAnalysisSystem system)
@@ -789,10 +840,7 @@ namespace osu.Game.EzOsuGame.Skills
                 r.Remove(row);
         }
 
-        /// <summary>
-        /// Typed Realm ChartDan (EZ>=10). Filtered on the current dan revision, so a bump
-        /// of the dan algorithm, CSI, or Mina reads as a miss and BDSP recomputes it.
-        /// </summary>
+        /// <summary>Typed Realm ChartDan (EZ>=10). Returns any stored row for the hash; staleness is backfill-only.</summary>
         public bool TryGetChartDan(string beatmapHash, out EzPersistedChartDan? chartDan)
         {
             chartDan = null;

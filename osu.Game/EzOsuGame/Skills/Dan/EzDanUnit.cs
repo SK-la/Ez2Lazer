@@ -104,7 +104,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             if (analysis.Dan is not { } dan || dan.Sides.Count == 0)
                 return null;
 
-            var side = dan.HoldRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(dan.KeyCount)
+            var side = EzDanAlgorithm.AllowsPersistedChartLnHalf(dan.KeyCount, dan.HoldRatio, dan.HoldCount)
                 ? EzDanSide.Ln
                 : EzDanSide.Rc;
 

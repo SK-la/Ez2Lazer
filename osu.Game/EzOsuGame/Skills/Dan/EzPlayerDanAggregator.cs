@@ -153,13 +153,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
                         if (!chartAffectingMods
                             && chartStore.TryGetChartDan(hash, out var persisted) && persisted != null)
-                        {
-                            var side = persisted.HoldRatio >= EzDanAlgorithm.LnPrimaryMinRatioFor(persisted.KeyCount)
-                                ? EzDanSide.Ln
-                                : EzDanSide.Rc;
-
-                            chart = persisted.ToVerdict(side);
-                        }
+                            chart = persisted.ToPresentationVerdict(beatmapInfo);
 
                         if (chart == null)
                         {

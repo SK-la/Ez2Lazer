@@ -59,6 +59,9 @@ namespace osu.Game.EzOsuGame.Skills.Dan
 
         public double HoldRatio { get; init; }
 
+        /// <summary>Column holds on the measured chart; &lt; 0 when unknown.</summary>
+        public int HoldCount { get; init; } = -1;
+
         public double? SunnySR { get; init; }
 
         /// <summary>Rating-axis mean the estimate was read against, or 0 when no axis carried a value.</summary>
@@ -135,6 +138,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
             {
                 KeyCount = keyCount,
                 HoldRatio = holdRatio,
+                HoldCount = holdCount,
                 SunnySR = sunnySR,
                 OverallMsd = primary.OverallMsd,
                 DominantAxis = dominantAxis,

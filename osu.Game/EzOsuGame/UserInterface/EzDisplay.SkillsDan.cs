@@ -307,8 +307,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 && skillProvider.TryGetChartDanForUi(beatmap, out var persisted, allowMemoryCompute: false)
                 && persisted != null)
             {
-                var side = persisted.HasSide(EzDanSide.Ln) ? EzDanSide.Ln : EzDanSide.Rc;
-                var verdict = persisted.ToVerdict(side);
+                var verdict = persisted.ToPresentationVerdict(beatmap);
 
                 if (verdict != null)
                 {

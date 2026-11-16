@@ -391,8 +391,8 @@ namespace osu.Game.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Chart dan from persisted Mina (+ Realm ssrwhen present). No Mina compute / no beatmap note load.
-        /// Hold ratio uses Mina <c>hold_ratio</c> only (no analysis SQLite on this path).
+        /// Chart dan from persisted Mina (+ Realm SunnySR when present). No Mina compute / no beatmap note load.
+        /// Hold ratio comes from <see cref="EzHoldMetrics.HoldRatio"/> on beatmap object counts, not a Mina axis.
         /// </summary>
         public EzChartDanVerdict? TryGetCachedChartDan(BeatmapInfo beatmapInfo)
         {

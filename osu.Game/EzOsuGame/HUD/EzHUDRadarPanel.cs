@@ -599,7 +599,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             // Decided before the values land: the long-note frame has its own axis set, and painting the RC frame
             // first would visibly morph into it.
-            if (expectsLnSkillRadar(keyCount, persistedChartDan, holdRatio, holdCount))
+            if (expectsLnSkillRadar(keyCount, holdRatio, holdCount))
             {
                 applyLnSkillRadar(EzLnSkillRadar.BuildAxes(holdRatio, structureAxes, keyCount));
                 return;
@@ -634,17 +634,12 @@ namespace osu.Game.EzOsuGame.HUD
         private static IReadOnlyDictionary<string, double> structureAxesOf(in EzAnalysisResult analysis) => analysis.AxesOf(EzAnalysisSystem.CSI);
 
         /// <summary>
-        /// Synchronous LN/RC pre-judgement. Realm-persisted ChartDan with an LN half is authoritative
-        /// (written through the same hold gate); otherwise fall back to that gate using the Mina hold ratio
-        /// and the stored hold-object count.
+        /// Synchronous LN/RC pre-judgement from beatmap object counts only (not ChartDan rows).
         /// </summary>
-        private static bool expectsLnSkillRadar(int keyCount, EzPersistedChartDan? persistedChartDan, double holdRatio, int holdCount)
+        private static bool expectsLnSkillRadar(int keyCount, double holdRatio, int holdCount)
         {
             if (keyCount <= 0)
                 return false;
-
-            if (persistedChartDan != null && persistedChartDan.HasSide(EzDanSide.Ln))
-                return true;
 
             return EzDanAlgorithm.AllowsPersistedChartLnHalf(keyCount, holdRatio, holdCount);
         }

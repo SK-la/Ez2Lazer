@@ -139,13 +139,10 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 });
 
                 Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.True, "no pass has recorded a revision for Dan");
-                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash));
+                Assert.That(store.TryGetChartDan(hash, out var readable), Is.True);
+                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash), "stored rows stay readable");
 
                 store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
-
-                // Dan's own stamp is not the whole answer: it reads the Sunny rating, so that system has to have run
-                // at its current revision too before a stored row counts as a result.
-                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Not.Contain(hash), "the upstreams have not run here");
 
                 stampWholeChain(store);
 
@@ -196,13 +193,169 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 Assert.That(chain.CompleteChartSkillInfo, Does.Not.Contain(hash), "the CSI row is retired");
                 Assert.That(chain.CompleteChartDan, Does.Not.Contain(hash), "the dan row is retired");
+                Assert.That(chain.ChartDanOwed, Does.Contain(hash));
                 Assert.That(chain.MsdOwed, Does.Not.Contain(hash), "Mina is upstream of CSI and keeps its row");
 
-                // The revision is recorded as part of the retirement, so the next pass fills what is missing instead
-                // of retiring the same rows again on every launch.
                 Assert.That(store.IsExpired(EzAnalysisSystem.CSI), Is.False);
                 Assert.That(store.IsExpired(EzAnalysisSystem.Dan), Is.False);
                 Assert.That(store.IsExpired(EzAnalysisSystem.Mina), Is.False);
+            });
+        }
+
+        [Test]
+        public void Invalidating_mina_upstream_only_keeps_csi_and_dan_until_downstream_retire()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-mina-staged";
+
+                seedChart(realm, hash);
+                stampWholeChain(store);
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "Keep",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                store.Invalidate(EzAnalysisSystem.Mina, includeDownstream: false);
+
+                Assert.That(store.GetBeatmapSkills(hash, EzAnalysisSystem.Mina), Is.Empty);
+                Assert.That(store.TryGetChartSkillInfo(hash, out _), Is.True);
+                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+
+                store.InvalidateDownstream(EzAnalysisSystem.Mina);
+
+                Assert.That(store.TryGetChartSkillInfo(hash, out _), Is.False);
+                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+            });
+        }
+
+        [Test]
+        public void Invalidating_csi_upstream_only_keeps_chart_dan_until_downstream_retire()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-csi-staged";
+
+                seedChart(realm, hash);
+                stampWholeChain(store);
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "Keep",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                store.Invalidate(EzAnalysisSystem.CSI, includeDownstream: false);
+
+                Assert.That(store.TryGetChartSkillInfo(hash, out _), Is.False);
+                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+
+                store.InvalidateDownstream(EzAnalysisSystem.CSI);
+
+                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+            });
+        }
+
+        [Test]
+        public void Invalidating_ssr_upstream_only_keeps_chart_dan_until_downstream_retire()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-ssr-staged";
+
+                seedChart(realm, hash);
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "Keep",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                store.Invalidate(EzAnalysisSystem.SSR, includeDownstream: false);
+
+                Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+                Assert.That(store.GetAppliedVersion(EzAnalysisSystem.Dan), Is.Zero);
+                Assert.That(store.DownstreamAwaitingReset(EzAnalysisSystem.SSR), Is.True);
+                Assert.That(store.CollectChartChainState().ChartDanOwed, Does.Contain(hash));
+
+                store.InvalidateDownstream(EzAnalysisSystem.SSR);
+
+                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+            });
+        }
+
+        [Test]
+        public void Invalidating_ssr_cascades_to_dan_and_owes_recompute()
+        {
+            RunTestWithRealm((realm, _) =>
+            {
+                var store = new EzChartSkillStore(realm);
+                const string hash = "chart-dan-ssr";
+
+                seedChart(realm, hash);
+                stampWholeChain(store);
+
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
+
+                realm.Write(r =>
+                {
+                    r.Add(new EzChartDan
+                    {
+                        BeatmapHash = hash,
+                        AlgorithmVersion = EzDanEngine.VERSION,
+                        KeyCount = 4,
+                        HoldRatio = 0.1,
+                        OverallMsd = 10,
+                        RcRawDan = 5,
+                        RcLabel = "Gone",
+                        LnRawDan = -1,
+                        ComputedAt = DateTimeOffset.UtcNow,
+                    });
+                });
+
+                var invalidated = store.Invalidate(EzAnalysisSystem.SSR);
+
+                Assert.That(invalidated, Does.Contain(EzAnalysisSystem.Dan));
+                Assert.That(store.TryGetChartDan(hash, out _), Is.False);
+                Assert.That(store.CollectChartChainState().ChartDanOwed, Does.Contain(hash));
             });
         }
 
@@ -374,17 +527,19 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 store.SetAppliedVersion(EzAnalysisSystem.Dan, EzDanEngine.VERSION);
                 EzSSRTuningSnapshot.Record();
 
-                // Dan reads the Sunny rating, which has never run here, so the stored row is not a result yet.
+                // Sunny not stamped: dan facet is stale and owed, but the stored row stays readable.
                 var withoutSunny = store.CollectChartChainState();
 
-                Assert.That(withoutSunny.CompleteChartDan, Is.Empty, "a dan derived from an absent Sunny rating is not a result");
+                Assert.That(withoutSunny.CompleteChartDan, Does.Contain(hash));
                 Assert.That(withoutSunny.ChartDanOwed, Does.Contain(hash));
+                Assert.That(withoutSunny.Facets.Single(f => f.Id == "Dan").IsStale, Is.True);
 
                 store.SetAppliedVersion(EzAnalysisSystem.SSR, EzSSRUnit.VERSION);
 
-                // Once the upstream is current the same row counts again: nothing had to be re-stamped for Dan.
-                Assert.That(store.CollectChartChainState().CompleteChartDan, Does.Contain(hash));
-                Assert.That(store.CollectChartChainState().ChartDanOwed, Does.Not.Contain(hash));
+                var withSunny = store.CollectChartChainState();
+                Assert.That(withSunny.CompleteChartDan, Does.Contain(hash));
+                Assert.That(withSunny.ChartDanOwed, Does.Not.Contain(hash));
+                Assert.That(withSunny.Facets.Single(f => f.Id == "Dan").IsStale, Is.False);
             });
         }
 

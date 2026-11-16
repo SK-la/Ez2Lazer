@@ -707,6 +707,8 @@ namespace osu.Game.Database
         {
             EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
 
+            bool sunnyFillFinished = true;
+
             if (scope.HasFlag(EzAnalysisSystem.SSR))
             {
                 // A tuning edit never bumps the revision, so the stored rows look current while having been produced
@@ -715,14 +717,23 @@ namespace osu.Game.Database
                 // what is still missing.
                 if (skillStore.IsExpired(EzAnalysisSystem.SSR) || EzSSRTuningSnapshot.IsPending)
                 {
-                    Logger.Log($"Retiring Sunny ratings for recomputation: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR))}.");
+                    // BeatmapInfo columns go to -1 (queued like every other BDSP pass); downstream Realm rows stay
+                    // until Sunny finishes, with AppliedVersion=0 marking the owed downstream reset.
+                    Logger.Log($"Retiring Sunny ratings for recomputation: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR, includeDownstream: false))}.");
 
                     if (EzSSRTuningSnapshot.IsPending)
                         EzSSRTuningSnapshot.Record();
                 }
 
-                if (!populateMissingSunnyStarRatings())
-                    Logger.Log("Sunny rating pass did not finish; the remaining charts stay missing and are picked up next launch.");
+                sunnyFillFinished = populateMissingSunnyStarRatings();
+
+                if (!sunnyFillFinished)
+                    Logger.Log("Sunny rating pass did not finish; downstream chart skills stay until Sunny finishes.");
+
+                if (sunnyFillFinished && skillStore.DownstreamAwaitingReset(EzAnalysisSystem.SSR))
+                {
+                    Logger.Log($"Sunny fill finished; resetting downstream of SSR: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.SSR))}.");
+                }
             }
 
             if (scope.HasFlag(EzAnalysisSystem.Official))
@@ -747,39 +758,96 @@ namespace osu.Game.Database
                 Logger.Log($"Ez analysis revisions: Mina v{EzMinaEngine.VERSION}, CSI v{EzCSIEngine.VERSION}, Dan v{EzDanEngine.VERSION}.");
             }
 
-            bool needsChartChain = scope.HasFlag(EzAnalysisSystem.Mina)
-                                   || scope.HasFlag(EzAnalysisSystem.CSI)
-                                   || scope.HasFlag(EzAnalysisSystem.Dan)
-                                   || scope.HasFlag(EzAnalysisSystem.PPP);
+            EzChartChainBackfillScope.Resolve(scope, out _, out _, out _, out _, out bool needsChartChain);
 
             if (needsChartChain)
             {
                 // Same contract as the Sunny pass: a revision that is behind is retired once instead of being read as
                 // stale by every later pass, so a cancelled pass resumes on the rows still missing.
-                retireExpiredChainSystems(scope);
+                retireExpiredChainSystems(scope, out bool stagedMinaUpstream, out bool stagedCsiUpstream);
 
-                // One pass over the library. Each chart pays only for the stages it owes, but it is loaded,
-                // converted and written by one iteration instead of one per stage.
-                populateChartChain(
-                    skillStore.CollectChartChainState("BDSP"),
-                    csi: scope.HasFlag(EzAnalysisSystem.CSI),
-                    msd: scope.HasFlag(EzAnalysisSystem.Mina),
-                    ppp: scope.HasFlag(EzAnalysisSystem.PPP),
-                    dan: scope.HasFlag(EzAnalysisSystem.Dan));
+                if (!runChartChainBackfill(scope, sunnyFillFinished, stagedMinaUpstream, stagedCsiUpstream))
+                    Logger.Log("Chart chain backfill did not finish; downstream rows stay until the upstream pass completes.");
             }
 
             EzStartupTrace.Log($"BDSP EzRealm backfill end scope={scope}");
         }
 
-        private void retireExpiredChainSystems(EzAnalysisSystem scope)
+        private void retireExpiredChainSystems(EzAnalysisSystem scope, out bool stagedMinaUpstream, out bool stagedCsiUpstream)
         {
+            stagedMinaUpstream = false;
+            stagedCsiUpstream = false;
+
             foreach (var system in new[] { EzAnalysisSystem.Mina, EzAnalysisSystem.CSI, EzAnalysisSystem.Dan, EzAnalysisSystem.PPP })
             {
                 if (!scope.HasFlag(system) || !skillStore.IsExpired(system))
                     continue;
 
-                Logger.Log($"Retiring {system} rows for recomputation: {string.Join(", ", skillStore.Invalidate(system))}.");
+                bool upstreamOnly = system is EzAnalysisSystem.Mina or EzAnalysisSystem.CSI;
+
+                if (system == EzAnalysisSystem.Mina)
+                    stagedMinaUpstream = true;
+
+                if (system == EzAnalysisSystem.CSI)
+                    stagedCsiUpstream = true;
+
+                Logger.Log($"Retiring {system} rows for recomputation: {string.Join(", ", skillStore.Invalidate(system, includeDownstream: !upstreamOnly))}.");
             }
+        }
+
+        /// <summary>
+        /// Runs the chart chain, staging downstream retirement until the upstream stage that forced it has finished.
+        /// </summary>
+        private bool runChartChainBackfill(EzAnalysisSystem scope, bool sunnyFillFinished, bool stagedMinaUpstream, bool stagedCsiUpstream)
+        {
+            EzChartChainBackfillScope.Resolve(scope, out bool runMsd, out bool runCsi, out bool runDan, out bool runPpp, out _);
+
+            if (scope.HasFlag(EzAnalysisSystem.SSR) && !sunnyFillFinished)
+                runDan = false;
+
+            if (stagedMinaUpstream)
+            {
+                if (!populateChartChainStages(msd: true, csi: false, ppp: false, dan: false))
+                    return false;
+
+                if (skillStore.DownstreamAwaitingReset(EzAnalysisSystem.Mina))
+                    Logger.Log($"Mina fill finished; resetting downstream of Mina: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.Mina))}.");
+
+                EzChartChainBackfillScope.Resolve(scope, out _, out runCsi, out runDan, out runPpp, out _);
+
+                if (scope.HasFlag(EzAnalysisSystem.SSR) && !sunnyFillFinished)
+                    runDan = false;
+
+                return populateChartChainStages(msd: false, csi: runCsi, ppp: runPpp, dan: runDan);
+            }
+
+            if (stagedCsiUpstream)
+            {
+                if (!populateChartChainStages(msd: runMsd, csi: true, ppp: false, dan: false))
+                    return false;
+
+                if (skillStore.DownstreamAwaitingReset(EzAnalysisSystem.CSI))
+                    Logger.Log($"CSI fill finished; resetting downstream of CSI: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.CSI))}.");
+
+                EzChartChainBackfillScope.Resolve(scope, out _, out _, out runDan, out runPpp, out _);
+
+                if (scope.HasFlag(EzAnalysisSystem.SSR) && !sunnyFillFinished)
+                    runDan = false;
+
+                return populateChartChainStages(msd: false, csi: false, ppp: runPpp, dan: runDan);
+            }
+
+            return populateChartChainStages(msd: runMsd, csi: runCsi, ppp: runPpp, dan: runDan);
+        }
+
+        private bool populateChartChainStages(bool msd, bool csi, bool ppp, bool dan)
+        {
+            return populateChartChain(
+                skillStore.CollectChartChainState("BDSP"),
+                csi: csi,
+                msd: msd,
+                ppp: ppp,
+                dan: dan);
         }
 
         private void clearEzRealmMetadata(EzAnalysisSystem scope)
