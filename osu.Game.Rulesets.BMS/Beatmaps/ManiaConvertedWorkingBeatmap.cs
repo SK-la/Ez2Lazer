@@ -21,7 +21,7 @@ namespace osu.Game.Rulesets.BMS.Beatmaps
     /// </summary>
     /// <remarks>
     /// <see cref="GetBeatmap"/> exposes the display copy built in the constructor, and
-    /// <see cref="GetPlayableBeatmap"/> derives a fresh working copy from the BMS source on every call.
+    /// Mutable playable conversion derives a fresh working copy from the BMS source on every call.
     /// The two never share mutable state: conversion mods, difficulty mods, processors and
     /// <see cref="HitObject.ApplyDefaults"/> all rewrite the beatmap in place, so applying them to the
     /// display copy would stack their effect across calls (mirroring twice restores the original, a

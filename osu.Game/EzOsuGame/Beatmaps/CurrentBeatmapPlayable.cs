@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Beatmaps
 
         IBeatmap GetPlayable(CancellationToken cancellationToken = default);
 
-        IBeatmap GetMutable(Action<IBeatmap> postConvert = null, CancellationToken cancellationToken = default);
+        IBeatmap GetMutable(Action<IBeatmap>? postConvert = null, CancellationToken cancellationToken = default);
     }
 
     public class CurrentBeatmapPlayable : ICurrentBeatmapPlayable
@@ -54,7 +54,7 @@ namespace osu.Game.EzOsuGame.Beatmaps
         public IBeatmap GetPlayable(CancellationToken cancellationToken = default)
             => beatmap.Value.GetPlayableBeatmap(ruleset.Value, mods.Value, cancellationToken);
 
-        public IBeatmap GetMutable(Action<IBeatmap> postConvert = null, CancellationToken cancellationToken = default)
+        public IBeatmap GetMutable(Action<IBeatmap>? postConvert = null, CancellationToken cancellationToken = default)
             => beatmap.Value.GetMutablePlayableBeatmap(ruleset.Value, mods.Value, cancellationToken, postConvert);
     }
 }

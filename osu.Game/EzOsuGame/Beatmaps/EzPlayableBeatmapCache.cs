@@ -11,8 +11,7 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.EzOsuGame.Beatmaps
 {
     /// <summary>
-    /// Compatibility shim forwarding to <see cref="WorkingBeatmap"/> playable caching. Prefer calling
-    /// <see cref="WorkingBeatmap.GetPlayableBeatmap"/> / <see cref="WorkingBeatmap.GetMutablePlayableBeatmap"/> directly.
+    /// Compatibility shim forwarding to <see cref="WorkingBeatmap"/> playable caching. Prefer calling WorkingBeatmap shared or mutable playable APIs directly.
     /// </summary>
     [Obsolete("Use WorkingBeatmap.GetPlayableBeatmap / GetMutablePlayableBeatmap")]
     public static class EzPlayableBeatmapCache
@@ -43,9 +42,11 @@ namespace osu.Game.EzOsuGame.Beatmaps
 
             if (working is WorkingBeatmap workingBeatmap)
             {
+                var modList = mods ?? Array.Empty<Mod>();
+
                 return token is CancellationToken cancellation
-                    ? workingBeatmap.GetMutablePlayableBeatmap(ruleset, mods, cancellation, bind)
-                    : workingBeatmap.GetMutablePlayableBeatmap(ruleset, mods, bind);
+                    ? workingBeatmap.GetMutablePlayableBeatmap(ruleset, modList, cancellation, bind)
+                    : workingBeatmap.GetMutablePlayableBeatmap(ruleset, modList, bind);
             }
 
             IBeatmap converted = GetShared(working, ruleset, mods, token);

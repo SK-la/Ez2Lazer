@@ -3,7 +3,6 @@
 
 using NUnit.Framework;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Mods;
@@ -16,7 +15,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
     {
         [SetUp]
         [TearDown]
-        public void ResetCache() => EzPlayableBeatmapCache.Reset();
+        public void ResetCache() => WorkingBeatmap.ClearCachedReadOnlyMarkersForTesting();
 
         [Test]
         public void SameModsReturnSameBoundInstance()
