@@ -23,10 +23,16 @@ namespace osu.Game.EzOsuGame.Audio
     public partial class InputAudioLatencyTracker : IDisposable
     {
         /// <summary>
-        /// 输出路径 RMS 阈值（线性 0–1）。表达式属性便于 IDE 热重载调试，无设置项。
-        /// 电平换算：<c>20 * log10(0.08) ≈ -22 dBFS</c>。
+        /// 输出路径 RMS 阈值（dBFS）。只存在于本次进程，不写入配置；重启回到 -22。
         /// </summary>
-        public static float AcousticRmsThreshold => 0.08f;
+        public static readonly BindableFloat AcousticThreshold = new BindableFloat(-22f)
+        {
+            MinValue = -60f,
+            MaxValue = -6f,
+            Precision = 1f,
+        };
+
+        public static float AcousticRmsThreshold => MathF.Pow(10f, AcousticThreshold.Value / 20f);
 
         private readonly Ez2ConfigManager ezConfig;
         private readonly INotificationOverlay? notificationOverlay;
@@ -36,6 +42,7 @@ namespace osu.Game.EzOsuGame.Audio
         private Action<ValueChangedEvent<bool>>? inputAudioLatencyConfigHandler;
         private Action<ValueChangedEvent<bool>>? enabledChangedHandler;
         private Action<EzLatencyRecord>? measurementHandler;
+        private Action<ValueChangedEvent<float>>? thresholdChangedHandler;
         private bool initialized;
         private bool started;
         private bool disposed;
@@ -89,8 +96,11 @@ namespace osu.Game.EzOsuGame.Audio
             measurementHandler = onMeasurement;
             latencyManager.OnNewRecord += measurementHandler;
 
+            thresholdChangedHandler = _ => pushAcousticThreshold();
+            AcousticThreshold.BindValueChanged(thresholdChangedHandler);
+
             Logger.Log(
-                $"[EzOsuLatency] audio tracker armed (In→Play→Acou; threshold={AcousticRmsThreshold:F4}, acousticProbe={(latencyManager.AcousticProbeRunning ? "on" : "off")})",
+                $"[EzLatency] audio tracker armed (In→Play→Acou; threshold={AcousticThreshold.Value:0}dBFS, acousticProbe={(latencyManager.AcousticProbeRunning ? "on" : "off")})",
                 Ez2ConfigManager.LOGGER_NAME,
                 LogLevel.Debug);
         }
@@ -147,7 +157,7 @@ namespace osu.Game.EzOsuGame.Audio
 
             if (!stats.HasData)
             {
-                Logger.Log("[EzOsuLatency] session ended with no complete records", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                Logger.Log("[EzLatency] session ended with no complete records", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
                 if (postNotification)
                     postSummaryNotification("Audio latency: no complete samples this play.");
@@ -168,7 +178,7 @@ namespace osu.Game.EzOsuGame.Audio
             }
 
             string summary =
-                $"[EzOsuLatency] n={stats.RecordCount}"
+                $"[EzLatency] n={stats.RecordCount}"
                 + $" | In→Play avg/min/max={stats.AvgInputToPlayback:F2}/{stats.MinInputToPlayback:F2}/{stats.MaxInputToPlayback:F2}ms"
                 + playToAcouPart
                 + acousticPart;
@@ -200,7 +210,7 @@ namespace osu.Game.EzOsuGame.Audio
         {
             if (notificationOverlay == null)
             {
-                Logger.Log("[EzOsuLatency] summary ready but INotificationOverlay is null", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                Logger.Log("[EzLatency] summary ready but INotificationOverlay is null", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 return;
             }
 
@@ -221,7 +231,7 @@ namespace osu.Game.EzOsuGame.Audio
                 }
                 catch (Exception ex)
                 {
-                    Logger.Log($"[EzOsuLatency] deferred notification failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                    Logger.Log($"[EzLatency] deferred notification failed: {ex.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 }
             });
         }
@@ -245,7 +255,7 @@ namespace osu.Game.EzOsuGame.Audio
                 : null;
 
             Logger.Log(
-                $"[EzOsuLatency] key={record.InputData.KeyValue} | In→Play={formatMs(inToPlay)} | Play→Acou={formatMs(playToAcou)} | In→Acou={formatMs(inToAcou)}",
+                $"[EzLatency] key={record.InputData.KeyValue} | In→Play={formatMs(inToPlay)} | Play→Acou={formatMs(playToAcou)} | In→Acou={formatMs(inToAcou)}",
                 Ez2ConfigManager.LOGGER_NAME,
                 LogLevel.Debug);
         }
@@ -271,6 +281,9 @@ namespace osu.Game.EzOsuGame.Audio
             if (measurementHandler != null)
                 latencyManager.OnNewRecord -= measurementHandler;
 
+            if (thresholdChangedHandler != null)
+                AcousticThreshold.ValueChanged -= thresholdChangedHandler;
+
             // Critical: do not leave GLOBAL.Enabled true after leaving gameplay.
             latencyManager.Enabled.Value = false;
             latencyManager.ClearStatistics();
@@ -278,7 +291,7 @@ namespace osu.Game.EzOsuGame.Audio
             if (Instance == this)
                 Instance = null;
 
-            Logger.Log("[EzOsuLatency] tracker disposed; GLOBAL.Enabled=false", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+            Logger.Log("[EzLatency] tracker disposed; GLOBAL.Enabled=false", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
         }
     }
 }
