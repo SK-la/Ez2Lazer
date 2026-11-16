@@ -473,8 +473,8 @@ namespace osu.Game.EzOsuGame.HUD
         }
 
         /// <summary>
-        /// The analysis result for this chart + mods, from the analysis cache only. A miss is "not computed yet",
-        /// never "read the stored rows instead".
+        /// The analysis result for this chart + mods, from the analysis cache only. The cache decides L1/L2/L3;
+        /// this panel does not. A kps-only slice has no radar polygons.
         /// </summary>
         private EzAnalysisResult? getLiveAnalysis(BeatmapInfo beatmapInfo)
         {
@@ -585,7 +585,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             EzPersistedChartDan? persistedChartDan = null;
 
-            skillProvider?.TryGetPersistedChartDan(beatmapInfo, out persistedChartDan);
+            analysisCache?.TryGetPersistedChartDan(beatmapInfo, out persistedChartDan);
 
             if (keyCount <= 0 && persistedChartDan is { KeyCount: > 0 })
                 keyCount = persistedChartDan.KeyCount;

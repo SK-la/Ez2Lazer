@@ -25,7 +25,10 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// The result for this chart + mods, computing it into the shared store when absent.
         /// </summary>
-        /// <remarks>Must not be called on the update thread: the pass is synchronous and heavy.</remarks>
+        /// <remarks>
+        /// Must not be called on the update thread: the pass is synchronous and heavy.
+        /// This batch path bypasses the Rec setting; UI-facing async lookups apply that setting separately.
+        /// </remarks>
         EzAnalysisResult? GetOrCompute(BeatmapInfo beatmap, RulesetInfo ruleset, IReadOnlyList<Mod>? mods);
     }
 }

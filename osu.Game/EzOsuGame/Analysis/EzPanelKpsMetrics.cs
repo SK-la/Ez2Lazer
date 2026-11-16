@@ -9,13 +9,8 @@ using osu.Game.Rulesets.Mods;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// 选歌 Panel KPS 显示解析（L1 主 SQLite + L2 <see cref="EzAnalysisCache"/> bindable）。
-    /// <para>
-    /// L1：NoMod 主 SQLite kps 切片 — <see cref="TryResolveBaselineFromSqlite"/>，Panel 首帧同步读。
-    /// </para>
-    /// <para>
-    /// L2：当前 ruleset/mods 下 <see cref="EzAnalysisCache.GetBindableAnalysis"/>（mod 感知 / Rec 即时算）。
-    /// </para>
+    /// 选歌 Panel KPS：消费端只订 <see cref="EzAnalysisCache.GetBindableAnalysis"/>（bindable 首帧可带 SQLite 切片）。
+    /// <see cref="TryResolveBaselineFromSqlite"/> 留给 cache 内部种子，不给 Panel 直读。
     /// </summary>
     public static class EzPanelKpsMetrics
     {

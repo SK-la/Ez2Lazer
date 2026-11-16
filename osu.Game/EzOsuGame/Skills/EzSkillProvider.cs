@@ -25,7 +25,8 @@ namespace osu.Game.EzOsuGame.Skills
     /// Unified read API for skill metrics (song select, local profile Track, …).
     /// Covers beatmap Mina/SSR chart metrics, player Mina rating skills, player dan estimates, chart skill info, and chart-dan verdicts.
     /// Writers (computers / aggregators) are separate DI services and are not read here.
-    /// All UI surfaces (HUD DualPanel / Radar, Analysis Wedge, LocalProfile Track, display tags) read through this type.
+    /// Chart analysis UI reads through <see cref="Analysis.EzAnalysisCache"/>, which may call into this type.
+    /// Player-side Track / DualPanel player half still read here. Writers stay BDSP / aggregators.
     /// </summary>
     public sealed class EzSkillProvider
     {

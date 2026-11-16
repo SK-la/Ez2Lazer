@@ -8,8 +8,8 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.HUD;
-using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics.Containers;
 using osu.Game.Rulesets.Mods;
@@ -39,7 +39,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private IBindable<IReadOnlyList<Mod>> mods { get; set; } = null!;
 
         [Resolved(canBeNull: true)]
-        private EzSkillProvider? skillProvider { get; set; }
+        private EzAnalysisCache? analysisCache { get; set; }
 
         [BackgroundDependencyLoader]
         private void load()
@@ -136,8 +136,8 @@ namespace osu.Game.EzOsuGame.Overlays
             int keys = (int)Math.Round(info.Difficulty.CircleSize);
 
             if (keys <= 0
-                && skillProvider != null
-                && skillProvider.TryGetPersistedChartDan(info, out var chartDan)
+                && analysisCache != null
+                && analysisCache.TryGetPersistedChartDan(info, out var chartDan)
                 && chartDan is { KeyCount: > 0 })
             {
                 keys = chartDan.KeyCount;

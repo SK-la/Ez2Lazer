@@ -18,6 +18,8 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
@@ -28,9 +30,14 @@ namespace osu.Game.EzOsuGame.Analysis
     /// <summary>
     /// 选歌 Ez 分析前台缓存与派发点。调用方只描述要分析的谱面 / 规则集 / mods，不指定读哪一层。
     ///
+    /// 数据层：L1 Realm 基线列（星 / PP）；L2 主 SQLite NoMod KPS 切片与本会话 store；L3
+    /// <see cref="EzAnalysisComputation"/> 整段 live pass。合成发生在 L3 结果进入 session 之前
+    /// （Sunny 星可覆盖为 L1），以及 <see cref="ReadVariantValues"/>。
+    ///
     /// 派发顺序：本会话 store → 即时计算（受 <see cref="Ez2Setting.EzAnalysisRecEnabled"/>）→ 主 SQLite NoMod 切片
     /// （受 <see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>）→ 无结果。
-    /// 已存切片只描述本规则集 NoMod 请求，因此有 mod 或换规则集的请求没有已存答案，由即时计算回答。
+    /// 已存切片只描述本规则集 NoMod 的 kps/KPC，没有轴、Dan、<see cref="EzAnalysisResult.SsrPatternRadar"/>；
+    /// Rec 关闭时因此没有雷达多边形。有 mod 或换规则集的请求没有已存切片，由即时计算回答。
     /// 标量（星 / PP / 技能星）经 <see cref="ReadVariantValues"/> 按当前选中系统读取，缺失的半侧才回落到基线列。
     /// <para>
     /// 本 cache 是纯读组件：任何落盘（主 SQLite 切片、Realm 值行与基线列）都由 BDSP、<see cref="BeatmapUpdater"/> 或设置里的手动重算发起。
@@ -94,6 +101,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         [Resolved]
         private Bindable<IReadOnlyList<Mod>> currentMods { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private EzSkillProvider? skillProvider { get; set; }
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
@@ -211,8 +221,9 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         /// <remarks>
         /// Dispatch order: this session's store, then a live pass when on-demand computation is enabled, then the
-        /// stored SQLite slice. A stored slice only describes a NoMod request for the beatmap's own ruleset, so a
-        /// modded or foreign-ruleset request is answered by the live pass.
+        /// stored SQLite slice. A stored slice is kps/KPC only (no radar). Rec off therefore yields no
+        /// <see cref="EzAnalysisResult.SsrPatternRadar"/>. A stored slice only describes a NoMod request for the
+        /// beatmap's own ruleset, so a modded or foreign-ruleset request is answered by the live pass.
         /// </remarks>
         public virtual Task<EzAnalysisResult?> GetAnalysisAsync(IBeatmapInfo beatmapInfo, IRulesetInfo? rulesetInfo = null, IEnumerable<Mod>? mods = null,
                                                                 CancellationToken cancellationToken = default, int computationDelay = 0)
@@ -313,8 +324,8 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Cached result, or a synchronous pass into the shared store when absent.
         /// </summary>
         /// <remarks>
-        /// Batch callers only (player aggregation). The pass is heavy and runs on the update scheduler, so calling
-        /// this from draw/update would stall the frame.
+        /// Batch callers only (player aggregation). The pass is heavy and synchronous, so calling this from draw/update
+        /// would stall the frame. This path bypasses the Rec setting; UI-facing async lookups remain gated separately.
         /// </remarks>
         public EzAnalysisResult? GetOrCompute(BeatmapInfo beatmap, RulesetInfo ruleset, IReadOnlyList<Mod>? mods)
         {
@@ -336,6 +347,31 @@ namespace osu.Game.EzOsuGame.Analysis
                 return null;
             }
         }
+
+        /// <summary>Chart dan for UI: L1 Realm / session, then optional memory compute. Does not write.</summary>
+        public bool TryGetChartDanForUi(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan, bool allowMemoryCompute = false)
+        {
+            chartDan = null;
+            return skillProvider != null && skillProvider.TryGetChartDanForUi(beatmapInfo, out chartDan, allowMemoryCompute);
+        }
+
+        /// <summary>Current-version Realm ChartDan only. Miss when absent.</summary>
+        public bool TryGetPersistedChartDan(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan)
+            => TryGetChartDanForUi(beatmapInfo, out chartDan, allowMemoryCompute: false);
+
+        /// <summary>One stored chart skill axis for many hashes (carousel sort/group). L1 rows only.</summary>
+        public IReadOnlyDictionary<string, double> GetBeatmapSkillAxisForHashes(
+            IEnumerable<string> beatmapHashes,
+            EzAnalysisSystem system,
+            string axisId,
+            int rulesetOnlineId = -1)
+            => skillProvider?.GetBeatmapSkillAxisForHashes(beatmapHashes, system, axisId, rulesetOnlineId)
+               ?? (IReadOnlyDictionary<string, double>)new Dictionary<string, double>(StringComparer.Ordinal);
+
+        /// <summary>Stored CSI pattern tags for many hashes. L1 rows only.</summary>
+        public IReadOnlyDictionary<string, string[]> GetChartSkillTagsForHashes(IEnumerable<string> beatmapHashes)
+            => skillProvider?.GetChartSkillTagsForHashes(beatmapHashes)
+               ?? (IReadOnlyDictionary<string, string[]>)new Dictionary<string, string[]>(StringComparer.Ordinal);
 
         public IBindable<string?> ActiveSongsBranchDisplayName => analysisDatabase.ActiveSongsBranchDisplayName;
 
