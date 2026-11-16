@@ -8,18 +8,21 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Localisation;
+using osu.Framework.Screens;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.EzOsuGame.Screens.Utility;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets;
+using osu.Game.Screens;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
@@ -41,7 +44,8 @@ namespace osu.Game.EzOsuGame.Overlays
                           EzLocalProfileOnlinePullService? onlinePullService,
                           RulesetStore? rulesetStore,
                           EzExternalRulesetManagerDialog? externalRulesetManager,
-                          EzDataRebuildDialog? rebuildDialog)
+                          EzDataRebuildDialog? rebuildDialog,
+                          IPerformFromScreenRunner? performer)
         {
             EzDataRebuildSettingsSection.AddTo(this, backgroundDataStoreProcessor, skillStore, playerSkillStore, localProfileService?.Store, rebuildDialog);
 
@@ -204,6 +208,12 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "gc", "garbage", "collection", "server", "workstation", "stutter", "frame", "内存", "卡顿", "帧" }
                 },
+            });
+
+            Add(new SettingsButtonV2
+            {
+                Text = EzAudioDriverLatencyScreen.BUTTON_TEXT,
+                Action = () => performer?.PerformFromScreen(menu => menu.Push(new EzAudioDriverLatencyScreen())),
             });
         }
 
