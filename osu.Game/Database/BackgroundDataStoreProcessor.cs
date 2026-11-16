@@ -747,10 +747,7 @@ namespace osu.Game.Database
                 Logger.Log($"Ez analysis revisions: Mina v{EzMinaEngine.VERSION}, CSI v{EzCSIEngine.VERSION}, Dan v{EzDanEngine.VERSION}.");
             }
 
-            bool needsChartChain = scope.HasFlag(EzAnalysisSystem.Mina)
-                                   || scope.HasFlag(EzAnalysisSystem.CSI)
-                                   || scope.HasFlag(EzAnalysisSystem.Dan)
-                                   || scope.HasFlag(EzAnalysisSystem.PPP);
+            EzChartChainBackfillScope.Resolve(scope, out bool runMsd, out bool runCsi, out bool runDan, out bool runPpp, out bool needsChartChain);
 
             if (needsChartChain)
             {
@@ -762,10 +759,10 @@ namespace osu.Game.Database
                 // converted and written by one iteration instead of one per stage.
                 populateChartChain(
                     skillStore.CollectChartChainState("BDSP"),
-                    csi: scope.HasFlag(EzAnalysisSystem.CSI),
-                    msd: scope.HasFlag(EzAnalysisSystem.Mina),
-                    ppp: scope.HasFlag(EzAnalysisSystem.PPP),
-                    dan: scope.HasFlag(EzAnalysisSystem.Dan));
+                    csi: runCsi,
+                    msd: runMsd,
+                    ppp: runPpp,
+                    dan: runDan);
             }
 
             EzStartupTrace.Log($"BDSP EzRealm backfill end scope={scope}");
@@ -803,6 +800,7 @@ namespace osu.Game.Database
 
             if (scope.HasFlag(EzAnalysisSystem.SSR))
             {
+                // Dan reads the Sunny rating, so the dependency edge retires it along with the ratings.
                 Logger.Log($"Retiring Sunny ratings: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR))}");
                 skillProvider.InvalidateLiveMetrics();
             }
