@@ -4,7 +4,9 @@
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Bindables;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics.Containers;
 
@@ -18,6 +20,8 @@ namespace osu.Game.Screens.Select
     {
         private Header header = null!;
         private Container contentContainer = null!;
+
+        public Bindable<EzRadarDisplayMode> RightRadarMode => header.RightRadarMode;
 
         public BeatmapDetailsArea()
         {
