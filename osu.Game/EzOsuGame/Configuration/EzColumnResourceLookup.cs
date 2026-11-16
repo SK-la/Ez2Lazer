@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using System.Collections.Generic;
 
 namespace osu.Game.EzOsuGame.Configuration
@@ -24,6 +23,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         public const string NOTE_TEXTURE_AFFIX_A = "white";
         public const string NOTE_TEXTURE_AFFIX_B = "blue";
+        // S/E 当前共用 red 资源夹；列色与着色预览按 EzColumnType 区分，不能按 affix 反推类型。
         public const string NOTE_TEXTURE_AFFIX_S = "red";
         public const string NOTE_TEXTURE_AFFIX_E = "red";
         public const string NOTE_TEXTURE_AFFIX_P = "green";
@@ -93,28 +93,6 @@ namespace osu.Game.EzOsuGame.Configuration
 
         public static string FormatEzProNoteResource(string prefix, string componentAfterPrefix)
             => prefix + componentAfterPrefix;
-
-        /// <summary>
-        /// 将 note 资源路径前缀（<c>note/{set}/</c> 下第一级）映射回列类型；未知时返回 <c>false</c>。
-        /// </summary>
-        public static bool TryGetColumnTypeForTexturePrefix(string prefix, out EzColumnType columnType)
-        {
-            columnType = default;
-
-            if (string.IsNullOrEmpty(prefix))
-                return false;
-
-            foreach (EzColumnType type in Enum.GetValues<EzColumnType>())
-            {
-                if (string.Equals(EzProNoteTexturePrefix(type), prefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    columnType = type;
-                    return true;
-                }
-            }
-
-            return false;
-        }
 
         /// <summary>
         /// 皮肤编辑器导出等场景：按列类型主前缀拼接部件，不做降级链尝试。

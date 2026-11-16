@@ -33,6 +33,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
     /// Draggable colouring previewer. Same chrome and horizontal drag as
     /// <see cref="EzSkinEditorComponentPickerWindow"/>; the body is a 3×5 grid of the current note
     /// set (algorithms × ranges). Clicking a cell writes that combination into the colouring settings.
+    /// 预览网格乘色由用户选择的 <see cref="EzColumnType"/> 决定，不按贴图 affix 反推类型。
     /// </summary>
     public partial class EzSkinEditorColouringPreviewerWindow : CompositeDrawable
     {
@@ -63,10 +64,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
         public Bindable<float> RememberedX { get; }
 
-        private readonly Bindable<string> prefix = new Bindable<string>(EzColumnResourceLookup.TINT_BASE_TEXTURE_AFFIX);
+        private readonly Bindable<EzColumnType> previewColumnType = new Bindable<EzColumnType>(EzColumnType.B);
 
         private Box background = null!;
-        private SettingsDropdown<string> prefixDropdown = null!;
+        private SettingsEnumDropdown<EzColumnType> columnTypeDropdown = null!;
         private Container gridHost = null!;
         private InputManager inputManager = null!;
         private OverlayColourProvider colourProvider = null!;
@@ -174,7 +175,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                 AutoSizeAxes = Axes.Y,
                                 Depth = float.MinValue,
                                 Padding = new MarginPadding { Horizontal = 0, Top = 5 },
-                                Child = prefixDropdown = new SettingsDropdown<string>
+                                Child = columnTypeDropdown = new SettingsEnumDropdown<EzColumnType>
                                 {
                                     LabelText = EzEditorStrings.COLOURING_PREVIEWER_BASE,
                                     ShowsDefaultIndicator = false,
@@ -205,8 +206,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 },
             };
 
-            refreshPrefixItems();
-            prefixDropdown.Current = prefix;
+            columnTypeDropdown.Current = previewColumnType;
 
             Open.BindValueChanged(_ =>
             {
@@ -225,16 +225,12 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 updateExpandedState(v.NewValue);
                 requestRebuild();
             }, true);
-            noteSetName.BindValueChanged(_ =>
-            {
-                refreshPrefixItems();
-                requestRebuild();
-            }, true);
-            prefix.BindValueChanged(_ =>
+            noteSetName.BindValueChanged(_ => requestRebuild(), true);
+            previewColumnType.BindValueChanged(_ =>
             {
                 requestRebuild();
                 applyColours();
-            });
+            }, true);
 
             foreach (var tint in columnTypeTints.Values)
                 tint.BindValueChanged(_ => applyColours());
@@ -268,20 +264,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
         }
 
         private void requestRebuild() => Scheduler.AddOnce(rebuildGrid);
-
-        private void refreshPrefixItems()
-        {
-            var items = listPrefixes();
-            string next = items.Contains(prefix.Value, StringComparer.OrdinalIgnoreCase)
-                ? prefix.Value
-                : items[0];
-
-            if (!items.Contains(next, StringComparer.OrdinalIgnoreCase))
-                items.Add(next);
-
-            prefixDropdown.Items = items;
-            prefix.Value = next;
-        }
 
         private List<string> listPrefixes()
         {
@@ -325,6 +307,25 @@ namespace osu.Game.EzOsuGame.Edit.Components
             return result;
         }
 
+        private string resolveNoteTexturePrefix()
+        {
+            string preferred = EzColumnResourceLookup.EzProNoteTexturePrefix(previewColumnType.Value);
+            var available = listPrefixes();
+
+            if (available.Contains(preferred, StringComparer.OrdinalIgnoreCase))
+                return preferred;
+
+            foreach (EzColumnType type in Enum.GetValues<EzColumnType>())
+            {
+                string candidate = EzColumnResourceLookup.EzProNoteTexturePrefix(type);
+
+                if (available.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+                    return candidate;
+            }
+
+            return available.Count > 0 ? available[0] : EzColumnResourceLookup.TINT_BASE_TEXTURE_AFFIX;
+        }
+
         private void rebuildGrid()
         {
             gridHost.Clear(true);
@@ -332,8 +333,6 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
             if (!Open.Value || !Expanded.Value)
                 return;
-
-            refreshPrefixItems();
 
             float ratio = factory.GetRatio();
             float cellHeight = Math.Clamp(cell_width * (ratio > 0 ? ratio : 1f), cell_height_min, cell_height_max);
@@ -360,7 +359,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 };
             }
 
-            string component = EzColumnResourceLookup.FormatEzProNoteResource(prefix.Value, EzColumnResourceLookup.NOTE_COMPONENT);
+            string component = EzColumnResourceLookup.FormatEzProNoteResource(resolveNoteTexturePrefix(), EzColumnResourceLookup.NOTE_COMPONENT);
 
             for (int row = 0; row < 5; row++)
             {
@@ -459,20 +458,9 @@ namespace osu.Game.EzOsuGame.Edit.Components
             _ => EzEditorStrings.COLOURING_PREVIEWER_WHITE_MAX,
         };
 
-        private Colour4 resolvePreviewTint()
-        {
-            if (EzColumnResourceLookup.TryGetColumnTypeForTexturePrefix(prefix.Value, out var type)
-                && columnTypeTints.TryGetValue(type, out var bindable))
-            {
-                return bindable.Value;
-            }
-
-            return columnTypeTints[EzColumnType.B].Value;
-        }
-
         private void applyColours()
         {
-            Colour4 tint = resolvePreviewTint();
+            Colour4 tint = columnTypeTints[previewColumnType.Value].Value;
             float strength = (float)colouringStrength.Value;
 
             foreach (var cell in cells)
