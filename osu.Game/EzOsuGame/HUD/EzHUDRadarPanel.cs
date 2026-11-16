@@ -585,7 +585,7 @@ namespace osu.Game.EzOsuGame.HUD
 
             EzPersistedChartDan? persistedChartDan = null;
 
-            skillProvider?.TryGetPersistedChartDan(beatmapInfo, out persistedChartDan);
+            analysisCache?.TryGetPersistedChartDan(beatmapInfo, out persistedChartDan);
 
             if (keyCount <= 0 && persistedChartDan is { KeyCount: > 0 })
                 keyCount = persistedChartDan.KeyCount;

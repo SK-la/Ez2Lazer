@@ -29,7 +29,6 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Carousel;
@@ -229,13 +228,13 @@ namespace osu.Game.Screens.Select
         {
             var beatmapList = beatmaps.Distinct().ToList();
 
-            if (beatmapList.Count == 0 || ezSkillProvider == null || system == EzAnalysisSystem.None || string.IsNullOrEmpty(axisId))
+            if (beatmapList.Count == 0 || system == EzAnalysisSystem.None || string.IsNullOrEmpty(axisId))
                 return Task.FromResult(empty_operation_difficulties);
 
             return Task.Run(() =>
             {
                 int rulesetOnlineId = ruleset.Value?.OnlineID ?? -1;
-                var byHash = ezSkillProvider.GetBeatmapSkillAxisForHashes(
+                var byHash = ezAnalysisCache.GetBeatmapSkillAxisForHashes(
                     beatmapList.Select(static b => b.Hash),
                     system,
                     axisId,
@@ -261,12 +260,12 @@ namespace osu.Game.Screens.Select
         {
             var beatmapList = beatmaps.Distinct().ToList();
 
-            if (beatmapList.Count == 0 || ezSkillProvider == null)
+            if (beatmapList.Count == 0)
                 return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, string[]>>(new Dictionary<BeatmapInfo, string[]>());
 
             return Task.Run(() =>
             {
-                var byHash = ezSkillProvider.GetChartSkillTagsForHashes(beatmapList.Select(static b => b.Hash));
+                var byHash = ezAnalysisCache.GetChartSkillTagsForHashes(beatmapList.Select(static b => b.Hash));
                 var resolved = new Dictionary<BeatmapInfo, string[]>(beatmapList.Count);
 
                 foreach (var beatmap in beatmapList)
@@ -1134,9 +1133,6 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
-
-        [Resolved(canBeNull: true)]
-        private EzSkillProvider? ezSkillProvider { get; set; }
 
         /// <remarks>
         /// FOOTGUN WARNING: this being sorted on the realm side before detaching is IMPORTANT.

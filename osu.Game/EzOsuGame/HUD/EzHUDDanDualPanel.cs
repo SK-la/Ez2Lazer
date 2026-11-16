@@ -32,7 +32,7 @@ namespace osu.Game.EzOsuGame.HUD
     /// <summary>
     /// HUD RC|LN skills-dan dual panel (Skill-radar style Chart / Player / Both sources).
     /// Borrowed by EzAnalysis wedge and Local Profile Track with bindable settings.
-    /// Chart side: Realm first, then always async live Mina/ChartDan for the selected map (sunnySR rhythm; not written).
+    /// Chart side: analysis cache (L1 dan then live pass). Player side stays on the skill provider.
     /// </summary>
     public partial class EzHUDDanDualPanel : CompositeDrawable, ISerialisableDrawable
     {
@@ -312,8 +312,7 @@ namespace osu.Game.EzOsuGame.HUD
             {
                 var info = beatmap.Value.BeatmapInfo;
 
-                // Instant: Realm / session / Mina memory (same role as ssrL1).
-                if (skillProvider != null && skillProvider.TryGetChartDanForUi(info, out var persistedChartDan, allowMemoryCompute: true)
+                if (analysisCache != null && analysisCache.TryGetChartDanForUi(info, out var persistedChartDan, allowMemoryCompute: true)
                                           && persistedChartDan != null)
                 {
                     chartSkillsetLabelsRc = persistedChartDan.SkillsetLabelsFor(EzDanSide.Rc);

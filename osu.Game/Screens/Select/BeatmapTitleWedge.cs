@@ -83,9 +83,6 @@ namespace osu.Game.Screens.Select
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
         [Resolved]
-        private EzAnalysisDatabase ezAnalysisDatabase { get; set; } = null!;
-
-        [Resolved]
         private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         private DifficultyDisplay difficultyDisplay = null!;
@@ -312,10 +309,6 @@ namespace osu.Game.Screens.Select
 
             if (working.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
                 return;
-
-            if (ruleset.Value is RulesetInfo rulesetInfo
-                && EzPanelKpsMetrics.TryResolveBaselineFromSqlite(ezAnalysisDatabase, beatmapInfo, rulesetInfo, mods.Value, out var baseline))
-                applyWedgeMetrics(baseline);
 
             computeEzAnalysis();
         }

@@ -18,6 +18,8 @@ using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.UI;
@@ -99,6 +101,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
         [Resolved]
         private Bindable<IReadOnlyList<Mod>> currentMods { get; set; } = null!;
+
+        [Resolved(canBeNull: true)]
+        private EzSkillProvider? skillProvider { get; set; }
 
         [BackgroundDependencyLoader]
         private void load(Ez2ConfigManager ezConfig)
@@ -320,7 +325,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         /// <remarks>
         /// Batch callers only (player aggregation). The pass is heavy and runs on the update scheduler, so calling
-        /// this from draw/update would stall the frame.
+        /// this from draw/update would stall the frame. When on-demand computation is off, this never starts an L3 pass.
         /// </remarks>
         public EzAnalysisResult? GetOrCompute(BeatmapInfo beatmap, RulesetInfo ruleset, IReadOnlyList<Mod>? mods)
         {
@@ -330,6 +335,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (cached != null)
                 return cached;
+
+            if (!runtimeAnalysisEnabled.Value)
+                return null;
 
             var lookup = new EzAnalysisLookupCache(beatmap, ruleset, mods);
 
@@ -342,6 +350,31 @@ namespace osu.Game.EzOsuGame.Analysis
                 return null;
             }
         }
+
+        /// <summary>Chart dan for UI: L1 Realm / session, then optional memory compute. Does not write.</summary>
+        public bool TryGetChartDanForUi(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan, bool allowMemoryCompute = false)
+        {
+            chartDan = null;
+            return skillProvider != null && skillProvider.TryGetChartDanForUi(beatmapInfo, out chartDan, allowMemoryCompute);
+        }
+
+        /// <summary>Current-version Realm ChartDan only. Miss when absent.</summary>
+        public bool TryGetPersistedChartDan(BeatmapInfo beatmapInfo, out EzPersistedChartDan? chartDan)
+            => TryGetChartDanForUi(beatmapInfo, out chartDan, allowMemoryCompute: false);
+
+        /// <summary>One stored chart skill axis for many hashes (carousel sort/group). L1 rows only.</summary>
+        public IReadOnlyDictionary<string, double> GetBeatmapSkillAxisForHashes(
+            IEnumerable<string> beatmapHashes,
+            EzAnalysisSystem system,
+            string axisId,
+            int rulesetOnlineId = -1)
+            => skillProvider?.GetBeatmapSkillAxisForHashes(beatmapHashes, system, axisId, rulesetOnlineId)
+               ?? (IReadOnlyDictionary<string, double>)new Dictionary<string, double>(StringComparer.Ordinal);
+
+        /// <summary>Stored CSI pattern tags for many hashes. L1 rows only.</summary>
+        public IReadOnlyDictionary<string, string[]> GetChartSkillTagsForHashes(IEnumerable<string> beatmapHashes)
+            => skillProvider?.GetChartSkillTagsForHashes(beatmapHashes)
+               ?? (IReadOnlyDictionary<string, string[]>)new Dictionary<string, string[]>(StringComparer.Ordinal);
 
         public IBindable<string?> ActiveSongsBranchDisplayName => analysisDatabase.ActiveSongsBranchDisplayName;
 

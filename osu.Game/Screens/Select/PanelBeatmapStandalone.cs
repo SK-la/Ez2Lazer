@@ -68,9 +68,6 @@ namespace osu.Game.Screens.Select
         [Resolved]
         private EzAnalysisCache ezAnalysisCache { get; set; } = null!;
 
-        [Resolved]
-        private EzAnalysisDatabase ezAnalysisDatabase { get; set; } = null!;
-
         private FillFlowContainer panelMetaFlow = null!;
         private EzDisplayKpsGraph ezDisplayKpsGraph = null!;
         private EzDisplayKps ezDisplayKps = null!;
@@ -374,10 +371,6 @@ namespace osu.Game.Screens.Select
 
             applyPanelKps(EzSongSelectAnalysisDisplay.EMPTY);
             lastStarDifficulty = default;
-
-            if (ruleset.Value is RulesetInfo rulesetInfo
-                && EzPanelKpsMetrics.TryResolveBaselineFromSqlite(ezAnalysisDatabase, beatmap, rulesetInfo, mods.Value, out var baselineKps))
-                applyPanelKps(baselineKps);
 
             computeStarRating();
             // spreadDisplay.Beatmap.Value = beatmap;
