@@ -27,7 +27,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         /// <remarks>
         /// Must not be called on the update thread: the pass is synchronous and heavy.
-        /// When on-demand computation is off, a miss stays a miss.
+        /// This batch path bypasses the Rec setting; UI-facing async lookups apply that setting separately.
         /// </remarks>
         EzAnalysisResult? GetOrCompute(BeatmapInfo beatmap, RulesetInfo ruleset, IReadOnlyList<Mod>? mods);
     }

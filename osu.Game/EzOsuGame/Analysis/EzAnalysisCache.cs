@@ -324,8 +324,8 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Cached result, or a synchronous pass into the shared store when absent.
         /// </summary>
         /// <remarks>
-        /// Batch callers only (player aggregation). The pass is heavy and runs on the update scheduler, so calling
-        /// this from draw/update would stall the frame. When on-demand computation is off, this never starts an L3 pass.
+        /// Batch callers only (player aggregation). The pass is heavy and synchronous, so calling this from draw/update
+        /// would stall the frame. This path bypasses the Rec setting; UI-facing async lookups remain gated separately.
         /// </remarks>
         public EzAnalysisResult? GetOrCompute(BeatmapInfo beatmap, RulesetInfo ruleset, IReadOnlyList<Mod>? mods)
         {
@@ -335,9 +335,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
             if (cached != null)
                 return cached;
-
-            if (!runtimeAnalysisEnabled.Value)
-                return null;
 
             var lookup = new EzAnalysisLookupCache(beatmap, ruleset, mods);
 
