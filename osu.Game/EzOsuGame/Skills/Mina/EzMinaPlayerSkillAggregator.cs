@@ -246,9 +246,8 @@ namespace osu.Game.EzOsuGame.Skills.Mina
         }
 
         /// <summary>
-        /// Pattern tags come from the chart-side CSI row only: this pass never computes or writes chart-side data.
-        /// A chart the chain has not rated yet contributes no pattern axes and is reported for a chain backfill;
-        /// a chart the chain settled as unrateable contributes nothing and is not reported (a retry changes nothing).
+        /// 谱面技能 Tag 只读 CSI 行：本 pass 不计算、不写谱面侧。
+        /// 链尚未结算的谱不贡献 Tag 分桶，记入欠账；unrateable 不贡献也不上报。
         /// </summary>
         private string[] resolvePatterns(string beatmapHash, Dictionary<string, string[]> memo, HashSet<string> missing)
         {
@@ -260,7 +259,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             if (chartStore.TryGetChartSkillInfo(beatmapHash, out var chart))
             {
                 if (chart is { IsUnavailable: false })
-                    patterns = chart.Patterns;
+                    patterns = chart.SkillTags;
             }
             else if (isChartChainRateable(beatmapHash))
             {

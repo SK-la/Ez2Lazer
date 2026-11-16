@@ -11,6 +11,7 @@ using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
@@ -30,6 +31,12 @@ using osu.Game.Utils;
 
 namespace osu.Game.EzOsuGame.Analysis
 {
+    /// <summary>
+    /// L3 pass: one <see cref="EzAnalysisResult"/> for a chart + mods.
+    /// When mods allow, L1 Sunny star (Realm) is chosen before Dan and scalar ratings so those fields share the headline;
+    /// <see cref="EzAnalysisResult.SsrPatternRadar"/> stays the live snapshot.
+    /// KPS/KPC NoMod slices are <c>ComputePersistedSqliteSlice</c>, not this method.
+    /// </summary>
     // 不主动释放 workingCache，让框架自行决定。主动释放会频繁触发大量 Invalidating 日志。
     internal static class EzAnalysisComputation
     {
@@ -317,7 +324,10 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        public static EzAnalysisResult Compute(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
+        public static EzAnalysisResult Compute(
+            BeatmapManager beatmapManager,
+            in EzAnalysisLookupCache lookup,
+            CancellationToken cancellationToken = default)
             => Compute(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup, cancellationToken);
 
         /// <summary>
@@ -372,7 +382,10 @@ namespace osu.Game.EzOsuGame.Analysis
             return new EzAnalysisResult(commonSummary, maniaSummary);
         }
 
-        public static EzAnalysisResult Compute(WorkingBeatmap workingBeatmap, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken = default)
+        public static EzAnalysisResult Compute(
+            WorkingBeatmap workingBeatmap,
+            in EzAnalysisLookupCache lookup,
+            CancellationToken cancellationToken = default)
         {
             // The engines that produce skill axes are independent of a ruleset exposing an analysis provider, so
             // the pass always measures them. Products that do need the provider (official performance, the Sunny
@@ -429,7 +442,7 @@ namespace osu.Game.EzOsuGame.Analysis
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Radar))
                 ssrAndRadar = computeSsrAndRadar(lookup, analysisBeatmap, measurements, cancellationToken);
 
-            double? sunnySR = ssrAndRadar.SunnySR;
+            double? sunnySR = persistedSunnyStar(lookup) ?? ssrAndRadar.SunnySR;
 
             MinaResult? mina;
 
@@ -459,10 +472,19 @@ namespace osu.Game.EzOsuGame.Analysis
             IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> ratings;
             EzDanSet? dan;
 
+            EzRadarChartData<string>? quantifiedKeyPattern = ssrAndRadar.KeyPatternRadar;
+
+            if (quantifiedKeyPattern is { } relativeRadar && sunnySR is double quantifiedSunny && EzKeyPatternUnit.IsQuantifiableSunny(quantifiedSunny))
+                quantifiedKeyPattern = EzKeyPatternUnit.Quantify(relativeRadar, quantifiedSunny);
+
+            EzRadarChartData<string>? keyPatternRadar = quantifiedKeyPattern is { } persistable
+                ? EzKeyPatternRadar.WithHoldRatio(persistable, measurements?.HoldRatio ?? 0)
+                : null;
+
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Axes))
             {
                 var computed = computeAxes(lookup, workingBeatmap, analysisBeatmap, mina, structure?.Axes, ppp, sunnySR, cancellationToken);
-                axes = computed.Axes;
+                axes = withKeyPatternAxes(computed.Axes, quantifiedKeyPattern);
                 ratings = computed.Ratings;
             }
 
@@ -470,7 +492,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 dan = computeDan(rulesetOnlineId, measurements, mina?.Axes, structure?.Info, sunnySR);
 
             var result = new EzAnalysisResult(commonSummary, maniaSummary, axes: axes, ratings: ratings, dan: dan,
-                keyPatternRadar: ssrAndRadar.KeyPatternRadar, ssrPatternRadar: ssrAndRadar.SsrPatternRadar, chartSkillInfo: structure?.Info);
+                keyPatternRadar: keyPatternRadar, ssrPatternRadar: ssrAndRadar.SsrPatternRadar, chartSkillInfo: structure?.Info);
 
             EzAnalysisPassPerf.RecordPass(succeeded: true);
             EzAnalysisPassPerf.MaybeLog();
@@ -517,6 +539,20 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly record struct AxesResult(
             IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> Axes,
             IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> Ratings);
+
+        private static IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> withKeyPatternAxes(
+            IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> axes,
+            EzRadarChartData<string>? keyPatternRadar)
+        {
+            if (keyPatternRadar == null)
+                return axes;
+
+            var copy = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(axes)
+            {
+                [EzAnalysisSystem.KeyPattern] = EzKeyPatternUnit.ToSkills(keyPatternRadar.Value),
+            };
+            return copy;
+        }
 
         /// <summary>
         /// The PP+ chart vector, with its star separated out: the engine reports the star beside the vector axes,
@@ -656,6 +692,22 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
+        /// L1 Sunny star when this request may use the Realm baseline. Null means the live L3 star stays.
+        /// </summary>
+        private static double? persistedSunnyStar(in EzAnalysisLookupCache lookup)
+        {
+            if (!EzModRate.CanUsePersistedSunnySR(lookup.OrderedMods))
+                return null;
+
+            double stored = lookup.BeatmapInfo.EzRatingData.SunnySR;
+
+            if (stored < 0 || !double.IsFinite(stored) || stored <= 0)
+                return null;
+
+            return stored;
+        }
+
+        /// <summary>
         /// Sunny star rating and the pp it implies for the current mods. A star is one number, not an axis.
         /// </summary>
         private static void addSsr(double? sunnySR, OfficialResult? official, Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
@@ -671,8 +723,8 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// Dan estimates for the sides this chart can be rated on, from the axis table and Sunny rating this pass
-        /// already measured.
+        /// Dan estimates for the sides this chart can be rated on, from the axis table and the Sunny headline
+        /// already resolved for this pass (L1 overlay when allowed).
         /// </summary>
         private static EzDanSet? computeDan(int rulesetOnlineId, EzChartMeasurements? measurements,
                                             IReadOnlyDictionary<string, double>? bareAxes, EzChartSkillInfo? chartInfo, double? sunnySR)
@@ -787,8 +839,11 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The rating and its pattern breakdown come from one engine call, so asking for both does not run the
         /// difficulty core twice for the same chart and mods.
         /// </remarks>
-        private static SsrAndRadar computeSsrAndRadar(in EzAnalysisLookupCache lookup, IBeatmap analysisBeatmap, EzChartMeasurements? measurements,
-                                                      CancellationToken cancellationToken)
+        private static SsrAndRadar computeSsrAndRadar(
+            in EzAnalysisLookupCache lookup,
+            IBeatmap analysisBeatmap,
+            EzChartMeasurements? measurements,
+            CancellationToken cancellationToken)
         {
             if (!EzSSRUnit.SupportsRuleset(lookup.Ruleset.OnlineID) || measurements is not { } measured)
                 return default;
@@ -796,7 +851,7 @@ namespace osu.Game.EzOsuGame.Analysis
             var chart = measured.Chart;
             int keyCount = measured.KeyCount;
 
-            EzRadarChartData<string>? keyPatternRadar = computeKeyPatternRadar(chart, measured.HoldRatio, cancellationToken);
+            EzRadarChartData<string>? keyPatternRadar = EzKeyPatternUnit.ComputeRadar(chart, cancellationToken);
 
             if (!EzSSREngine.IsPatternSupported(keyCount))
                 return new SsrAndRadar(null, keyPatternRadar, null);
@@ -804,6 +859,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (chart.Notes.Count == 0)
                 return new SsrAndRadar(0, keyPatternRadar, null);
 
+            // L3 SunnySRSkill spokes always from this live snapshot; L1 Sunny star is resolved later in Compute.
             var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, analysisBeatmap.Difficulty.OverallDifficulty,
                 getRateAdjustMultiplier(lookup.OrderedMods));
 
@@ -811,44 +867,6 @@ namespace osu.Game.EzOsuGame.Analysis
 
             return new SsrAndRadar(sunnySR, keyPatternRadar, EzManiaSR4PatternRadarBuilder.Create(combined.PatternSnapshot));
         }
-
-        /// <summary>
-        /// The structure view of a chart, measured from the same extraction the structure pass used.
-        /// </summary>
-        private static EzRadarChartData<string> computeKeyPatternRadar(EzManiaChartInput chart, double holdRatio, CancellationToken cancellationToken)
-        {
-            var notes = EzManiaKeyPatternHelper.NotesInTimeOrder(chart);
-
-            if (notes.Count == 0)
-                return createKeyPatternRadarData(0, 0, 0, 0, 0, 0);
-
-            int totalColumns = 0;
-
-            for (int i = 0; i < notes.Count; i++)
-                totalColumns = Math.Max(totalColumns, notes[i].Column + 1);
-
-            var rows = EzManiaKeyPatternHelper.BuildRows(notes, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken);
-
-            // The hold share is already measured for this pass; counting it again here was a second walk of the chart.
-            double longNoteRatio = Math.Round(holdRatio * 100, 2, MidpointRounding.AwayFromZero);
-
-            return createKeyPatternRadarData(
-                EzManiaKeyPatternBracket.Compute(rows, totalColumns, cancellationToken),
-                EzManiaKeyPatternChord.Compute(rows, cancellationToken),
-                longNoteRatio,
-                EzManiaKeyPatternJack.Compute(notes, time => EzManiaKeyPatternHelper.BeatLengthAt(chart, time), cancellationToken),
-                EzManiaKeyPatternDelay.Compute(rows, totalColumns, cancellationToken),
-                EzManiaKeyPatternDump.Compute(rows, totalColumns, cancellationToken));
-        }
-
-        private static EzRadarChartData<string> createKeyPatternRadarData(double bracket, double chord, double longNoteRatio, double jack, double delay, double dump)
-            => EzRadarChartData<string>.Create(
-                new EzRadarAxisValue<string>("Bracket", bracket, "0.00"),
-                new EzRadarAxisValue<string>("Chord", chord, "0.00"),
-                new EzRadarAxisValue<string>("LN%", longNoteRatio, "0.00"),
-                new EzRadarAxisValue<string>("Jack", jack, "0.00"),
-                new EzRadarAxisValue<string>("Delay", delay, "0.00"),
-                new EzRadarAxisValue<string>("Dump", dump, "0.00"));
 
         /// <summary>
         /// 把稀疏列统计补 0 到真实列数（仅 Mania 分析路径；0 note 谱面的空字典不补）。

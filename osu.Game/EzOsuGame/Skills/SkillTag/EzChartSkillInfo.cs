@@ -4,9 +4,9 @@
 namespace osu.Game.EzOsuGame.Skills.SkillTag
 {
     /// <summary>
-    ///     Chart analysis fields used by hub-aligned dan skillset filing
-    ///     (mirror of mania-hub <c>ChartSkillInfo</c> filing subset).
-    ///     Persisted as typed Realm <see cref="EzBeatmapChartSkillInfo"/> (EZ≥9).
+    /// 谱面技能 Tag 产品（CSI / ChartSkillInfo）。
+    /// <see cref="SkillTags"/> 是从轴分抽出的标签；其余字段是同一次 filing 的结构量。
+    /// Persisted as typed Realm <see cref="EzBeatmapChartSkillInfo"/> (EZ≥9).
     /// </summary>
     public sealed class EzChartSkillInfo
     {
@@ -25,7 +25,8 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         /// <summary>True when this is an unavailable stub (see <see cref="Unavailable"/>).</summary>
         public bool IsUnavailable => KeyCount is < 0;
 
-        public string[] Patterns { get; init; } = [];
+        /// <summary>抽出的谱面技能 Tag id，不是 KeyPattern 轴。</summary>
+        public string[] SkillTags { get; init; } = [];
 
         /// <summary>Structurally detected 4K quadstream/minijack/jack-marathon demand.</summary>
         public bool JackDemand { get; init; }

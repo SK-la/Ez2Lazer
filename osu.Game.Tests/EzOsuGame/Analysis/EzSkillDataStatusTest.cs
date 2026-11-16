@@ -45,7 +45,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["Dan"].Missing, Is.EqualTo(3));
                 Assert.That(status.HasWorkToDo, Is.True);
                 Assert.That(status["PPP"].Missing, Is.EqualTo(4));
-                Assert.That(status.TotalPending, Is.EqualTo(13));
+                Assert.That(status["KeyPattern"].Missing, Is.EqualTo(3));
+                Assert.That(status.TotalPending, Is.EqualTo(16));
             });
         }
 
@@ -62,7 +63,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
 
                 // CSI: a complete, b settled stub, c missing.
-                store.UpsertChartSkillInfo(mania_a, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.UpsertChartSkillInfo(mania_a, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = true });
                 store.WriteChartSkillInfoUnavailable(mania_b, Guid.NewGuid());
 
                 // Dan: a and b have a row, c has none.
@@ -100,7 +101,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["CSI"].Pending, Is.EqualTo(1));
                 Assert.That(status["Dan"].Pending, Is.EqualTo(1));
                 Assert.That(status["PPP"].Missing, Is.EqualTo(4));
-                Assert.That(status.TotalPending, Is.EqualTo(7));
+                Assert.That(status["KeyPattern"].Missing, Is.EqualTo(3));
+                Assert.That(status.TotalPending, Is.EqualTo(10));
 
                 string described = status.Describe();
                 Assert.That(described, Does.Contain("Mina v"));
@@ -119,7 +121,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
 
                 // A non-mania chart with a full set of rows must not inflate the report either way.
                 store.WriteBeatmapMsd(osu_hash, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7));
-                store.UpsertChartSkillInfo(osu_hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.UpsertChartSkillInfo(osu_hash, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 var status = store.GetSkillDataStatus();
 
@@ -173,7 +175,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status.UniverseCount, Is.EqualTo(3));
                 Assert.That(status["Mina"].Missing, Is.EqualTo(3));
                 Assert.That(status["PPP"].Missing, Is.EqualTo(6));
-                Assert.That(status.TotalPending, Is.EqualTo(15));
+                Assert.That(status["KeyPattern"].Missing, Is.EqualTo(5));
+                Assert.That(status.TotalPending, Is.EqualTo(20));
             });
         }
 
@@ -264,7 +267,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 var store = new EzChartSkillStore(realm);
 
                 store.WriteBeatmapMsdUnrateable(mania_b, Guid.NewGuid());
-                store.UpsertChartSkillInfo(mania_b, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.UpsertChartSkillInfo(mania_b, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 var status = store.GetSkillDataStatus();
 

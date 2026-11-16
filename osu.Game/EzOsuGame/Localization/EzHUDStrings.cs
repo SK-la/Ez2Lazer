@@ -57,10 +57,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString RADAR_USE_ABSOLUTE_VALUE = new EzLocalizationManager.EzLocalisableString("使用星数绝对值", "Use Star Absolute Value");
 
         public static readonly LocalisableString RADAR_USE_ABSOLUTE_VALUE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "开启后，会把指标结果视为比例，乘上sunnySR，变成星级难度指标。"
-            + "\n注意这样并不可靠，只是提供一种视觉策略。",
-            "When enabled, the result of each metric will be treated as a ratio and multiplied by sunnySR to become a star rating metric."
-            + "\nNote that this is not reliable and just provides a visual strategy.");
+            "开启后显示 Ez键型 量化星（相对分/10×SunnySR）。关闭则还原为相对 0–10。"
+            + "\nLN% 始终来自物件计数，不乘星。",
+            "When enabled, Ez KeyPattern shows quantified stars (relative/10×SunnySR). When off, it restores the relative 0–10 scores."
+            + "\nLN% always comes from object counts and is not multiplied by star.");
 
         // 通用设置（所有模式共享）
         public static readonly LocalisableString ALPHA_LABEL = new EzLocalizationManager.EzLocalisableString("透明度", "Alpha");

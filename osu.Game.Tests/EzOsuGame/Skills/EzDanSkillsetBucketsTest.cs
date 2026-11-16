@@ -119,7 +119,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 return new EzChartSkillInfo
                 {
-                    Patterns = patterns,
+                    SkillTags = patterns,
                     LnRatio = 0.1,
                     DanEligible = true,
                     LengthSeconds = 90,
@@ -165,7 +165,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 return new EzChartSkillInfo
                 {
-                    Patterns = patterns,
+                    SkillTags = patterns,
                     LnRatio = 0.5,
                     DanEligible = true,
                     LengthSeconds = 120,
@@ -195,7 +195,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var chart = new EzChartSkillInfo
             {
-                Patterns = new[] { "delay" },
+                SkillTags = new[] { "delay" },
                 DanEligible = true,
                 KeyCount = 7,
             };

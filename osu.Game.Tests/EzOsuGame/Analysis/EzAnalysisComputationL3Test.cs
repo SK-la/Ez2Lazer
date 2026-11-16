@@ -36,6 +36,19 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [Test]
+        public void Mania_pass_uses_persisted_sunny_star_for_headline_and_summary()
+        {
+            var beatmap = new TestBeatmap(new ManiaRuleset().RulesetInfo);
+            beatmap.BeatmapInfo.EzRatingData.SunnySR = 9.87;
+            var lookup = new EzAnalysisLookupCache(beatmap.BeatmapInfo, beatmap.BeatmapInfo.Ruleset, mods: null);
+
+            var result = EzAnalysisComputation.Compute(new TestWorkingBeatmap(beatmap), lookup);
+
+            Assert.That(result.RatingOf(EzAnalysisSystem.SSR).StarRating, Is.EqualTo(9.87));
+            Assert.That(result.ManiaSummary?.SunnySR, Is.EqualTo(9.87));
+        }
+
+        [Test]
         public void Osu_pass_emits_ppp_axes()
         {
             var beatmap = new TestBeatmap(new OsuRuleset().RulesetInfo);

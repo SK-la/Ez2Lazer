@@ -64,6 +64,7 @@ using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.EzOsuGame.WarmUp;
@@ -492,6 +493,7 @@ namespace osu.Game
             var pppUnit = new EzPPPUnit(BeatmapManager, chartSkillStore, pppEngine);
             var danUnit = new EzDanUnit(ezAnalysisCache, chartSkillStore);
             var ssrUnit = new EzSSRUnit(BeatmapManager, chartSkillStore);
+            var keyPatternUnit = new EzKeyPatternUnit(BeatmapManager, chartSkillStore);
             var csiUnit = new EzCSIUnit(BeatmapManager, chartSkillStore, liveMetrics);
 
             var playerPPPAggregator = new EzPlayerPPPAggregator(BeatmapManager, playerSkillStore, pppEngine);
@@ -508,6 +510,7 @@ namespace osu.Game
             dependencies.Cache(msdUnit);
             dependencies.Cache(pppUnit);
             dependencies.Cache(ssrUnit);
+            dependencies.Cache(keyPatternUnit);
             dependencies.Cache(csiUnit);
             dependencies.Cache(danUnit);
 

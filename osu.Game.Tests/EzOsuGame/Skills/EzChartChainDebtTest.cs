@@ -42,7 +42,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 // The two ends of the chain: fully rated, and rated up to Mina only.
                 store.WriteBeatmapMsd(settled_chart, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7));
-                store.UpsertChartSkillInfo(settled_chart, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.UpsertChartSkillInfo(settled_chart, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = true });
                 store.WriteBeatmapMsd(waiting_on_csi_chart, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7));
 
                 var debt = EzChartChainDebt.Collect(new[]
@@ -85,7 +85,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 var before = EzChartChainDebt.Collect(new[] { ("alpha", waiting_on_csi_chart) }, store);
                 Assert.That(before.PlaysFor("alpha"), Is.EqualTo(1));
 
-                store.UpsertChartSkillInfo(waiting_on_csi_chart, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.UpsertChartSkillInfo(waiting_on_csi_chart, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 var after = EzChartChainDebt.Collect(new[] { ("alpha", waiting_on_csi_chart) }, store);
                 Assert.That(after.HasDebt, Is.False);
@@ -105,7 +105,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 // The shape a pass used to leave behind: a full CSI row derived from the stub Mina axis. The chart
                 // is settled for the whole chain, so reporting it as waiting is what kept re-queueing the chain.
                 store.WriteBeatmapMsdUnrateable(unrateable_with_csi_chart, Guid.NewGuid());
-                store.UpsertChartSkillInfo(unrateable_with_csi_chart, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = false });
+                store.UpsertChartSkillInfo(unrateable_with_csi_chart, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = false });
 
                 var debt = EzChartChainDebt.Collect(new[]
                 {

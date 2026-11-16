@@ -260,7 +260,7 @@ namespace osu.Game.EzOsuGame.Skills
 
                 replaceHistory(c, tx, username, keyCount, historySamples, minaVersion);
 
-                replaceValues(c, tx, username, keyCount, EzAnalysisSystem.Pattern.ToStorageId(), -1,
+                replaceValues(c, tx, username, keyCount, EzAnalysisSystem.PlayerSkillTag.ToStorageId(), -1,
                     toRows(patternValues(skillRatings), analyzedPlays, provisional, tagVersion, at), tagVersion);
             });
         }
@@ -280,7 +280,7 @@ namespace osu.Game.EzOsuGame.Skills
                                   """;
                 cmd.Parameters.AddWithValue("$username", username);
                 cmd.Parameters.AddWithValue("$key_count", keyCount);
-                cmd.Parameters.AddWithValue("$system", EzAnalysisSystem.Pattern.ToStorageId());
+                cmd.Parameters.AddWithValue("$system", EzAnalysisSystem.PlayerSkillTag.ToStorageId());
                 cmd.Parameters.AddWithValue("$version", version);
 
                 var list = new List<EzMinaPlayerSkillTagPlayData>();

@@ -6,7 +6,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Skills;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.Graphics;
@@ -19,7 +19,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// Composite skill + dan tag: e.g. <c>技 7++ (20.5)</c>.
     /// Optional secondary (player) dan + value for AB overlays.
     /// Supports <see cref="LayoutDirection"/> horizontal (default) or vertical (skill → dan → value).
-    /// Song-select panel binding is Realm/Mina read-only — never <c>TryGetChartDan</c> / Mina.
+        /// Song-select panel binding is L1 via <see cref="EzAnalysisCache"/> — no live Mina pass.
     /// </summary>
     public partial class EzDisplaySkillsDan : FillFlowContainer
     {
@@ -62,7 +62,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
 
         /// <summary>
-        /// When set, loads chart dan via <see cref="EzSkillProvider"/> (cached / Realm only).
+        /// When set, loads chart dan via <see cref="EzAnalysisCache"/> (L1 only).
         /// Manual <see cref="Set(EzMinaSkillAxis, string?, double?, string?, double?, int, EzDanSide)"/> / <see cref="SetFrom"/> / <see cref="SetSkillset"/> still work without this.
         /// </summary>
         public BeatmapInfo? Beatmap
@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         }
 
         [Resolved(canBeNull: true)]
-        private EzSkillProvider? skillProvider { get; set; }
+        private EzAnalysisCache? analysisCache { get; set; }
 
         public EzDisplaySkillsDan()
         {
@@ -302,9 +302,8 @@ namespace osu.Game.EzOsuGame.UserInterface
             if (beatmap == null)
                 return;
 
-            // Realm or session (DualPanel may have memory-computed). Panel never computes.
-            if (skillProvider != null
-                && skillProvider.TryGetChartDanForUi(beatmap, out var persisted, allowMemoryCompute: false)
+            if (analysisCache != null
+                && analysisCache.TryGetChartDanForUi(beatmap, out var persisted, allowMemoryCompute: false)
                 && persisted != null)
             {
                 var verdict = persisted.ToPresentationVerdict(beatmap);
