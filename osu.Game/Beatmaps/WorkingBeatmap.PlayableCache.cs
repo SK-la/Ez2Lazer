@@ -53,6 +53,9 @@ namespace osu.Game.Beatmaps
                 sharedPlayableEntries.Clear();
         }
 
+        public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset)
+            => GetMutablePlayableBeatmap(ruleset, Array.Empty<Mod>());
+
         public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods)
             => GetMutablePlayableBeatmap(ruleset, mods, postConvert: null);
 
@@ -92,9 +95,11 @@ namespace osu.Game.Beatmaps
 
             var key = new SharedPlayableKey(BeatmapInfo.Hash, ruleset.ShortName, EzModSignature.Compute(snapshot), snapshot);
 
+            IBeatmap? cached;
+
             lock (playableCacheGate)
             {
-                if (tryGetSharedEntry(key, out IBeatmap? cached))
+                if (tryGetSharedEntry(key, out cached))
                 {
                     markAsCachedReadOnly(cached!);
                     publishGauges();
