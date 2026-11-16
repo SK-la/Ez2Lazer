@@ -312,6 +312,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 store.Invalidate(EzAnalysisSystem.SSR, includeDownstream: false);
 
                 Assert.That(store.TryGetChartDan(hash, out _), Is.True);
+                Assert.That(store.GetAppliedVersion(EzAnalysisSystem.Dan), Is.Zero);
+                Assert.That(store.DownstreamAwaitingReset(EzAnalysisSystem.SSR), Is.True);
+                Assert.That(store.CollectChartChainState().ChartDanOwed, Does.Contain(hash));
 
                 store.InvalidateDownstream(EzAnalysisSystem.SSR);
 

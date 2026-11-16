@@ -388,7 +388,33 @@ namespace osu.Game.EzOsuGame.Skills
                 invalidated.AddRange(DownstreamOf(system));
 
             retireRows(invalidated);
+
+            // Sunny columns go to -1; Realm downstream keeps its rows but AppliedVersion=0 until the upstream pass
+            // finishes and BDSP calls <see cref="InvalidateDownstream"/> once (same contract as column -1 queuing).
+            if (!includeDownstream)
+                stampDownstreamAwaitingReset(system);
+
             return invalidated;
+        }
+
+        /// <summary>
+        /// Downstream systems were left readable but stamped as owing a reset after an upstream-only invalidate.
+        /// </summary>
+        public bool DownstreamAwaitingReset(EzAnalysisSystem upstream)
+        {
+            foreach (var downstream in DownstreamOf(upstream))
+            {
+                if (GetAppliedVersion(downstream) == 0)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void stampDownstreamAwaitingReset(EzAnalysisSystem upstream)
+        {
+            foreach (var downstream in DownstreamOf(upstream))
+                SetAppliedVersion(downstream, 0);
         }
 
         /// <summary>

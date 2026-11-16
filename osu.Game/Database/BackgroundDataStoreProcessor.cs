@@ -708,7 +708,6 @@ namespace osu.Game.Database
             EzStartupTrace.Log($"BDSP EzRealm backfill begin scope={scope}");
 
             bool sunnyFillFinished = true;
-            bool sunnyRetiredUpstream = false;
 
             if (scope.HasFlag(EzAnalysisSystem.SSR))
             {
@@ -718,10 +717,9 @@ namespace osu.Game.Database
                 // what is still missing.
                 if (skillStore.IsExpired(EzAnalysisSystem.SSR) || EzSSRTuningSnapshot.IsPending)
                 {
-                    // Drop Sunny columns first; ChartDan stays until the Sunny pass finishes so one maintenance run
-                    // can refill upstream then retire downstream in order.
+                    // BeatmapInfo columns go to -1 (queued like every other BDSP pass); downstream Realm rows stay
+                    // until Sunny finishes, with AppliedVersion=0 marking the owed downstream reset.
                     Logger.Log($"Retiring Sunny ratings for recomputation: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR, includeDownstream: false))}.");
-                    sunnyRetiredUpstream = true;
 
                     if (EzSSRTuningSnapshot.IsPending)
                         EzSSRTuningSnapshot.Record();
@@ -732,9 +730,9 @@ namespace osu.Game.Database
                 if (!sunnyFillFinished)
                     Logger.Log("Sunny rating pass did not finish; downstream chart skills stay until Sunny finishes.");
 
-                if (sunnyRetiredUpstream && sunnyFillFinished)
+                if (sunnyFillFinished && skillStore.DownstreamAwaitingReset(EzAnalysisSystem.SSR))
                 {
-                    Logger.Log($"Sunny fill finished; retiring downstream of SSR: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.SSR))}.");
+                    Logger.Log($"Sunny fill finished; resetting downstream of SSR: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.SSR))}.");
                 }
             }
 
@@ -812,7 +810,8 @@ namespace osu.Game.Database
                 if (!populateChartChainStages(msd: true, csi: false, ppp: false, dan: false))
                     return false;
 
-                Logger.Log($"Mina fill finished; retiring downstream of Mina: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.Mina))}.");
+                if (skillStore.DownstreamAwaitingReset(EzAnalysisSystem.Mina))
+                    Logger.Log($"Mina fill finished; resetting downstream of Mina: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.Mina))}.");
 
                 EzChartChainBackfillScope.Resolve(scope, out _, out runCsi, out runDan, out runPpp, out _);
 
@@ -827,7 +826,8 @@ namespace osu.Game.Database
                 if (!populateChartChainStages(msd: runMsd, csi: true, ppp: false, dan: false))
                     return false;
 
-                Logger.Log($"CSI fill finished; retiring downstream of CSI: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.CSI))}.");
+                if (skillStore.DownstreamAwaitingReset(EzAnalysisSystem.CSI))
+                    Logger.Log($"CSI fill finished; resetting downstream of CSI: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.CSI))}.");
 
                 EzChartChainBackfillScope.Resolve(scope, out _, out _, out runDan, out runPpp, out _);
 

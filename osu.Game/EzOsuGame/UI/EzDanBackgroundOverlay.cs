@@ -138,8 +138,10 @@ namespace osu.Game.EzOsuGame.UI
             if (keyCount <= 0 && info.Difficulty.CircleSize > 0)
                 keyCount = (int)Math.Round(info.Difficulty.CircleSize);
 
-            EzDanSide side = EzDanAlgorithm.PreferredPresentationSide(info, keyCount);
-            setBadge(badge, tryLoadBadge(keyCount, side, chartDan?.LabelFor(side)));
+            var presentation = chartDan?.ToPresentationVerdict(info);
+            EzDanSide side = presentation?.Side ?? EzDanAlgorithm.PreferredPresentationSide(info, keyCount);
+            string? label = presentation?.Label ?? chartDan?.LabelFor(side);
+            setBadge(badge, tryLoadBadge(keyCount, side, label));
         }
 
         private static bool isDanBeatmap(BeatmapInfo info)
