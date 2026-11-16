@@ -8,7 +8,6 @@ using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
-using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SSR;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -57,8 +56,10 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("dan", "段位", "Dan")]
         Dan = 1 << 5,
 
-        /// <summary>Player SkillTag buckets derived from plays.</summary>
-        [EzSkillMeta("player_skill_tag", "键型", "Pattern")]
+        /// <summary>
+        /// Chart KeyPattern structure axes. Persist and Filter axes land in a later pass; this slot must not hold player tags.
+        /// </summary>
+        [EzSkillMeta("ezpattern", "键型结构", "Key Pattern")]
         Pattern = 1 << 6,
 
         /// <summary>Lightweight chart tags. A data group, not a system.</summary>
@@ -69,9 +70,13 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("scores", "成绩", "Scores")]
         Scores = 1 << 8,
 
+        /// <summary>Player SkillTag buckets derived from plays. L2 id <c>player_skill_tag</c>; not <see cref="Pattern"/>.</summary>
+        [EzSkillMeta("player_skill_tag", "键型", "Skill Tag")]
+        PlayerSkillTag = 1 << 9,
+
         /// <summary>Every system and data group.</summary>
         [EzSkillMeta("all", "全部", "All")]
-        All = Official | SSR | PPP | Mina | CSI | Dan | Pattern | MetadataTags | Scores,
+        All = Official | SSR | PPP | Mina | CSI | Dan | Pattern | MetadataTags | Scores | PlayerSkillTag,
     }
 
     /// <summary>
@@ -140,7 +145,8 @@ namespace osu.Game.EzOsuGame.Analysis
             EzAnalysisSystem.CSI => EzCSIEngine.VERSION,
             EzAnalysisSystem.Dan => EzDanEngine.VERSION,
             EzAnalysisSystem.PPP => EzPPPEngine.VERSION,
-            EzAnalysisSystem.Pattern => EzMinaPlayerSkillModeData.VERSION,
+            EzAnalysisSystem.Pattern => 0,
+            EzAnalysisSystem.PlayerSkillTag => EzMinaPlayerSkillModeData.VERSION,
             EzAnalysisSystem.SSR => EzSSRUnit.VERSION,
             _ => 0,
         };
