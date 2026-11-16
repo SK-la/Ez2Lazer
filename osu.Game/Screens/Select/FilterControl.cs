@@ -26,6 +26,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
@@ -518,6 +519,11 @@ namespace osu.Game.Screens.Select
                 case EzAnalysisSystem.Mina:
                     foreach (var axis in EzMinaSkillAxisExtensions.RadarAxes)
                         items.Add(new SkillAxisDropdownItem(EzAnalysisSystem.Mina, axis.ToMetaId(), axis.Meta().DisplayName));
+                    break;
+
+                case EzAnalysisSystem.SSR:
+                    foreach (var axis in EzSunnySrSkillAxisExtensions.ChartAxes)
+                        items.Add(new SkillAxisDropdownItem(EzAnalysisSystem.SSR, axis.ToMetaId(), axis.Meta().DisplayName));
                     break;
 
                 case EzAnalysisSystem.PPP:
