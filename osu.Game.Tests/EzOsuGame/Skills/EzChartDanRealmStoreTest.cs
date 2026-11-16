@@ -163,7 +163,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 stampWholeChain(store);
 
                 store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
-                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 realm.Write(r =>
                 {
@@ -213,7 +213,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 seedChart(realm, hash);
                 stampWholeChain(store);
                 store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(20, 18, 16, 14, 12, 10, 8, 6));
-                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 realm.Write(r =>
                 {
@@ -254,7 +254,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 seedChart(realm, hash);
                 stampWholeChain(store);
-                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { Patterns = new[] { "jack" }, KeyCount = 4, DanEligible = true });
+                store.UpsertChartSkillInfo(hash, new EzChartSkillInfo { SkillTags = new[] { "jack" }, KeyCount = 4, DanEligible = true });
 
                 realm.Write(r =>
                 {

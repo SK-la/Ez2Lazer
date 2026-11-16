@@ -36,7 +36,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var chart = new EzChartSkillInfo
             {
-                Patterns = new[] { "speedjack" },
+                SkillTags = new[] { "speedjack" },
                 TechScore = 0,
                 ChordjackScore = 0,
                 LnRatio = 0,
@@ -52,7 +52,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var delayChart = new EzChartSkillInfo
             {
-                Patterns = new[] { "delay" },
+                SkillTags = new[] { "delay" },
                 JackShare = 0,
                 StreamShare = 1,
                 TechCategory = true,
@@ -75,7 +75,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var lnChart = new EzChartSkillInfo
             {
-                Patterns = new[] { "ln_tech", "ln_general" },
+                SkillTags = new[] { "ln_tech", "ln_general" },
                 LnRatio = 0.8,
                 TechScore = 0,
                 ChordjackScore = 0,

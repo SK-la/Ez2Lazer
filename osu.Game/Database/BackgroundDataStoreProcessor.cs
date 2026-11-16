@@ -956,7 +956,7 @@ namespace osu.Game.Database
         /// Fills the SunnyStarRatings that are not stored yet.
         /// </summary>
         /// <remarks>
-        /// Retirement happens before this runs (<see cref="EzChartSkillStore.Invalidate"/>), so the only question here
+        /// Retirement happens before this runs (<see cref="EzChartSkillStore.Invalidate(EzAnalysisSystem)"/>), so the only question here
         /// is whether a chart has a rating: a pass that is cancelled leaves the rest missing, and the next launch
         /// continues from there instead of retiring everything again.
         /// </remarks>

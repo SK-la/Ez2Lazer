@@ -253,8 +253,8 @@ namespace osu.Game.EzOsuGame.Skills
 
             foreach (var (hash, info) in infos)
             {
-                if (info.Patterns is { Length: > 0 })
-                    result[hash] = info.Patterns;
+                if (info.SkillTags is { Length: > 0 })
+                    result[hash] = info.SkillTags;
             }
 
             return result;

@@ -63,7 +63,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var chart = new EzChartSkillInfo
             {
-                Patterns = [],
+                SkillTags = [],
                 JackShare = 0.7,
                 StreamShare = 0.2,
                 TechCategory = false,
@@ -85,7 +85,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         {
             var chart = new EzChartSkillInfo
             {
-                Patterns = [],
+                SkillTags = [],
                 JackShare = 0.1,
                 StreamShare = 0.85,
                 TechCategory = false,
@@ -115,7 +115,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             var chart = new EzChartSkillInfo
             {
-                Patterns = [],
+                SkillTags = [],
                 JackDemand = true,
                 JackShare = 0.65,
                 DanEligible = true,

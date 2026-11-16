@@ -8,6 +8,7 @@ using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SSR;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -48,7 +49,9 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("mina", "Mina", "Mina")]
         Mina = 1 << 3,
 
-        /// <summary>Chart structure vector. No rating of its own.</summary>
+        /// <summary>
+        /// ChartSkillInfo：谱面技能 Tag 产品（抽出的标签）以及同一次 pass 的结构轴表。不是 KeyPattern。
+        /// </summary>
         [EzSkillMeta("csi", "特点", "CSI")]
         CSI = 1 << 4,
 
@@ -57,7 +60,7 @@ namespace osu.Game.EzOsuGame.Analysis
         Dan = 1 << 5,
 
         /// <summary>
-        /// Chart KeyPattern structure axes. Persist and Filter axes land in a later pass; this slot must not hold player tags.
+        /// 谱面 KeyPattern 技能轴。不是 SkillTag。Persist and Filter axes land in a later pass.
         /// </summary>
         [EzSkillMeta("ezpattern", "键型结构", "Key Pattern")]
         Pattern = 1 << 6,
@@ -70,8 +73,10 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("scores", "成绩", "Scores")]
         Scores = 1 << 8,
 
-        /// <summary>Player SkillTag buckets derived from plays. L2 id <c>player_skill_tag</c>; not <see cref="Pattern"/>.</summary>
-        [EzSkillMeta("player_skill_tag", "键型", "Skill Tag")]
+        /// <summary>
+        /// 玩家技能 Tag：用谱面 SkillTag 给成绩分桶后的聚合。L2 id <c>player_skill_tag</c>。不是玩家技能轴，也不是 <see cref="Pattern"/>。
+        /// </summary>
+        [EzSkillMeta("player_skill_tag", "玩家技能标签", "Player Skill Tag")]
         PlayerSkillTag = 1 << 9,
 
         /// <summary>Every system and data group.</summary>
