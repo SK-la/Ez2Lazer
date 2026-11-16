@@ -73,7 +73,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
         private EzLocalTextureFactory factory = null!;
         private EzResourceStore resources = null!;
         private Bindable<string> noteSetName = null!;
-        private Bindable<Colour4> previewTint = null!;
+        private readonly Dictionary<EzColumnType, Bindable<Colour4>> columnTypeTints = new Dictionary<EzColumnType, Bindable<Colour4>>();
         private Bindable<EzColouringMode> colouringMode = null!;
         private Bindable<EzColouringRange> colouringRange = null!;
         private Bindable<double> colouringStrength = null!;
@@ -107,7 +107,10 @@ namespace osu.Game.EzOsuGame.Edit.Components
             this.resources = resources;
 
             noteSetName = ezConfig.GetBindable<string>(Ez2Setting.NoteSetName);
-            previewTint = ezConfig.GetBindable<Colour4>(Ez2Setting.ColumnTypeB);
+
+            foreach (EzColumnType type in Enum.GetValues<EzColumnType>())
+                columnTypeTints[type] = ezConfig.GetColumnColorBindableByType(type);
+
             colouringMode = ezConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode);
             colouringRange = ezConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange);
             colouringStrength = ezConfig.GetBindable<double>(Ez2Setting.ColouringStrength);
@@ -225,8 +228,15 @@ namespace osu.Game.EzOsuGame.Edit.Components
                 refreshPrefixItems();
                 requestRebuild();
             }, true);
-            prefix.BindValueChanged(_ => requestRebuild());
-            previewTint.BindValueChanged(_ => applyColours());
+            prefix.BindValueChanged(_ =>
+            {
+                requestRebuild();
+                applyColours();
+            });
+
+            foreach (var tint in columnTypeTints.Values)
+                tint.BindValueChanged(_ => applyColours());
+
             colouringMode.BindValueChanged(_ => updateSelection());
             colouringRange.BindValueChanged(_ => updateSelection());
             colouringStrength.BindValueChanged(_ =>
@@ -428,9 +438,20 @@ namespace osu.Game.EzOsuGame.Edit.Components
             _ => EzEditorStrings.COLOURING_PREVIEWER_WHITE_MAX,
         };
 
+        private Colour4 resolvePreviewTint()
+        {
+            if (EzColumnResourceLookup.TryGetColumnTypeForTexturePrefix(prefix.Value, out var type)
+                && columnTypeTints.TryGetValue(type, out var bindable))
+            {
+                return bindable.Value;
+            }
+
+            return columnTypeTints[EzColumnType.B].Value;
+        }
+
         private void applyColours()
         {
-            Colour4 tint = previewTint.Value;
+            Colour4 tint = resolvePreviewTint();
             float strength = (float)colouringStrength.Value;
 
             foreach (var cell in cells)
