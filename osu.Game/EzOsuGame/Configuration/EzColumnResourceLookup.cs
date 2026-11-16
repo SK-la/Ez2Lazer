@@ -23,6 +23,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         public const string NOTE_TEXTURE_AFFIX_A = "white";
         public const string NOTE_TEXTURE_AFFIX_B = "blue";
+        // S/E 当前共用 red 资源夹；列色与着色预览按 EzColumnType 区分，不能按 affix 反推类型。
         public const string NOTE_TEXTURE_AFFIX_S = "red";
         public const string NOTE_TEXTURE_AFFIX_E = "red";
         public const string NOTE_TEXTURE_AFFIX_P = "green";
