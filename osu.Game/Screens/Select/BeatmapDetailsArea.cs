@@ -2,9 +2,11 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics.Containers;
 
@@ -18,6 +20,11 @@ namespace osu.Game.Screens.Select
     {
         private Header header = null!;
         private Container contentContainer = null!;
+
+        /// <summary>
+        /// Shared with <see cref="FilterControl"/> before <see cref="Header"/> exists; <see cref="Header.RightRadarMode"/> mirrors this in <see cref="load"/>.
+        /// </summary>
+        public Bindable<EzRadarDisplayMode> RightRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.MSDSkillDual);
 
         public BeatmapDetailsArea()
         {
@@ -47,6 +54,8 @@ namespace osu.Game.Screens.Select
                     Depth = 1f,
                 },
             };
+
+            header.RightRadarMode.BindTarget = RightRadarMode;
         }
 
         protected override void LoadComplete()

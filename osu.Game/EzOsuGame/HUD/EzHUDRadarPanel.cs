@@ -44,7 +44,7 @@ namespace osu.Game.EzOsuGame.HUD
         [Description("Key Pattern")]
         KeyPattern,
 
-        [Description("SunnySR Skill")]
+        [Description("SSR Skill")]
         SunnySRSkill,
 
         [Description("Skill Dual")]
