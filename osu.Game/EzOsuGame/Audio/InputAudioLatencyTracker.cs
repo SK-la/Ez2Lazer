@@ -34,6 +34,11 @@ namespace osu.Game.EzOsuGame.Audio
 
         public static float AcousticRmsThreshold => MathF.Pow(10f, AcousticThreshold.Value / 20f);
 
+        /// <summary>
+        /// 中途退出是否也弹汇总。只存在于本次进程，不写入配置。默认只在打完进结算时通知。
+        /// </summary>
+        public static readonly BindableBool NotifyOnEarlyExit = new BindableBool();
+
         private readonly Ez2ConfigManager ezConfig;
         private readonly INotificationOverlay? notificationOverlay;
         private readonly EzLatencyManager latencyManager;
@@ -265,9 +270,9 @@ namespace osu.Game.EzOsuGame.Audio
             if (disposed)
                 return;
 
-            // Exit/teardown: log only, never toast.
+            // 结算路径已经发过汇总。没发过的退出按临时开关决定是否弹通知。
             if (!reportGenerated)
-                GenerateLatencyReport(postNotification: false);
+                GenerateLatencyReport(postNotification: NotifyOnEarlyExit.Value);
 
             disposed = true;
             Stop();

@@ -80,12 +80,25 @@ namespace osu.Game.EzOsuGame.Overlays
                 LabelFormat = value => $"{value:0} dB",
             });
 
+            SettingsItemV2 latencyExitNotifyItem = new SettingsItemV2(new FormCheckBox
+            {
+                Current = InputAudioLatencyTracker.NotifyOnEarlyExit,
+                Caption = INPUT_AUDIO_LATENCY_EXIT_NOTIFY,
+                HintText = INPUT_AUDIO_LATENCY_EXIT_NOTIFY_TOOLTIP,
+            });
+
             latencyThresholdVisibilityHandler = enabled =>
             {
                 if (enabled.NewValue)
+                {
                     latencyThresholdItem.Show();
+                    latencyExitNotifyItem.Show();
+                }
                 else
+                {
                     latencyThresholdItem.Hide();
+                    latencyExitNotifyItem.Hide();
+                }
             };
             latencyTrackerEnabled.BindValueChanged(latencyThresholdVisibilityHandler, true);
 
@@ -110,6 +123,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     Keywords = new[] { "latency", "audio", "input" }
                 },
                 latencyThresholdItem,
+                latencyExitNotifyItem,
                 new SettingsItemV2(new FormCheckBox
                 {
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.EzJudgmentDiagEnabled),
@@ -454,6 +468,15 @@ namespace osu.Game.EzOsuGame.Overlays
             + "\n数值越低，越轻的打击音也能过阈值。",
             "dBFS. Not saved; this launch only, back to -22 after restart."
             + "\nLower values let quieter hitsounds cross the threshold.");
+
+        internal static readonly LocalisableString INPUT_AUDIO_LATENCY_EXIT_NOTIFY = new EzLocalizationManager.EzLocalisableString(
+            "中途退出也通知", "Also notify when leaving mid-play");
+
+        internal static readonly LocalisableString INPUT_AUDIO_LATENCY_EXIT_NOTIFY_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "不写入配置，重启后关闭。"
+            + "\n关闭时只在打完进结算、心流或快速轮换时弹汇总。打开后，中途退出也弹。",
+            "Not saved; off again after restart."
+            + "\nOff: toast only when a play reaches results, flow, or quick rotation. On: also toast when leaving mid-play.");
 
         internal static readonly LocalisableString EZ_HUD_CAMERA_ENABLED = new EzLocalizationManager.EzLocalisableString(
             "启用摄像头 HUD", "Enable Camera HUD");

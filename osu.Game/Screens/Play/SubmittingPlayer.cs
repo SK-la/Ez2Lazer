@@ -18,6 +18,7 @@ using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Audio;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Screens.Play;
@@ -337,8 +338,8 @@ namespace osu.Game.Screens.Play
 
             statics.SetValue(Static.LastLocalUserScore, Score?.ScoreInfo.DeepClone());
 
-            // 退出：只打日志，不推送（打完一局的 toast 在 Results/抽卡/心流路径）
-            LatencyTracker?.GenerateLatencyReport(postNotification: false);
+            // 打完进结算的通知在 Results/抽卡/心流路径。中途退出是否再弹，由临时开关决定。
+            LatencyTracker?.GenerateLatencyReport(postNotification: InputAudioLatencyTracker.NotifyOnEarlyExit.Value);
 
             return exiting;
         }
