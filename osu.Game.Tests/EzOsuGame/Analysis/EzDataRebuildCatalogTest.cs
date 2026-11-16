@@ -107,6 +107,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Is.EqualTo(new[] { EzDataRebuildAction.RealmCSI, EzDataRebuildAction.RealmMina, EzDataRebuildAction.RealmSSR }));
 
             Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmSSR), Is.Empty);
+            Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmPattern), Is.Empty);
             Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.RealmPPP), Is.Empty);
             Assert.That(EzDataRebuildCatalog.DependenciesOf(EzDataRebuildAction.SqliteSongsBranches).Select(n => n.Action),
                 Is.EqualTo(new[] { EzDataRebuildAction.SqliteMain }));

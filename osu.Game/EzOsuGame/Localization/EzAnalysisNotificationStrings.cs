@@ -22,6 +22,12 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString SUNNY_SKILL_AXES_COMPLETED =
             new EzLocalizationManager.EzLocalisableString("谱面 Sunny 技能轴已更新", "beatmaps' Sunny skill axes updated");
 
+        public static readonly LocalisableString KEYPATTERN_RUNNING =
+            new EzLocalizationManager.EzLocalisableString("补算谱面 KeyPattern 轴", "Filling chart KeyPattern axes");
+
+        public static readonly LocalisableString KEYPATTERN_COMPLETED =
+            new EzLocalizationManager.EzLocalisableString("谱面 KeyPattern 轴已更新", "beatmaps' KeyPattern axes updated");
+
         public static readonly LocalisableString OFFICIAL_RUNNING = new EzLocalizationManager.EzLocalisableString("补算官方 SR / PP", "Filling official SR / PP");
         public static readonly LocalisableString OFFICIAL_COMPLETED = new EzLocalizationManager.EzLocalisableString("官方 SR / PP 已更新", "beatmaps' official SR / PP updated");
 
@@ -101,6 +107,7 @@ namespace osu.Game.EzOsuGame.Localization
             EzAnalysisSystem.Mina => "MSD",
             EzAnalysisSystem.CSI => "CSI",
             EzAnalysisSystem.Dan => "Dan",
+            EzAnalysisSystem.Pattern => "KeyPattern",
             _ => system.ToString(),
         };
     }

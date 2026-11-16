@@ -13,6 +13,7 @@ using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.Startup;
 using Realms;
@@ -464,6 +465,10 @@ namespace osu.Game.EzOsuGame.Skills
 
                 case EzAnalysisSystem.SSR:
                     ClearRatings(EzAnalysisSystem.SSR);
+                    break;
+
+                case EzAnalysisSystem.Pattern:
+                    ClearBeatmapPatternSkills();
                     break;
             }
         }
@@ -947,6 +952,7 @@ namespace osu.Game.EzOsuGame.Skills
             facets.AddRange(report.Facets);
             facets.Add(scanPppCharts().Status);
             facets.Add(scanSunnySrSkillCharts().Status);
+            facets.Add(scanKeyPatternCharts().Status);
 
             return new EzDataStateReport
             {
@@ -959,6 +965,57 @@ namespace osu.Game.EzOsuGame.Skills
         /// <summary>Beatmaps whose PPP chart skills are missing a current per-skill version.</summary>
         public IReadOnlyList<Guid> CollectPppChartDebt()
             => scanPppCharts().OwedIds;
+
+        /// <summary>
+        /// Mania charts missing the current KeyPattern radar axis set.
+        /// </summary>
+        public IReadOnlyList<Guid> CollectKeyPatternSkillDebt()
+        {
+            return realmAccess.Run(r =>
+            {
+                const int revision = EzKeyPatternUnit.VERSION;
+                string systemId = EzAnalysisSystem.Pattern.ToStorageId();
+                var required = EzKeyPatternAxisExtensions.RadarAxisIds;
+
+                var presentByHash = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+
+                foreach (var row in r.All<EzBeatmapSkillValue>().Where(v => v.SystemId == systemId && v.AlgorithmVersion == revision))
+                {
+                    if (!presentByHash.TryGetValue(row.BeatmapHash, out var set))
+                        presentByHash[row.BeatmapHash] = set = new HashSet<string>(StringComparer.Ordinal);
+
+                    set.Add(row.SkillId);
+                }
+
+                var owed = new List<Guid>();
+
+                foreach (var beatmap in r.All<BeatmapInfo>())
+                {
+                    if (beatmap.BeatmapSet == null || string.IsNullOrEmpty(beatmap.Hash))
+                        continue;
+
+                    if (!EzKeyPatternUnit.SupportsRuleset(beatmap.Ruleset.OnlineID))
+                        continue;
+
+                    if (!presentByHash.TryGetValue(beatmap.Hash, out var have))
+                    {
+                        owed.Add(beatmap.ID);
+                        continue;
+                    }
+
+                    foreach (string axisId in required)
+                    {
+                        if (!have.Contains(axisId))
+                        {
+                            owed.Add(beatmap.ID);
+                            break;
+                        }
+                    }
+                }
+
+                return (IReadOnlyList<Guid>)owed;
+            });
+        }
 
         /// <summary>
         /// Mania charts with a stored Sunny star but not the full current <see cref="EzSunnySrSkillAxis"/> set.
@@ -1014,6 +1071,29 @@ namespace osu.Game.EzOsuGame.Skills
             });
         }
 
+        private KeyPatternChartScan scanKeyPatternCharts()
+        {
+            var owed = CollectKeyPatternSkillDebt();
+
+            int universe = realmAccess.Run(r => r.All<BeatmapInfo>().AsEnumerable().Count(b =>
+                b.BeatmapSet != null
+                && !string.IsNullOrEmpty(b.Hash)
+                && EzKeyPatternUnit.SupportsRuleset(b.Ruleset.OnlineID)));
+
+            var facet = new EzFacetStatus
+            {
+                Id = "KeyPattern",
+                CurrentRevision = EzKeyPatternUnit.VERSION,
+                Ready = Math.Max(0, universe - owed.Count),
+                Settled = 0,
+                Missing = owed.Count,
+            };
+
+            return new KeyPatternChartScan(facet);
+        }
+
+        private readonly record struct KeyPatternChartScan(EzFacetStatus Status);
+
         private SunnySrSkillChartScan scanSunnySrSkillCharts()
         {
             var owed = CollectSunnySrSkillDebt();
@@ -1041,6 +1121,21 @@ namespace osu.Game.EzOsuGame.Skills
                 Ready = Math.Max(0, universe - missing),
                 Settled = 0,
                 Missing = missing,
+            });
+        }
+
+        public void ClearBeatmapPatternSkills()
+        {
+            string systemId = EzAnalysisSystem.Pattern.ToStorageId();
+
+            realmAccess.Write(r =>
+            {
+                var rows = r.All<EzBeatmapSkillValue>()
+                            .Where(v => v.SystemId == systemId)
+                            .ToList();
+
+                foreach (var row in rows)
+                    r.Remove(row);
             });
         }
 

@@ -207,5 +207,16 @@ namespace osu.Game.EzOsuGame.Analysis
         public EzAnalysisResult WithTagSummary(EzBeatmapTagSummary? tagSummary) => CommonSummary is KpsSummary commonSummary
             ? new EzAnalysisResult(commonSummary, ManiaSummary, tagSummary, Axes, Ratings, Dan, KeyPatternRadar, SsrPatternRadar, ChartSkillInfo)
             : this;
+
+        public EzAnalysisResult WithPersistedKeyPattern(EzRadarChartData<string> radar, IReadOnlyDictionary<string, double> patternAxes)
+        {
+            if (CommonSummary is not KpsSummary commonSummary)
+                return this;
+
+            var axes = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(Axes);
+            axes[EzAnalysisSystem.Pattern] = patternAxes;
+
+            return new EzAnalysisResult(commonSummary, ManiaSummary, TagSummary, axes, Ratings, Dan, radar, SsrPatternRadar, ChartSkillInfo);
+        }
     }
 }

@@ -1,7 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Analysis;
 
 namespace osu.Game.EzOsuGame.Skills.SkillTag
 {
@@ -55,14 +58,64 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
     {
         public static EzKeyPatternAxis[] All => EzEnumMetaCache<EzKeyPatternAxis>.ALL;
 
+        /// <summary>Axes the KeyPattern radar persist and Filter currently compute.</summary>
+        public static EzKeyPatternAxis[] RadarAxes { get; } =
+        {
+            EzKeyPatternAxis.Bracket,
+            EzKeyPatternAxis.Chord,
+            EzKeyPatternAxis.LnPercent,
+            EzKeyPatternAxis.Jack,
+            EzKeyPatternAxis.Delay,
+            EzKeyPatternAxis.Dump,
+        };
+
+        public static IReadOnlyList<string> RadarAxisIds { get; } = RadarAxes.Select(static a => a.ToMetaId()).ToArray();
+
         public static EzSkillMetaAttribute Meta(this EzKeyPatternAxis axis)
             => EzEnumMetaCache<EzKeyPatternAxis>.Meta(axis);
 
-        public static string ToWireLabel(this EzKeyPatternAxis axis) => axis.Meta().Id;
+        public static string ToMetaId(this EzKeyPatternAxis axis) => axis.Meta().Id;
+
+        public static string ToWireLabel(this EzKeyPatternAxis axis) => axis.ToMetaId();
 
         public static LocalisableString DisplayName(this EzKeyPatternAxis axis) => axis.Meta().DisplayName;
 
         public static bool TryParse(string? wire, out EzKeyPatternAxis axis)
             => EzEnumMetaCache<EzKeyPatternAxis>.TryParse(wire, out axis);
+
+        public static bool HasCompleteRadarSkills(IReadOnlyDictionary<string, double> skills)
+        {
+            if (skills.Count == 0)
+                return false;
+
+            foreach (string axisId in RadarAxisIds)
+            {
+                if (!skills.TryGetValue(axisId, out double value) || !double.IsFinite(value))
+                    return false;
+            }
+
+            return true;
+        }
+    }
+
+    /// <summary>Builds the KeyPattern radar from persisted Pattern rows. Axis keys are wire ids.</summary>
+    public static class EzKeyPatternRadar
+    {
+        public static EzRadarChartData<string>? TryCreateFromStored(IReadOnlyDictionary<string, double> skills)
+        {
+            if (!EzKeyPatternAxisExtensions.HasCompleteRadarSkills(skills))
+                return null;
+
+            var axes = new EzRadarAxisValue<string>[EzKeyPatternAxisExtensions.RadarAxes.Length];
+
+            for (int i = 0; i < axes.Length; i++)
+            {
+                var axis = EzKeyPatternAxisExtensions.RadarAxes[i];
+                string id = axis.ToMetaId();
+                axes[i] = new EzRadarAxisValue<string>(id, skills[id], "0.00");
+            }
+
+            return EzRadarChartData<string>.Create(axes);
+        }
     }
 }

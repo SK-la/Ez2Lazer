@@ -24,10 +24,11 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.HUD;
-using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
@@ -524,7 +525,8 @@ namespace osu.Game.Screens.Select
                     if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID)
                         break;
 
-                    // KeyPattern 轴落库与选歌项在后续 KeyPattern 系统 PR 接入 EzKeyPatternAxis。
+                    foreach (var axis in EzKeyPatternAxisExtensions.RadarAxes)
+                        items.Add(new SkillAxisDropdownItem(EzAnalysisSystem.Pattern, axis.ToMetaId(), axis.Meta().DisplayName));
                     break;
 
                 case EzAnalysisSystem.Mina:

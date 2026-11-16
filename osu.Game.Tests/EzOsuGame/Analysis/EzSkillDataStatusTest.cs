@@ -45,7 +45,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["Dan"].Missing, Is.EqualTo(3));
                 Assert.That(status.HasWorkToDo, Is.True);
                 Assert.That(status["PPP"].Missing, Is.EqualTo(4));
-                Assert.That(status.TotalPending, Is.EqualTo(13));
+                Assert.That(status["KeyPattern"].Missing, Is.EqualTo(3));
+                Assert.That(status.TotalPending, Is.EqualTo(16));
             });
         }
 
@@ -100,7 +101,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["CSI"].Pending, Is.EqualTo(1));
                 Assert.That(status["Dan"].Pending, Is.EqualTo(1));
                 Assert.That(status["PPP"].Missing, Is.EqualTo(4));
-                Assert.That(status.TotalPending, Is.EqualTo(7));
+                Assert.That(status["KeyPattern"].Missing, Is.EqualTo(3));
+                Assert.That(status.TotalPending, Is.EqualTo(10));
 
                 string described = status.Describe();
                 Assert.That(described, Does.Contain("Mina v"));
@@ -173,7 +175,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status.UniverseCount, Is.EqualTo(3));
                 Assert.That(status["Mina"].Missing, Is.EqualTo(3));
                 Assert.That(status["PPP"].Missing, Is.EqualTo(6));
-                Assert.That(status.TotalPending, Is.EqualTo(15));
+                Assert.That(status["KeyPattern"].Missing, Is.EqualTo(5));
+                Assert.That(status.TotalPending, Is.EqualTo(20));
             });
         }
 

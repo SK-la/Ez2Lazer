@@ -9,6 +9,7 @@ using osu.Game.EzOsuGame.Skills.Dan;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.PPP;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 using osu.Game.EzOsuGame.Skills.SSR;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -59,9 +60,7 @@ namespace osu.Game.EzOsuGame.Analysis
         [EzSkillMeta("dan", "段位", "Dan")]
         Dan = 1 << 5,
 
-        /// <summary>
-        /// 谱面 KeyPattern 技能轴。不是 SkillTag。Persist and Filter axes land in a later pass.
-        /// </summary>
+        /// <summary>谱面 KeyPattern 技能轴。不是 SkillTag。</summary>
         [EzSkillMeta("ezpattern", "键型结构", "Key Pattern")]
         Pattern = 1 << 6,
 
@@ -150,7 +149,7 @@ namespace osu.Game.EzOsuGame.Analysis
             EzAnalysisSystem.CSI => EzCSIEngine.VERSION,
             EzAnalysisSystem.Dan => EzDanEngine.VERSION,
             EzAnalysisSystem.PPP => EzPPPEngine.VERSION,
-            EzAnalysisSystem.Pattern => 0,
+            EzAnalysisSystem.Pattern => EzKeyPatternUnit.VERSION,
             EzAnalysisSystem.PlayerSkillTag => EzMinaPlayerSkillModeData.VERSION,
             EzAnalysisSystem.SSR => EzSSRUnit.VERSION,
             _ => 0,
