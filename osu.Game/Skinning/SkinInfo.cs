@@ -60,6 +60,9 @@ namespace osu.Game.Skinning
                 if (type == null)
                     return new TrianglesSkin(this, resources, fallback);
 
+                if (type == typeof(RetroSkin))
+                    return new RetroSkin(this, resources, fallback);
+
                 var folderCtor = type.GetConstructor(new[] { typeof(SkinInfo), typeof(IStorageResourceProvider), typeof(IResourceStore<byte[]>) });
 
                 if (folderCtor != null)

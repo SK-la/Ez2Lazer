@@ -334,6 +334,38 @@ namespace osu.Game.EzOsuGame
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 File.Copy(file, destination, overwrite: true);
             }
+
+            (string iniName, string iniCreator) = readIni(destinationDirectory);
+            FolderMeta? meta = readMeta(destinationDirectory);
+
+            if (meta == null)
+                return;
+
+            if (!string.IsNullOrEmpty(iniName))
+                meta.Name = iniName;
+
+            if (!string.IsNullOrEmpty(iniCreator))
+                meta.Creator = iniCreator;
+
+            writeMeta(destinationDirectory, meta);
+        }
+
+        public static bool TryFindById(Guid id, out SkinInfo skinInfo)
+        {
+            skinInfo = null!;
+
+            string? directory = findDirectoryById(id);
+
+            if (directory == null)
+                return false;
+
+            string folderName = Path.GetFileName(directory);
+
+            if (string.IsNullOrEmpty(folderName))
+                return false;
+
+            skinInfo = createInfo(folderName, directory);
+            return true;
         }
 
         public static SkinInfo ImportArchive(Storage storage, ArchiveReader archive, IEnumerable<(string original, string shortened)> files)
