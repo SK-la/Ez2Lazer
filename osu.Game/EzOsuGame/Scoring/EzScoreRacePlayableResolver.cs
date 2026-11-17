@@ -28,9 +28,17 @@ namespace osu.Game.EzOsuGame.Scoring
             ArgumentNullException.ThrowIfNull(ruleset);
 
             Mod[] stripped = mods == null ? Array.Empty<Mod>() : EzModCompatibility.StripUnknown(mods);
-            return EzPlayableBeatmapCache.GetBound(working, ruleset, stripped, SESSION_READY_SCOPE,
-                beatmap => prepareSessionReady(beatmap, ruleset),
-                cancellationToken == CancellationToken.None ? null : cancellationToken);
+
+            if (working is WorkingBeatmap workingBeatmap)
+            {
+                return workingBeatmap.GetMutablePlayableBeatmap(ruleset, stripped,
+                    cancellationToken == CancellationToken.None ? CancellationToken.None : cancellationToken,
+                    beatmap => prepareSessionReady(beatmap, ruleset));
+            }
+
+            IBeatmap converted = working.GetPlayableBeatmap(ruleset, stripped, cancellationToken);
+            prepareSessionReady(converted, ruleset);
+            return converted;
         }
 
         private static void prepareSessionReady(IBeatmap beatmap, IRulesetInfo rulesetInfo)

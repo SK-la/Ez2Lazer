@@ -683,6 +683,9 @@ namespace osu.Game.EzOsuGame.Overlays
             lastLoadTimeMs = Time.Current - loadStartTime;
             lastDisplayedLoadTimeMs = -1;
 
+            if (EzBeatmapPreviewModes.IsManiaRuleset(currentRuleset))
+                playableBeatmap = WorkingBeatmap.DetachFromSharedPlayableCache(playableBeatmap);
+
             setupDrawableRulesetAsync(eventVersion, playableBeatmap, currentRuleset, token);
 
             previewClock.Stop();

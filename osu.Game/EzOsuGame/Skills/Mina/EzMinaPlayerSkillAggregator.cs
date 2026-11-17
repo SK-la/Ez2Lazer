@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
@@ -143,7 +142,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                                 continue;
 
                             var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                            var playable = EzPlayableBeatmapCache.GetShared(working, score.Ruleset, score.Mods);
+                            var playable = working.GetPlayableBeatmap(score.Ruleset, score.Mods);
                             keyCount = EzHoldMetrics.ResolveKeyCount(playable);
 
                             double holdRatio = EzHoldMetrics.ComputeHoldRatio(playable);

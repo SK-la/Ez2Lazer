@@ -58,8 +58,10 @@ namespace osu.Game.Rulesets.Osu.EzOsu.ReplayJudge
             var mods = EzModCompatibility.StripUnknown(scoreInfo.Mods);
             EzEnumJudgeMode judgeMode = environment.JudgeMode;
 
-            return EzPlayableBeatmapCache.GetBound(workingBeatmap, scoreInfo.Ruleset, mods, bindingScopeFor(judgeMode),
-                playable => bindForSimulation(playable, judgeMode), cancellationToken);
+            if (workingBeatmap is not WorkingBeatmap mutableWorking)
+                throw new InvalidOperationException($"Expected {nameof(WorkingBeatmap)}.");
+
+            return mutableWorking.GetMutablePlayableBeatmap(scoreInfo.Ruleset, mods, cancellationToken, playable => bindForSimulation(playable, judgeMode));
         }
 
         private static void bindForSimulation(IBeatmap beatmap, EzEnumJudgeMode judgeMode)

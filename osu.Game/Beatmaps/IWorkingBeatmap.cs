@@ -3,6 +3,7 @@
 
 #nullable disable
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -106,6 +107,14 @@ namespace osu.Game.Beatmaps
         /// <returns>The converted <see cref="IBeatmap"/>.</returns>
         /// <exception cref="BeatmapInvalidForRulesetException">If <see cref="Beatmap"/> could not be converted to <paramref name="ruleset"/>.</exception>
         IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Constructs a fresh playable <see cref="IBeatmap"/> that is never taken from the shared cache.
+        /// Use when the result will be mutated (gameplay, replay simulation, in-place binding).
+        /// </summary>
+        IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods = null);
+
+        IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken, Action<IBeatmap> postConvert = null);
 
         /// <summary>
         /// Load a new audio track instance for this beatmap. This should be called once before accessing <see cref="Track"/>.

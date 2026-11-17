@@ -118,14 +118,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.ReplayJudge
         /// </remarks>
         private static void warnIfSharedInstanceBound(IBeatmap beatmap, EzEnumJudgeMode judgeMode, bool owned)
         {
-            if (owned || !EzPlayableBeatmapCache.IsSharedInstance(beatmap))
+            if (owned || !WorkingBeatmap.IsCachedReadOnlyPlayableInstance(beatmap))
                 return;
 
             if (Interlocked.Increment(ref sharedBindingWarnCount) > 10)
                 return;
 
-            string message = $"[ManiaJudgeBinding] bound a shared EzPlayableBeatmapCache instance in place (JudgeMode {judgeMode}, "
-                             + $"objects={beatmap.HitObjects.Count}); shared instances are read-only, ask for GetBound instead.";
+            string message = $"[ManiaJudgeBinding] bound a shared read-only playable instance in place (JudgeMode {judgeMode}, "
+                             + $"objects={beatmap.HitObjects.Count}); use GetMutablePlayableBeatmap / EnsureMutablePlayable instead.";
 
             Logger.Log(message, Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
             Debug.Fail(message);

@@ -9,7 +9,6 @@ using osu.Framework.Audio.Track;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Skills;
@@ -44,7 +43,7 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             performancePoints = 0;
 
-            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+            IWorkingBeatmap workingBeatmap = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
             IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -60,8 +59,8 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             sunnySR = 0;
 
-            IBeatmap analysisBeatmap = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo), lookup.Ruleset, lookup.OrderedMods,
-                cancellationToken);
+            IBeatmap analysisBeatmap = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo)
+                                                     .GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -131,7 +130,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 return -1;
 
             var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
-            var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo));
+            IWorkingBeatmap playable = beatmapManager.GetWorkingBeatmap(beatmapInfo);
             IBeatmap analysisBeatmap = playable.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             return computeBaselinePerformancePoints(playable, analysisBeatmap, lookup, starRating, cancellationToken);
@@ -154,12 +153,12 @@ namespace osu.Game.EzOsuGame.Analysis
                 return -1;
 
             var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
-            var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo), analysisBeatmap);
+            var playable = new SeededPlayableWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo), analysisBeatmap);
 
             return computeBaselinePerformancePoints(playable, analysisBeatmap, lookup, starRating, cancellationToken);
         }
 
-        private static double computeBaselinePerformancePoints(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, double starRating,
+        private static double computeBaselinePerformancePoints(IWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup, double starRating,
                                                                CancellationToken cancellationToken)
             => analysisBeatmap.HitObjects.Count == 0
                 ? -1
@@ -184,7 +183,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 return (-1, -1, -1);
 
             var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
-            var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo), analysisBeatmap);
+            var playable = new SeededPlayableWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo), analysisBeatmap);
 
             if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { Calculator: { } calculator, Score: { } score, Attributes: { } attributes } official)
                 return (-1, -1, -1);
@@ -209,7 +208,7 @@ namespace osu.Game.EzOsuGame.Analysis
             performancePoints = -1;
 
             var lookup = new EzAnalysisLookupCache(beatmapInfo, beatmapInfo.Ruleset, mods: null);
-            var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(beatmapInfo));
+            IWorkingBeatmap playable = beatmapManager.GetWorkingBeatmap(beatmapInfo);
             IBeatmap analysisBeatmap = playable.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { } official)
@@ -232,7 +231,7 @@ namespace osu.Game.EzOsuGame.Analysis
         public static bool TryComputeSunnySRAndPp(BeatmapManager beatmapManager, in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                   out double? sunnySR, out double? pp)
         {
-            PlayableCachedWorkingBeatmap workingBeatmap = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+            IWorkingBeatmap workingBeatmap = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
             IBeatmap analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -262,7 +261,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             try
             {
-                var playable = new PlayableCachedWorkingBeatmap(beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo));
+                IWorkingBeatmap playable = beatmapManager.GetWorkingBeatmap(lookup.BeatmapInfo);
                 IBeatmap analysisBeatmap = playable.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
                 cancellationToken.ThrowIfCancellationRequested();
@@ -344,7 +343,7 @@ namespace osu.Game.EzOsuGame.Analysis
             IBeatmap analysisBeatmap;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Convert))
-                analysisBeatmap = EzPlayableBeatmapCache.GetShared(workingBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+                analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -393,13 +392,10 @@ namespace osu.Game.EzOsuGame.Analysis
             int rulesetOnlineId = lookup.Ruleset.OnlineID;
             bool columnRuleset = rulesetOnlineId == EzLocalProfileConstants.MANIA_RULESET_ID;
 
-            // One conversion serves this whole pass: the framework's shared cache is skipped here because the
-            // difficulty calculator needs an instance it may hand to sibling calculators repeatedly.
-            var playable = new PlayableCachedWorkingBeatmap(workingBeatmap);
             IBeatmap analysisBeatmap;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Convert))
-                analysisBeatmap = playable.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+                analysisBeatmap = workingBeatmap.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -486,7 +482,7 @@ namespace osu.Game.EzOsuGame.Analysis
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Axes))
             {
-                var computed = computeAxes(lookup, playable, analysisBeatmap, mina, structure?.Axes, ppp, sunnySR, cancellationToken);
+                var computed = computeAxes(lookup, workingBeatmap, analysisBeatmap, mina, structure?.Axes, ppp, sunnySR, cancellationToken);
                 axes = withKeyPatternAxes(computed.Axes, quantifiedKeyPattern);
                 ratings = computed.Ratings;
             }
@@ -516,7 +512,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Takes the products this pass already measured so no producer is computed twice.
         /// </summary>
         private static AxesResult computeAxes(
-            in EzAnalysisLookupCache lookup, PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap,
+            in EzAnalysisLookupCache lookup, IWorkingBeatmap playable, IBeatmap analysisBeatmap,
             MinaResult? mina, IReadOnlyDictionary<string, double>? structure, PppResult? ppp,
             double? sunnySR, CancellationToken cancellationToken)
         {
@@ -615,7 +611,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <summary>
         /// The ruleset's perfect-play performance for an arbitrary star rating.
         /// </summary>
-        private static double calculatePerformanceAtRating(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
+        private static double calculatePerformanceAtRating(IWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
                                                            double starRating, CancellationToken cancellationToken)
         {
             if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { Calculator: { } calculator, Score: { } score, Attributes: { } attributes })
@@ -628,7 +624,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Official difficulty and performance for the current mods. Both come from one difficulty calculation,
         /// which is why they are produced together rather than by two independent passes.
         /// </summary>
-        private static OfficialResult? addOfficial(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
+        private static OfficialResult? addOfficial(IWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
                                                    CancellationToken cancellationToken, Dictionary<EzAnalysisSystem, EzScalarRating> ratings)
         {
             if (computeOfficial(playable, analysisBeatmap, lookup, cancellationToken) is not { } official)
@@ -653,7 +649,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The only place that builds the calculator/score-processor pair. The live pass and the songs-branch
         /// build both read the pair from here, so the same chart and mods cannot yield two different numbers.
         /// </remarks>
-        private static OfficialResult? computeOfficial(PlayableCachedWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
+        private static OfficialResult? computeOfficial(IWorkingBeatmap playable, IBeatmap analysisBeatmap, in EzAnalysisLookupCache lookup,
                                                        CancellationToken cancellationToken)
         {
             using var scope = EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Official);
@@ -671,7 +667,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             ScoreProcessor scoreProcessor = ruleset.CreateScoreProcessor();
             scoreProcessor.Mods.Value = lookup.OrderedMods;
-            scoreProcessor.ApplyBeatmap(analysisBeatmap);
+            IBeatmap scoreProcessorBeatmap = WorkingBeatmap.EnsureMutablePlayable(playable, analysisBeatmap, lookup.Ruleset, lookup.OrderedMods, cancellationToken);
+            scoreProcessor.ApplyBeatmap(scoreProcessorBeatmap);
             cancellationToken.ThrowIfCancellationRequested();
 
             ScoreInfo perfectScore = new ScoreInfo(lookup.BeatmapInfo, ruleset.RulesetInfo)
@@ -939,7 +936,7 @@ namespace osu.Game.EzOsuGame.Analysis
             }
         }
 
-        private static bool tryComputeOperationValues(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
+        private static bool tryComputeOperationValues(IWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
                                                       in EzAnalysisLookupCache lookup, CancellationToken cancellationToken,
                                                       out double? sunnySR, out double? pp)
         {
@@ -965,33 +962,32 @@ namespace osu.Game.EzOsuGame.Analysis
             return sunnySR != null;
         }
 
-        private static double? tryComputePerfectPp(PlayableCachedWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
+        private static double? tryComputePerfectPp(IWorkingBeatmap playableWorkingBeatmap, IBeatmap analysisBeatmap,
                                                    in EzAnalysisLookupCache lookup, CancellationToken cancellationToken)
             => computeOfficial(playableWorkingBeatmap, analysisBeatmap, lookup, cancellationToken)?.PerformancePoints;
 
-        private class PlayableCachedWorkingBeatmap : IWorkingBeatmap
+        /// <summary>
+        /// For callers that already hold the converted chart and must not convert again for this pass.
+        /// </summary>
+        private sealed class SeededPlayableWorkingBeatmap : IWorkingBeatmap
         {
             private readonly IWorkingBeatmap working;
-            private IBeatmap? playable;
+            private readonly IBeatmap seededPlayable;
 
-            public PlayableCachedWorkingBeatmap(IWorkingBeatmap working)
+            public SeededPlayableWorkingBeatmap(IWorkingBeatmap working, IBeatmap seededPlayable)
             {
                 this.working = working;
+                this.seededPlayable = seededPlayable;
             }
 
-            /// <summary>
-            /// Seeds the cache with a chart the caller already converted; the wrapper then never converts again.
-            /// </summary>
-            public PlayableCachedWorkingBeatmap(IWorkingBeatmap working, IBeatmap playable)
-                : this(working)
-            {
-                this.playable = playable;
-            }
+            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => seededPlayable;
 
-            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => playable ??= working.GetPlayableBeatmap(ruleset, mods);
+            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken) => seededPlayable;
 
-            public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken) =>
-                playable ??= working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
+            public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => working.GetMutablePlayableBeatmap(ruleset, mods);
+
+            public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken, Action<IBeatmap>? postConvert = null)
+                => working.GetMutablePlayableBeatmap(ruleset, mods, cancellationToken, postConvert);
 
             IBeatmapInfo IWorkingBeatmap.BeatmapInfo => working.BeatmapInfo;
             bool IWorkingBeatmap.BeatmapLoaded => working.BeatmapLoaded;

@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
 
 namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
@@ -64,7 +63,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
 
             try
             {
-                playable = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(beatmapInfo), beatmapInfo.Ruleset);
+                playable = beatmapManager.GetWorkingBeatmap(beatmapInfo).GetPlayableBeatmap(beatmapInfo.Ruleset);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {

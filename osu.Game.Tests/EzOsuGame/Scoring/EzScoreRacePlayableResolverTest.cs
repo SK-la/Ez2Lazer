@@ -2,7 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using NUnit.Framework;
-using osu.Game.EzOsuGame.Beatmaps;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Mods;
@@ -15,7 +15,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
     {
         [SetUp]
         [TearDown]
-        public void ResetCache() => EzPlayableBeatmapCache.Reset();
+        public void ResetCache() => WorkingBeatmap.ClearCachedReadOnlyMarkersForTesting();
 
         [Test]
         public void SameModsReturnSameBoundInstance()
@@ -26,8 +26,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var first = EzScoreRacePlayableResolver.GetSessionReady(working, ruleset);
             var second = EzScoreRacePlayableResolver.GetSessionReady(working, ruleset);
 
-            Assert.That(second, Is.SameAs(first));
-            Assert.That(EzPlayableBeatmapCache.IsSharedInstance(first), Is.False);
+            Assert.That(second, Is.Not.SameAs(first), "可改路径每次产生新实例");
+            Assert.That(WorkingBeatmap.IsCachedReadOnlyPlayableInstance(first), Is.False);
         }
 
         [Test]
@@ -41,7 +41,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var hardRock = EzScoreRacePlayableResolver.GetSessionReady(working, rulesetInstance.RulesetInfo, new[] { hr });
 
             Assert.That(hardRock, Is.Not.SameAs(nm));
-            Assert.That(EzPlayableBeatmapCache.IsSharedInstance(hardRock), Is.False);
+            Assert.That(WorkingBeatmap.IsCachedReadOnlyPlayableInstance(hardRock), Is.False);
         }
     }
 }

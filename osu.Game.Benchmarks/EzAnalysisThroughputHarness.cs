@@ -77,7 +77,7 @@ namespace osu.Game.Benchmarks
             IBeatmap officialPlayable = loadPlayable(rawBeatmap, rulesetInfo, mods);
             int keyCount = EzHoldMetrics.ResolveKeyCount(starPlayable);
             double overallDifficulty = starPlayable.Difficulty.OverallDifficulty;
-            double star = computeStar(starPlayable, keyCount, overallDifficulty);
+            // double star = computeStar(starPlayable, keyCount, overallDifficulty);
             var chartOnce = EzCSIEngine.FromPlayable(starPlayable);
 
             Console.WriteLine($"chart: {mania_beatmap_name}");
@@ -262,6 +262,7 @@ namespace osu.Game.Benchmarks
 
                 stopwatch.Restart();
                 var allocatedByType = new Dictionary<string, (long Bytes, int Count)>();
+
                 foreach (var obj in converted.HitObjects)
                 {
                     long before = GC.GetAllocatedBytesForCurrentThread();
@@ -559,6 +560,14 @@ namespace osu.Game.Benchmarks
 
             public IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken) => playable;
 
+            public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods) => playable;
+
+            public IBeatmap GetMutablePlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken cancellationToken, Action<IBeatmap>? postConvert = null)
+            {
+                postConvert?.Invoke(playable);
+                return playable;
+            }
+
             IBeatmapInfo IWorkingBeatmap.BeatmapInfo => playable.BeatmapInfo;
             bool IWorkingBeatmap.BeatmapLoaded => true;
             bool IWorkingBeatmap.TrackLoaded => false;
@@ -571,6 +580,7 @@ namespace osu.Game.Benchmarks
             Track IWorkingBeatmap.Track => null!;
             Track IWorkingBeatmap.LoadTrack() => null!;
             Stream IWorkingBeatmap.GetStream(string storagePath) => Stream.Null;
+
             void IWorkingBeatmap.BeginAsyncLoad()
             {
             }

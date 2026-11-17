@@ -465,7 +465,7 @@ namespace osu.Game.Rulesets.BMS
 
         protected override IBeatmap GetBeatmap() => maniaBeatmap;
 
-        public override IBeatmap GetPlayableBeatmap(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token) => maniaBeatmap;
+        protected override IBeatmap ConvertPlayableBeatmapCore(IRulesetInfo ruleset, IReadOnlyList<Mod> mods, CancellationToken token) => maniaBeatmap;
 
         public override Texture? GetBackground() => source.GetBackground();
 

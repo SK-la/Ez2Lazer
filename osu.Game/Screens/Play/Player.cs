@@ -740,7 +740,8 @@ namespace osu.Game.Screens.Play
 
                 try
                 {
-                    playable = Beatmap.Value.GetPlayableBeatmap(ruleset.RulesetInfo, gameplayMods, cancellationToken);
+                    playable = WorkingBeatmap.DetachFromSharedPlayableCache(
+                        Beatmap.Value.GetMutablePlayableBeatmap(ruleset.RulesetInfo, gameplayMods, cancellationToken));
                 }
                 catch (BeatmapInvalidForRulesetException)
                 {

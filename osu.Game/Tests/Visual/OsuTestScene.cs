@@ -23,6 +23,7 @@ using osu.Framework.Platform;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Game.Beatmaps;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics;
@@ -143,6 +144,8 @@ namespace osu.Game.Tests.Visual
                 isolatedBaseDependencies = rulesetDependencies = new DrawableRulesetDependencies(providedRuleset, baseDependencies);
 
             Dependencies = isolatedBaseDependencies;
+
+            Dependencies.CacheAs<ICurrentBeatmapPlayable>(new CurrentBeatmapPlayable(Beatmap, Ruleset, SelectedMods));
 
             Beatmap.Default = parent.Get<Bindable<WorkingBeatmap>>().Default;
             Beatmap.SetDefault();

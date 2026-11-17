@@ -16,7 +16,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
@@ -392,7 +391,7 @@ namespace osu.Game.Screens.Select
                     cancellationToken.ThrowIfCancellationRequested();
 
                     // 只读消费者：选歌界面的统计展示与难度/分析/预览共用同一次转换。
-                    var playableBeatmap = EzPlayableBeatmapCache.GetShared(selectedBeatmap, selectedRuleset, selectedMods, cancellationToken);
+                    var playableBeatmap = selectedBeatmap.GetPlayableBeatmap(selectedRuleset, selectedMods, cancellationToken);
 
                     cancellationToken.ThrowIfCancellationRequested();
 

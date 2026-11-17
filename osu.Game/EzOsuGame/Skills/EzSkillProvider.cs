@@ -10,7 +10,6 @@ using System.Threading;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Mods;
@@ -1142,7 +1141,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (map == null && beatmapManager != null)
                 {
                     var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                    map = EzPlayableBeatmapCache.GetShared(working, beatmapInfo.Ruleset, mods);
+                    map = working.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
                 }
 
                 if (map == null)
@@ -1209,7 +1208,7 @@ namespace osu.Game.EzOsuGame.Skills
                 if (beatmapManager == null)
                     return false;
 
-                map = EzPlayableBeatmapCache.GetShared(beatmapManager.GetWorkingBeatmap(beatmapInfo), beatmapInfo.Ruleset);
+                map = beatmapManager.GetWorkingBeatmap(beatmapInfo).GetPlayableBeatmap(beatmapInfo.Ruleset);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {

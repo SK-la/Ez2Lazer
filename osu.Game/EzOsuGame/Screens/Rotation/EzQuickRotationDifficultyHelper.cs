@@ -7,7 +7,6 @@ using System.Linq;
 using System.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.SkillTag;
@@ -48,7 +47,7 @@ namespace osu.Game.EzOsuGame.Screens.Rotation
             if (UsesSunnyStarRating(ruleset))
             {
                 var working = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                var playable = EzPlayableBeatmapCache.GetShared(working, ruleset, mods, cancellationToken);
+                var playable = working.GetPlayableBeatmap(ruleset, mods, cancellationToken);
 
                 int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
 
