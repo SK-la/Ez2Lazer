@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Runtime.InteropServices;
 
 namespace osu.Game.EzOsuGame.Pets
 {
@@ -11,6 +12,9 @@ namespace osu.Game.EzOsuGame.Pets
     /// </summary>
     internal static unsafe class EzPetCubismCoreCompat
     {
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+        private delegate int* GetDrawableSortOrdersDelegate(IntPtr model);
+
         private enum OrderApi
         {
             Unknown,
@@ -20,7 +24,7 @@ namespace osu.Game.EzOsuGame.Pets
         }
 
         private static OrderApi orderApi = OrderApi.Unknown;
-        private static delegate* unmanaged[Cdecl]<IntPtr, int*> orderFn;
+        private static GetDrawableSortOrdersDelegate? orderFn;
 
         /// <summary>
         /// Returns per-drawable sort keys, or null to keep index order.
@@ -43,14 +47,14 @@ namespace osu.Game.EzOsuGame.Pets
         {
             if (EzPetCubismNative.TryGetExport("csmGetRenderOrders", out IntPtr renderOrders))
             {
-                orderFn = (delegate* unmanaged[Cdecl]<IntPtr, int*>)renderOrders;
+                orderFn = Marshal.GetDelegateForFunctionPointer<GetDrawableSortOrdersDelegate>(renderOrders);
                 orderApi = OrderApi.RenderOrders;
                 return;
             }
 
             if (EzPetCubismNative.TryGetExport("csmGetDrawableDrawOrders", out IntPtr drawOrders))
             {
-                orderFn = (delegate* unmanaged[Cdecl]<IntPtr, int*>)drawOrders;
+                orderFn = Marshal.GetDelegateForFunctionPointer<GetDrawableSortOrdersDelegate>(drawOrders);
                 orderApi = OrderApi.DrawableDrawOrders;
                 return;
             }
