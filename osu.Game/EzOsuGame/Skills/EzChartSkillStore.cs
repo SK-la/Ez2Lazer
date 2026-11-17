@@ -578,7 +578,7 @@ namespace osu.Game.EzOsuGame.Skills
 
             var beatmapIds = realmAccess.Run(r =>
             {
-                var beatmaps = r.All<BeatmapInfo>();
+                var beatmaps = r.All<BeatmapInfo>().ToList().AsEnumerable();
 
                 switch (system)
                 {
