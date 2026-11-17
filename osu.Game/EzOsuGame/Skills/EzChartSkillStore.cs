@@ -485,16 +485,29 @@ namespace osu.Game.EzOsuGame.Skills
             if (system == EzAnalysisSystem.KeyPattern)
                 return;
 
-            realmAccess.Write(r =>
-            {
-                foreach (var beatmap in r.All<BeatmapInfo>())
-                {
-                    if (beatmap.EzRatingData.GetStar(system) < 0 && beatmap.EzRatingData.GetPerformance(system) < 0)
-                        continue;
+            var beatmapIds = realmAccess.Run(r => r.All<BeatmapInfo>()
+                                                   .Where(b => b.EzRatingData.GetStar(system) >= 0 || b.EzRatingData.GetPerformance(system) >= 0)
+                                                   .Select(b => b.ID)
+                                                   .ToList());
 
-                    EzRatingWriter.Clear(beatmap, system);
-                }
-            });
+            if (beatmapIds.Count == 0)
+                return;
+
+            const int batch_size = 500;
+
+            for (int i = 0; i < beatmapIds.Count; i += batch_size)
+            {
+                var batch = beatmapIds.Skip(i).Take(batch_size).ToList();
+
+                realmAccess.Write(r =>
+                {
+                    foreach (Guid id in batch)
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo beatmap)
+                            EzRatingWriter.Clear(beatmap, system);
+                    }
+                });
+            }
         }
 
         /// <summary>

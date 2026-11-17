@@ -744,6 +744,8 @@ namespace osu.Game.Database
 
                 if (sunnyFillFinished && !populateMissingSunnySrSkillAxes())
                     Logger.Log("Sunny SR4 skill axis pass did not finish; remaining charts are picked up next launch.");
+
+                populateMissingMultiSystemBaselines();
             }
 
             if (scope.HasFlag(EzAnalysisSystem.KeyPattern) && !populateMissingKeyPatternAxes())
@@ -823,7 +825,7 @@ namespace osu.Game.Database
                 if (!populateChartChainStages(msd: true, csi: false, ppp: false, dan: false))
                     return false;
 
-                if (skillStore.DownstreamAwaitingReset(EzAnalysisSystem.Mina))
+                if (skillStore.DownstreamAwaitingReset(EzAnalysisSystem.Mina) && shouldResetDownstreamAfterUpstreamFill(scope, EzAnalysisSystem.Mina))
                     Logger.Log($"Mina fill finished; resetting downstream of Mina: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.Mina))}.");
 
                 EzChartChainBackfillScope.Resolve(scope, out _, out runCsi, out runDan, out runPpp, out _);
@@ -839,7 +841,7 @@ namespace osu.Game.Database
                 if (!populateChartChainStages(msd: runMsd, csi: true, ppp: false, dan: false))
                     return false;
 
-                if (skillStore.DownstreamAwaitingReset(EzAnalysisSystem.CSI))
+                if (skillStore.DownstreamAwaitingReset(EzAnalysisSystem.CSI) && shouldResetDownstreamAfterUpstreamFill(scope, EzAnalysisSystem.CSI))
                     Logger.Log($"CSI fill finished; resetting downstream of CSI: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.CSI))}.");
 
                 EzChartChainBackfillScope.Resolve(scope, out _, out _, out runDan, out runPpp, out _);
@@ -871,26 +873,25 @@ namespace osu.Game.Database
             // carry that to the systems derived from it. The revision is recorded at the same time, so an interrupted
             // pass resumes on whatever is still missing instead of retiring the library again.
             if (scope.HasFlag(EzAnalysisSystem.Mina))
-                Logger.Log($"Retiring Mina and its downstream systems: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Mina))}");
+                retireRealmSystemForForce(scope, EzAnalysisSystem.Mina, "Retiring Mina");
 
             if (scope.HasFlag(EzAnalysisSystem.CSI))
-                Logger.Log($"Retiring CSI and its downstream systems: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.CSI))}");
+                retireRealmSystemForForce(scope, EzAnalysisSystem.CSI, "Retiring CSI");
 
             if (scope.HasFlag(EzAnalysisSystem.Dan))
-                Logger.Log($"Retiring Dan: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.Dan))}");
+                retireRealmSystemForForce(scope, EzAnalysisSystem.Dan, "Retiring Dan");
 
             if (scope.HasFlag(EzAnalysisSystem.PPP))
-                Logger.Log($"Retiring PP+: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.PPP))}");
+                retireRealmSystemForForce(scope, EzAnalysisSystem.PPP, "Retiring PP+");
 
             if (scope.HasFlag(EzAnalysisSystem.SSR))
             {
-                // Dan reads the Sunny rating, so the dependency edge retires it along with the ratings.
-                Logger.Log($"Retiring Sunny ratings: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.SSR))}");
+                retireRealmSystemForForce(scope, EzAnalysisSystem.SSR, "Retiring Sunny ratings");
                 skillProvider.InvalidateLiveMetrics();
             }
 
             if (scope.HasFlag(EzAnalysisSystem.KeyPattern))
-                Logger.Log($"Retiring KeyPattern axes: {string.Join(", ", skillStore.Invalidate(EzAnalysisSystem.KeyPattern))}");
+                retireRealmSystemForForce(scope, EzAnalysisSystem.KeyPattern, "Retiring KeyPattern axes");
 
             bool clearBeatmapInfoFields = scope.HasFlag(EzAnalysisSystem.MetadataTags)
                                           || scope.HasFlag(EzAnalysisSystem.Official);
@@ -964,6 +965,46 @@ namespace osu.Game.Database
         }
 
         private void forceEzRealmMetadataRecalculation() => clearEzRealmMetadata(EzAnalysisSystem.All);
+
+        private void retireRealmSystemForForce(EzAnalysisSystem scope, EzAnalysisSystem system, string logPrefix)
+        {
+            bool cascade = shouldCascadeInvalidationOnForce(scope, system);
+            Logger.Log($"{logPrefix}{(cascade ? " and its downstream systems" : string.Empty)}: {string.Join(", ", skillStore.Invalidate(system, cascade))}.");
+        }
+
+        /// <summary>
+        /// Force-clear only cascades to downstream when those systems are part of the same maintenance request.
+        /// </summary>
+        private static bool shouldCascadeInvalidationOnForce(EzAnalysisSystem scope, EzAnalysisSystem system)
+        {
+            if (scope.HasFlag(EzAnalysisSystem.All))
+                return true;
+
+            foreach (var downstream in EzChartSkillStore.DownstreamOf(system))
+            {
+                if (!scope.HasFlag(downstream))
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// After an upstream pass, derived rows are reset only when the request also covers at least one downstream system.
+        /// </summary>
+        private static bool shouldResetDownstreamAfterUpstreamFill(EzAnalysisSystem scope, EzAnalysisSystem upstream)
+        {
+            if (scope.HasFlag(EzAnalysisSystem.All))
+                return true;
+
+            foreach (var downstream in EzChartSkillStore.DownstreamOf(upstream))
+            {
+                if (scope.HasFlag(downstream))
+                    return true;
+            }
+
+            return false;
+        }
 
         /// <summary>
         /// Fills the SunnyStarRatings that are not stored yet.

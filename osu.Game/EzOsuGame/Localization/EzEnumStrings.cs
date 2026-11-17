@@ -78,9 +78,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_ACTION_PPP_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "四个模式各自的谱面向量，不依赖图表链", "Per-mode chart vector; independent of the chart chain");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_NAME = new EzLocalizationManager.EzLocalisableString("Sunny 星级", "Sunny SR");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_NAME = new EzLocalizationManager.EzLocalisableString("Sunny SR / PP", "Sunny SR / PP");
         public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_DETAIL = new EzLocalizationManager.EzLocalisableString(
-            "独立评级，不依赖其他系统", "Independent rating; depends on nothing else");
+            "Sunny 星、Max PP 与 SR4 技能轴；顺带刷新 Ez键型", "Sunny star, max PP, and SR4 skill axes; also refreshes Ez KeyPattern");
 
         public static readonly LocalisableString DATA_REBUILD_ACTION_PATTERN_NAME = new EzLocalizationManager.EzLocalisableString("Ez键型", "Ez KeyPattern");
         public static readonly LocalisableString DATA_REBUILD_ACTION_PATTERN_DETAIL = new EzLocalizationManager.EzLocalisableString(
