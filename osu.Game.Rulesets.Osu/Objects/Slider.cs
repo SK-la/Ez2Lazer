@@ -35,7 +35,7 @@ namespace osu.Game.Rulesets.Osu.Objects
             set => throw new NotSupportedException($"Adjust via {nameof(RepeatCount)} instead"); // can be implemented if/when needed.
         }
 
-        public override IList<HitSampleInfo> AuxiliarySamples => CreateSlidingSamples().Concat(TailSamples).ToArray();
+        public override IList<HitSampleInfo> AuxiliarySamples => CreateSlidingSamples().Concat(TailSamples ?? Enumerable.Empty<HitSampleInfo>()).ToArray();
 
         private readonly Cached<Vector2> endPositionCache = new Cached<Vector2>();
 
