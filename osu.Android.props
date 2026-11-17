@@ -10,7 +10,7 @@
     <PublishReadyToRun>false</PublishReadyToRun>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ppy.osu.Framework.Android" Version="2026.1114.0" />
+    <PackageReference Include="ppy.osu.Framework.Android" Version="2026.1117.0" />
   </ItemGroup>
   <PropertyGroup>
     <!-- Fody does not handle Android build well, and warns when unchanged.
