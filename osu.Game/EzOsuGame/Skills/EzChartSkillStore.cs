@@ -602,7 +602,7 @@ namespace osu.Game.EzOsuGame.Skills
                         return new List<Guid>();
                 }
 
-                return beatmaps.Select(b => b.ID).ToList();
+                return beatmaps.ToList().Select(b => b.ID).ToList();
             });
 
             if (beatmapIds.Count == 0)
