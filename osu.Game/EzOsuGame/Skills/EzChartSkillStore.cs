@@ -487,10 +487,37 @@ namespace osu.Game.EzOsuGame.Skills
         /// Retires every system that reads <paramref name="system"/>, after that system's own refill pass has finished.
         /// </summary>
         public IReadOnlyList<EzAnalysisSystem> InvalidateDownstream(EzAnalysisSystem system)
+            => InvalidateDownstream(system, Array.Empty<EzAnalysisSystem>());
+
+        /// <summary>
+        /// Retires downstream of <paramref name="system"/> except systems already written in the same pass.
+        /// Those keep their rows and receive the current revision stamp so they are not owed another reset.
+        /// </summary>
+        public IReadOnlyList<EzAnalysisSystem> InvalidateDownstream(EzAnalysisSystem system, IReadOnlyList<EzAnalysisSystem> alreadyFilled)
         {
             var downstream = DownstreamOf(system);
-            retireRows(downstream);
-            return downstream;
+            var filled = alreadyFilled.Count == 0 ? null : alreadyFilled.ToHashSet();
+            var toRetire = filled == null
+                ? downstream
+                : downstream.Where(s => !filled.Contains(s)).ToList();
+
+            retireRows(toRetire);
+
+            if (filled != null)
+            {
+                foreach (var kept in downstream)
+                {
+                    if (!filled.Contains(kept))
+                        continue;
+
+                    int version = kept.CurrentVersion();
+
+                    if (version > 0)
+                        SetAppliedVersion(kept, version);
+                }
+            }
+
+            return toRetire;
         }
 
         private void retireRows(IReadOnlyList<EzAnalysisSystem> systems)
