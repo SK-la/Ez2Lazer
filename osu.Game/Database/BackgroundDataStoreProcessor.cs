@@ -732,7 +732,7 @@ namespace osu.Game.Database
                         EzSSRTuningSnapshot.Record();
                 }
 
-                (sunnyFillFinished, int sunnyStarDebt) = populateMissingSunnyStarRatings();
+                (sunnyFillFinished, _) = populateMissingSunnyStarRatings();
 
                 if (!sunnyFillFinished)
                     Logger.Log("Sunny rating pass did not finish; downstream chart skills stay until Sunny finishes.");
@@ -742,11 +742,11 @@ namespace osu.Game.Database
                     Logger.Log($"Sunny fill finished; resetting downstream of SSR: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.SSR))}.");
                 }
 
-                // Star-debt charts already wrote SR4 axes in the same compute pass.
-                if (sunnyFillFinished && sunnyStarDebt == 0 && !populateMissingSunnySrSkillAxes())
+                if (sunnyFillFinished && !populateMissingSunnySrSkillAxes())
                     Logger.Log("Sunny SR4 skill axis pass did not finish; remaining charts are picked up next launch.");
 
-                populateMissingMultiSystemBaselines();
+                if (sunnyFillFinished)
+                    populateMissingMultiSystemBaselines();
             }
 
             if (scope.HasFlag(EzAnalysisSystem.KeyPattern) && !populateMissingKeyPatternAxes())
@@ -2494,6 +2494,7 @@ namespace osu.Game.Database
             int total = work.Count;
             int next = -1;
             int aborted = 0;
+            int computedCount = 0;
 
             int workers = Math.Min(analysisWorkerCount, total);
             var threads = new Thread[workers];
@@ -2535,7 +2536,7 @@ namespace osu.Game.Database
                     });
 
                     failed++;
-                    updateNotificationProgress(notification, i + 1, total);
+                    updateNotificationProgress(notification, i + 1, total, progressStart: 0.5f, progressScale: 0.5f);
                     continue;
                 }
 
@@ -2551,9 +2552,17 @@ namespace osu.Game.Database
                             ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
                     }
                 }
+                else
+                {
+                    realmAccess.Write(r =>
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo live && live.EzRatingData.SunnySR < 0)
+                            EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+                    });
+                }
 
                 processed++;
-                updateNotificationProgress(notification, i + 1, total);
+                updateNotificationProgress(notification, i + 1, total, progressStart: 0.5f, progressScale: 0.5f);
             }
 
             return new ChartBatchResult(total, processed, failed, false);
@@ -2580,10 +2589,12 @@ namespace osu.Game.Database
                         if (beatmap == null)
                         {
                             computed[id] = null;
+                            reportComputeProgress();
                             continue;
                         }
 
                         computed[id] = compute(beatmap);
+                        reportComputeProgress();
                     }
                     catch (ObjectDisposedException)
                     {
@@ -2594,8 +2605,15 @@ namespace osu.Game.Database
                     {
                         Logger.Log($"Sunny compute failed on {id}: {e}");
                         computed[id] = null;
+                        reportComputeProgress();
                     }
                 }
+            }
+
+            void reportComputeProgress()
+            {
+                int current = Interlocked.Increment(ref computedCount);
+                updateNotificationProgress(notification, current, total, progressScale: 0.5f);
             }
         }
 
@@ -2692,7 +2710,7 @@ namespace osu.Game.Database
         /// <summary>Outcome of one <see cref="runChartBatch{T}"/>.</summary>
         private readonly record struct ChartBatchResult(int Attempted, int Processed, int Failed, bool Aborted);
 
-        private int lastNotificationProgressReported = -1;
+        private float lastNotificationProgressReported = -1;
 
         private const int notification_progress_update_interval = 25;
 
@@ -2704,7 +2722,7 @@ namespace osu.Game.Database
 
         private readonly Lock notificationTextLock = new Lock();
 
-        private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount)
+        private void updateNotificationProgress(ProgressNotification? notification, int processedCount, int totalCount, float progressStart = 0, float progressScale = 1)
         {
             if (notification == null)
                 return;
@@ -2712,20 +2730,25 @@ namespace osu.Game.Database
             // a fixed interval means batches smaller than it never report anything between the initial 0 and
             // completion, which reads as a permanently stuck progress bar.
             int updateInterval = Math.Max(1, Math.Min(notification_progress_update_interval, totalCount / 20));
+            float progress = progressStart + progressScale * processedCount / totalCount;
+            float progressInterval = progressScale * updateInterval / totalCount;
 
             bool shouldUpdate = processedCount == 0 ||
                                 processedCount >= totalCount ||
-                                processedCount - lastNotificationProgressReported >= updateInterval;
+                                progress - Volatile.Read(ref lastNotificationProgressReported) >= progressInterval;
 
             if (!shouldUpdate)
                 return;
 
             // Several analysis workers report at once; a stale value here only means a redundant UI update.
-            Volatile.Write(ref lastNotificationProgressReported, processedCount);
+            Volatile.Write(ref lastNotificationProgressReported, progress);
 
             Schedule(() =>
             {
                 if (notification.State == ProgressNotificationState.Cancelled)
+                    return;
+
+                if (progress < notification.Progress)
                     return;
 
                 LocalisableString baseText;
@@ -2737,7 +2760,7 @@ namespace osu.Game.Database
                 }
 
                 notification.Text = $"{baseText} ({EzAnalysisNotificationStrings.Progress(processedCount, totalCount)})";
-                notification.Progress = (float)processedCount / totalCount;
+                notification.Progress = progress;
             });
 
             if (processedCount > 0 && processedCount % 25 == 0)
