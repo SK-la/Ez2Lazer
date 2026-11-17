@@ -740,7 +740,8 @@ namespace osu.Game.Database
 
                 if (sunnyFillFinished && skillStore.DownstreamAwaitingReset(EzAnalysisSystem.SSR))
                 {
-                    Logger.Log($"Sunny fill finished; resetting downstream of SSR: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.SSR))}.");
+                    // KeyPattern rows were written in the same Sunny pass; retiring them would recompute the same axes.
+                    Logger.Log($"Sunny fill finished; resetting downstream of SSR: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.SSR, new[] { EzAnalysisSystem.KeyPattern }))}.");
                 }
 
                 if (sunnyFillFinished && !populateMissingSunnySrSkillAxes())
