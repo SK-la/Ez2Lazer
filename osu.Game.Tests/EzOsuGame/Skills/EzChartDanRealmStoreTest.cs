@@ -293,6 +293,9 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
                 seedChart(realm, hash);
 
+                store.WriteBeatmapMsd(hash, new EzMinaSkillAxisData(10, 1, 2, 3, 4, 5, 6, 7));
+                store.SetAppliedVersion(EzAnalysisSystem.Mina, EzMinaEngine.VERSION);
+
                 realm.Write(r =>
                 {
                     r.Add(new EzChartDan

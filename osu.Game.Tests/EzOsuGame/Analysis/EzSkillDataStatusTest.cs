@@ -46,7 +46,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status.HasWorkToDo, Is.True);
                 Assert.That(status["PPP"].Missing, Is.EqualTo(4));
                 Assert.That(status["KeyPattern"].Missing, Is.EqualTo(3));
-                Assert.That(status.TotalPending, Is.EqualTo(16));
+                Assert.That(status["SunnySRSkill"].Missing, Is.EqualTo(3));
+                Assert.That(status.TotalPending, Is.EqualTo(19));
             });
         }
 
@@ -102,7 +103,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["Dan"].Pending, Is.EqualTo(1));
                 Assert.That(status["PPP"].Missing, Is.EqualTo(4));
                 Assert.That(status["KeyPattern"].Missing, Is.EqualTo(3));
-                Assert.That(status.TotalPending, Is.EqualTo(10));
+                Assert.That(status["SunnySRSkill"].Missing, Is.EqualTo(3));
+                Assert.That(status.TotalPending, Is.EqualTo(13));
 
                 string described = status.Describe();
                 Assert.That(described, Does.Contain("Mina v"));
@@ -176,7 +178,8 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Assert.That(status["Mina"].Missing, Is.EqualTo(3));
                 Assert.That(status["PPP"].Missing, Is.EqualTo(6));
                 Assert.That(status["KeyPattern"].Missing, Is.EqualTo(5));
-                Assert.That(status.TotalPending, Is.EqualTo(20));
+                Assert.That(status["SunnySRSkill"].Missing, Is.EqualTo(5));
+                Assert.That(status.TotalPending, Is.EqualTo(25));
             });
         }
 
@@ -303,14 +306,20 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var set = new BeatmapSetInfo();
             r.Add(set);
 
-            r.Add(new BeatmapInfo
+            var beatmap = new BeatmapInfo
             {
                 Hash = hash,
                 BeatmapSet = set,
                 Ruleset = ruleset,
                 DifficultyName = hash,
                 Difficulty = new BeatmapDifficulty { CircleSize = circleSize },
-            });
+            };
+
+            // KeyPattern debt waits until Sunny has left the pending (-1) state on an empty chart.
+            if (ruleset.OnlineID == 3)
+                beatmap.EzRatingData.SunnySR = 0;
+
+            r.Add(beatmap);
         }
     }
 }
