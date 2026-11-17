@@ -551,8 +551,9 @@ namespace osu.Game.EzOsuGame.Skills
 
             var beatmapIds = realmAccess.Run(r => r.All<BeatmapInfo>()
                                                    .Where(b => b.EzRatingData.GetStar(system) >= 0 || b.EzRatingData.GetPerformance(system) >= 0)
-                                                   .Select(b => b.ID)
-                                                   .ToList());
+                                                   .ToList())
+                                          .Select(b => b.ID)
+                                          .ToList();
 
             if (beatmapIds.Count == 0)
                 return;
