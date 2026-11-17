@@ -1512,20 +1512,25 @@ namespace osu.Game.Screens.Play
             PauseOverlay?.StopAllSamples();
             FailOverlay?.StopAllSamples();
 
-            if (LoadedBeatmapSuccessfully && !GameplayState.HasPassed)
+            if (GameplayState != null)
             {
-                Debug.Assert(resultsDisplayDelegate == null);
+                if (LoadedBeatmapSuccessfully && !GameplayState.HasPassed)
+                {
+                    Debug.Assert(resultsDisplayDelegate == null);
 
-                if (!GameplayState.HasFailed)
-                    GameplayState.HasQuit = true;
+                    if (!GameplayState.HasFailed)
+                        GameplayState.HasQuit = true;
 
-                if (DrawableRuleset.ReplayScore == null)
-                    ScoreProcessor.FailScore(Score.ScoreInfo);
+                    if (DrawableRuleset.ReplayScore == null)
+                        ScoreProcessor.FailScore(Score.ScoreInfo);
+                }
+
+                // [Ez] 局末落盘。时序追踪的结束事件与整段落盘都在 EzDiagnosticSession 里。
+                EzOsuGame.Diagnostics.EzDiagnosticSession.End(
+                    $"hasPassed={GameplayState.HasPassed} hasFailed={GameplayState.HasFailed} hasQuit={GameplayState.HasQuit}");
             }
-
-            // [Ez] 局末落盘。时序追踪的结束事件与整段落盘都在 EzDiagnosticSession 里。
-            EzOsuGame.Diagnostics.EzDiagnosticSession.End(
-                $"hasPassed={GameplayState.HasPassed} hasFailed={GameplayState.HasFailed} hasQuit={GameplayState.HasQuit}");
+            else
+                EzOsuGame.Diagnostics.EzDiagnosticSession.End("gameplayState=null");
 
             // GameplayClockContainer performs seeks / start / stop operations on the beatmap's track.
             // as we are no longer the current screen, we cannot guarantee the track is still usable.
