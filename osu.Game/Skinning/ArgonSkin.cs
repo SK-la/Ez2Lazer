@@ -8,6 +8,7 @@ using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.IO.Stores;
 using osu.Game.Audio;
 using osu.Game.Beatmaps.Formats;
 using osu.Game.Extensions;
@@ -43,10 +44,12 @@ namespace osu.Game.Skinning
 
         [UsedImplicitly(ImplicitUseKindFlags.InstantiatedWithFixedConstructorSignature)]
         public ArgonSkin(SkinInfo skin, IStorageResourceProvider resources)
-            : base(
-                skin,
-                resources
-            )
+            : this(skin, resources, null)
+        {
+        }
+
+        public ArgonSkin(SkinInfo skin, IStorageResourceProvider resources, IResourceStore<byte[]>? fallbackStore)
+            : base(skin, resources, fallbackStore)
         {
             Resources = resources;
         }
@@ -294,6 +297,7 @@ namespace osu.Game.Skinning
                                 var statisticsGrid = container.OfType<ArgonScoreStatisticsGrid>().FirstOrDefault();
 
                                 var leftWedgeBasePosition = new Vector2(-ShearedButton.CORNER_RADIUS);
+
                                 static Vector2 leftWedgeOffset(float y) => new Vector2(-y * OsuGame.SHEAR.X, y);
 
                                 beatmapInfoWedge?.Position = leftWedgeBasePosition;

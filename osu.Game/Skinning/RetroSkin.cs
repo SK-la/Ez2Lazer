@@ -25,7 +25,7 @@ namespace osu.Game.Skinning
             Name = "osu! \"retro\" (2008)",
             Creator = "team osu!",
             Protected = true,
-            InstantiationInfo = typeof(RetroSkin).GetInvariantInstantiationInfo(),
+            InstantiationInfo = typeof(LegacySkin).GetInvariantInstantiationInfo(),
         };
 
         public RetroSkin(IStorageResourceProvider resources)
@@ -35,7 +35,12 @@ namespace osu.Game.Skinning
 
         [UsedImplicitly(ImplicitUseKindFlags.InstantiatedWithFixedConstructorSignature)]
         public RetroSkin(SkinInfo skin, IStorageResourceProvider resources)
-            : base(skin, resources, new NamespacedResourceStore<byte[]>(resources.Resources, "Skins/Retro"))
+            : this(skin, resources, null)
+        {
+        }
+
+        public RetroSkin(SkinInfo skin, IStorageResourceProvider resources, IResourceStore<byte[]>? fallbackStore)
+            : base(skin, resources, fallbackStore)
         {
         }
 

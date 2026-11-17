@@ -110,8 +110,9 @@ namespace osu.Game.Skinning
         {
             if (EzLegacySkinFolders.TryGetDirectory(original, out string folder))
             {
-                EzLegacySkinFolders.SyncFromExternalEditMount(task.Path, folder);
-                return EzLegacySkinFolders.Scan().FirstOrDefault(s => s.Hash == original.Hash)?.ToLiveUnmanaged();
+                await Task.Run(() => EzLegacySkinFolders.SyncFromExternalEditMount(task.Path, folder)).ConfigureAwait(false);
+                return EzLegacySkinFolders.Scan().FirstOrDefault(s => s.Hash == original.Hash)?.ToLiveUnmanaged()
+                       ?? original.ToLiveUnmanaged();
             }
 
             return await Realm.WriteAsync<Live<SkinInfo>?>(r =>

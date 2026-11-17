@@ -50,14 +50,34 @@ namespace osu.Game.Skinning
         public virtual Skin CreateInstance(IStorageResourceProvider resources)
         {
             if (EzLegacySkinFolders.TryGetDirectory(this, out string directory))
-                return new LegacySkin(this, resources, new StorageBackedResourceStore(new NativeStorage(directory)));
+            {
+                var fallback = new StorageBackedResourceStore(new NativeStorage(directory));
 
-            var type = string.IsNullOrEmpty(InstantiationInfo)
+                var type = string.IsNullOrEmpty(InstantiationInfo)
+                    ? typeof(LegacySkin)
+                    : Type.GetType(InstantiationInfo);
+
+                if (type == null)
+                    return new TrianglesSkin(this, resources, fallback);
+
+                if (type == typeof(RetroSkin))
+                    return new RetroSkin(this, resources, fallback);
+
+                var folderCtor = type.GetConstructor(new[] { typeof(SkinInfo), typeof(IStorageResourceProvider), typeof(IResourceStore<byte[]>) });
+
+                if (folderCtor != null)
+                    return (Skin)folderCtor.Invoke(new object[] { this, resources, fallback });
+
+                // type cannot read from a folder; keep folder contents usable
+                return new LegacySkin(this, resources, fallback);
+            }
+
+            var realmSkinType = string.IsNullOrEmpty(InstantiationInfo)
                 // handle the case of skins imported before InstantiationInfo was added.
                 ? typeof(LegacySkin)
                 : Type.GetType(InstantiationInfo);
 
-            if (type == null)
+            if (realmSkinType == null)
             {
                 // Since the class was renamed from "DefaultSkin" to "TrianglesSkin", the type retrieval would fail
                 // for user modified skins. This aims to amicably handle that.
@@ -66,7 +86,7 @@ namespace osu.Game.Skinning
                 return new TrianglesSkin(this, resources);
             }
 
-            return (Skin)Activator.CreateInstance(type, this, resources)!;
+            return (Skin)Activator.CreateInstance(realmSkinType, this, resources)!;
         }
 
         public IList<RealmNamedFileUsage> Files { get; } = null!;

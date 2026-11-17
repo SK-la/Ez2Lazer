@@ -330,15 +330,16 @@ namespace osu.Game.Overlays.SkinEditor
 
             Schedule(() =>
             {
-                var oldSkin = skinManager.CurrentSkin!.Value;
-                var newSkinInfo = oldSkin.SkinInfo.PerformRead(s => s);
-
-                // Create a new skin instance to ensure the skin is reloaded
-                // If there's a better way to reload the skin, this should be replaced with it.
                 setGlobalSkinDisabled(false);
-                skinManager.CurrentSkin.Value = newSkinInfo.CreateInstance(skinManager);
 
-                oldSkin.Dispose();
+                if (skinManager.CurrentSkinInfo.Value.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _)))
+                    skinManager.ReloadCurrentLegacyFolderSkinIfActive();
+                else
+                {
+                    var oldSkin = skinManager.CurrentSkin!.Value;
+                    skinManager.CurrentSkin.Value = oldSkin.SkinInfo.Value.CreateInstance(skinManager);
+                    oldSkin.Dispose();
+                }
 
                 Hide();
             });
