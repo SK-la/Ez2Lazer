@@ -58,29 +58,15 @@ namespace osu.Game.Skinning
                     : Type.GetType(InstantiationInfo);
 
                 if (type == null)
-                    return new TrianglesSkin(this, resources);
-
-                if (type == typeof(ArgonSkin))
-                    return new ArgonSkin(this, resources, fallback);
-
-                if (type == typeof(DefaultLegacySkin))
-                    return new DefaultLegacySkin(this, resources, fallback);
-
-                if (type == typeof(LegacySkin))
-                    return new LegacySkin(this, resources, fallback);
-
-                if (type == typeof(TrianglesSkin))
                     return new TrianglesSkin(this, resources, fallback);
-
-                if (typeof(LegacySkin).IsAssignableFrom(type))
-                    return (Skin)Activator.CreateInstance(type, this, resources, fallback)!;
 
                 var folderCtor = type.GetConstructor(new[] { typeof(SkinInfo), typeof(IStorageResourceProvider), typeof(IResourceStore<byte[]>) });
 
                 if (folderCtor != null)
                     return (Skin)folderCtor.Invoke(new object[] { this, resources, fallback });
 
-                return (Skin)Activator.CreateInstance(type, this, resources)!;
+                // type cannot read from a folder; keep folder contents usable
+                return new LegacySkin(this, resources, fallback);
             }
 
             var realmSkinType = string.IsNullOrEmpty(InstantiationInfo)
