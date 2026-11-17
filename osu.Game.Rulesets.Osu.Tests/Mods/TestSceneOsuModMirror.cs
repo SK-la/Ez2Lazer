@@ -47,16 +47,22 @@ namespace osu.Game.Rulesets.Osu.Tests.Mods
             PassCondition = () =>
             {
                 var slider = this.ChildrenOfType<DrawableSlider>().SingleOrDefault();
-                var playfield = this.ChildrenOfType<OsuPlayfield>().Single();
+                var playfield = this.ChildrenOfType<OsuPlayfield>().SingleOrDefault();
 
-                if (slider == null)
+                if (slider == null || playfield == null)
+                    return false;
+
+                var repeat = slider.NestedHitObjects.OfType<DrawableSliderRepeat>().SingleOrDefault();
+                var tick = slider.NestedHitObjects.OfType<DrawableSliderTick>().FirstOrDefault();
+
+                if (repeat == null || tick == null)
                     return false;
 
                 return Precision.AlmostEquals(playfield.ToLocalSpace(slider.HeadCircle.ScreenSpaceDrawQuad.Centre), slider.HitObject.Position)
                        && Precision.AlmostEquals(playfield.ToLocalSpace(slider.TailCircle.ScreenSpaceDrawQuad.Centre), slider.HitObject.Position)
-                       && Precision.AlmostEquals(playfield.ToLocalSpace(slider.NestedHitObjects.OfType<DrawableSliderRepeat>().Single().ScreenSpaceDrawQuad.Centre),
+                       && Precision.AlmostEquals(playfield.ToLocalSpace(repeat.ScreenSpaceDrawQuad.Centre),
                            slider.HitObject.Position + slider.HitObject.Path.PositionAt(1))
-                       && Precision.AlmostEquals(playfield.ToLocalSpace(slider.NestedHitObjects.OfType<DrawableSliderTick>().First().ScreenSpaceDrawQuad.Centre),
+                       && Precision.AlmostEquals(playfield.ToLocalSpace(tick.ScreenSpaceDrawQuad.Centre),
                            slider.HitObject.Position + slider.HitObject.Path.PositionAt(0.7f));
             }
         });
