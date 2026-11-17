@@ -247,7 +247,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
                                                     Origin = Anchor.CentreLeft,
                                                     Scale = new Vector2(0.875f),
                                                 },
-                                                displaySR = new EzDisplaySR(EzManiaSummary.EMPTY, StarRatingDisplaySize.Small, animated: true)
+                                                displaySR = new EzDisplaySR(null, StarRatingDisplaySize.Small, animated: true)
                                                 {
                                                     Anchor = Anchor.CentreLeft,
                                                     Origin = Anchor.CentreLeft,
@@ -316,11 +316,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (showSunnySR)
             {
                 displaySR.Show();
-                displaySR.Current.Value = maniaSummary;
+                displaySR.Current.Value = row.SunnyStarRating;
             }
             else
             {
-                displaySR.Current.Value = EzManiaSummary.EMPTY;
+                displaySR.Current.Value = null;
                 displaySR.Hide();
             }
 
@@ -333,7 +333,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             lastManiaSummary = maniaSummary;
             UpdateKps(kpsList);
 
-            if (showSunnySR&& maniaSummary.ColumnCounts.Count > 0)
+            if (showSunnySR && maniaSummary.ColumnCounts.Count > 0)
             {
                 ezDisplayKpc.ManiaSummary = maniaSummary;
                 ezDisplayKpc.Show();

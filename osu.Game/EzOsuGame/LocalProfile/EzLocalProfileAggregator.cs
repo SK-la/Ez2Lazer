@@ -733,7 +733,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
         {
             if (modsAffectAnalysis)
             {
-                if (hasKps && analysis.ManiaSummary?.SunnySR is double analysisSunnySR&& analysisSunnySR>= 0)
+                if (hasKps && analysis.RatingOf(EzAnalysisSystem.SSR).StarRating is double analysisSunnySR && analysisSunnySR >= 0)
                     return analysisSunnySR;
 
                 return resolvedStarRating >= 0 ? resolvedStarRating : -1;
@@ -742,7 +742,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             if (beatmap.EzRatingData.SunnySR >= 0)
                 return beatmap.EzRatingData.SunnySR;
 
-            if (hasKps && analysis.ManiaSummary?.SunnySR is double storedSunnySR&& storedSunnySR>= 0)
+            if (hasKps && analysis.RatingOf(EzAnalysisSystem.SSR).StarRating is double storedSunnySR && storedSunnySR >= 0)
                 return storedSunnySR;
 
             // Align play counts with official star buckets when dedicated ssris unavailable.

@@ -18,6 +18,7 @@ using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.EzOsuGame.UserInterface;
@@ -305,11 +306,14 @@ namespace osu.Game.Screens.Select
             clearEzAnalysisBinding();
             kpsGraph.SetPoints(EzSongSelectAnalysisDisplay.EMPTY.KpsList);
             wedgeMetricsApplied = false;
-            difficultyDisplay.ApplyKpcMetrics(EzSongSelectAnalysisDisplay.EMPTY);
 
             if (working.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
+            {
+                difficultyDisplay.ApplyKpcMetrics(EzSongSelectAnalysisDisplay.EMPTY, null);
                 return;
+            }
 
+            difficultyDisplay.ApplyKpcMetrics(EzSongSelectAnalysisDisplay.EMPTY, beatmapInfo.GetEzStarRating());
             computeEzAnalysis();
         }
 
@@ -351,15 +355,15 @@ namespace osu.Game.Screens.Select
             if (result is { } analysis && !EzSongSelectAnalysisDisplay.ShouldApplyPanelKpsUpdate(analysis, mods.Value))
                 return;
 
-            applyWedgeMetrics(EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, result, mods.Value));
+            applyWedgeMetrics(EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, result, mods.Value), EzRulesetReadout.SkillStar(beatmapInfo, result));
         }
 
-        private void applyWedgeMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+        private void applyWedgeMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics, double? skillStar)
         {
             lastWedgeMetrics = metrics;
             wedgeMetricsApplied = true;
             applyWedgeKpsGraph(metrics);
-            difficultyDisplay.ApplyKpcMetrics(metrics);
+            difficultyDisplay.ApplyKpcMetrics(metrics, skillStar);
         }
 
         private void applyWedgeKpsGraph(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)

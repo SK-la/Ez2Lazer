@@ -781,7 +781,7 @@ LIMIT 1;
                     var kpsList = JsonSerializer.Deserialize<List<double>>(kpsListJson) ?? new List<double>();
 
                     EzManiaSummary? maniaSummary = storedRulesetOnlineId == 3 && maniaUpdatedAt > 0
-                        ? new EzManiaSummary(columnCounts, holdNoteCounts, sunnySR: null)
+                        ? new EzManiaSummary(columnCounts, holdNoteCounts)
                         : null;
 
                     result = new EzAnalysisResult(new KpsSummary(averageKps, maxKps, kpsList), maniaSummary);
@@ -3748,7 +3748,7 @@ WHERE {EzAnalysisSchemaManager.COL_BEATMAP_ID} = $id;
         /// </summary>
         private static bool isValidAnalysisResult(EzAnalysisResult result)
         {
-            if (result.ManiaSummary?.SunnySR is double sunnySR && (double.IsNaN(sunnySR) || double.IsInfinity(sunnySR)))
+            if (result.RatingOf(EzAnalysisSystem.SSR).StarRating is double sunnySR && !double.IsFinite(sunnySR))
                 return false;
 
             return true;

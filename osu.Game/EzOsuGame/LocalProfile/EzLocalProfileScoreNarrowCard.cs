@@ -170,7 +170,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
             if (showSunnySR)
             {
-                starFlow.Add(new EzDisplaySR(row.ReadManiaSummary(), StarRatingDisplaySize.Small)
+                starFlow.Add(new EzDisplaySR(row.SunnyStarRating, StarRatingDisplaySize.Small)
                 {
                     Anchor = Anchor.CentreLeft,
                     Origin = Anchor.CentreLeft,

@@ -33,20 +33,17 @@ namespace osu.Game.Rulesets.BMS.UI.SongSelect
                 }
             }
 
-            var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts: null, sunnySR: record.SunnySR);
+            EzManiaSummary? maniaSummary = columnCounts == null ? null : new EzManiaSummary(columnCounts, holdNoteCounts: null);
 
-            // The stored pp is a chart-level baseline, so it fills the official rating slot.
-            Dictionary<EzAnalysisSystem, EzScalarRating>? ratings = null;
+            var ratings = new Dictionary<EzAnalysisSystem, EzScalarRating>();
 
             if (record.Pp is double pp && double.IsFinite(pp) && pp > 0)
-            {
-                ratings = new Dictionary<EzAnalysisSystem, EzScalarRating>
-                {
-                    [EzAnalysisSystem.Official] = new EzScalarRating(null, pp),
-                };
-            }
+                ratings[EzAnalysisSystem.Official] = new EzScalarRating(null, pp);
 
-            return new EzAnalysisResult(kpsSummary, maniaSummary, ratings: ratings);
+            if (record.SunnySR is double sunny && double.IsFinite(sunny))
+                ratings[EzAnalysisSystem.SSR] = new EzScalarRating(sunny, null);
+
+            return new EzAnalysisResult(kpsSummary, maniaSummary, ratings: ratings.Count == 0 ? null : ratings);
         }
 
         private static IReadOnlyList<double> tryDeserializeKpsList(string? json)

@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
             {
                 var columns = JsonSerializer.Deserialize<Dictionary<int, int>>(ColumnCountsJson) ?? new Dictionary<int, int>();
                 var holds = JsonSerializer.Deserialize<Dictionary<int, int>>(HoldCountsJson) ?? new Dictionary<int, int>();
-                return new EzManiaSummary(columns, holds, SunnyStarRating >= 0 ? SunnyStarRating : null);
+                return new EzManiaSummary(columns, holds);
             }
             catch
             {
@@ -116,10 +116,11 @@ namespace osu.Game.EzOsuGame.LocalProfile
             var metadata = beatmap.Metadata;
             var maniaSummary = analysis.ManiaSummary;
 
+            double? analysisSunny = analysis.RatingOf(EzAnalysisSystem.SSR).StarRating;
             double resolvedSunnySR = sunnyStarRating
-                                 ?? (hasKps && maniaSummary?.SunnySR is double analysisSunnySR && analysisSunnySR >= 0
-                                     ? analysisSunnySR
-                                     : beatmap.EzRatingData.SunnySR);
+                                     ?? (hasKps && analysisSunny is double analysisSunnySR && analysisSunnySR >= 0
+                                         ? analysisSunnySR
+                                         : beatmap.EzRatingData.SunnySR);
 
             int keyCount = 0;
 

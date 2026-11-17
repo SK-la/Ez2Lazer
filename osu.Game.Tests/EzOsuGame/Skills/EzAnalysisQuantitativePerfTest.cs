@@ -236,11 +236,11 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             // Reported, not compared: on mania the ruleset radar (ssr+ its SR4 breakdown) is the largest single item
             // of a full pass, well above the structure, Mina and dan steps this chain covers. Surfacing it here keeps
             // that ordering visible instead of letting the smaller stages look like the budget.
-            double overallDifficulty = 8;
+            const double overall_difficulty = 8;
 
             var radar = EzPerfMeasurer.Measure("radar (ssr+ SR4)", runs, () =>
             {
-                EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, overallDifficulty);
+                EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, overall_difficulty);
             });
 
             TestContext.Progress.WriteLine($"{keyCount}K holdRatio={holdRatio:P0} rows={chart.Notes.Count}");
@@ -463,7 +463,7 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             return new EzAnalysisResult(
                 new KpsSummary(6.5, 9.5, kps),
-                new EzManiaSummary(columns, holds, 12.5),
+                new EzManiaSummary(columns, holds),
                 axes: axes,
                 dan: dan,
                 keyPatternRadar: keyPatternRadar,

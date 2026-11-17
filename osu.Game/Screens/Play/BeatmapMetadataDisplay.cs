@@ -273,8 +273,8 @@ namespace osu.Game.Screens.Play
 
             mods.BindValueChanged(_ =>
             {
-                if (beatmap.BeatmapInfo is BeatmapInfo beatmapInfo && ezAnalysisBindable != null)
-                    dualDifficultyDisplay.ApplyAnalysisMetrics(beatmapInfo, EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, ezAnalysisBindable.Value, mods.Value));
+                if (beatmap.BeatmapInfo is BeatmapInfo info && ezAnalysisBindable != null)
+                    dualDifficultyDisplay.ApplySkillStar(info, EzRulesetReadout.SkillStar(info, ezAnalysisBindable.Value));
             });
         }
 
@@ -296,7 +296,7 @@ namespace osu.Game.Screens.Play
             ezAnalysisBindable = ezAnalysisCache.GetBindableAnalysis(beatmapInfo, ezAnalysisCancellationSource.Token);
             ezAnalysisBindable.BindValueChanged(change =>
             {
-                dualDifficultyDisplay.ApplyAnalysisMetrics(beatmapInfo, EzSongSelectAnalysisDisplay.Resolve(beatmapInfo, change.NewValue, mods.Value));
+                dualDifficultyDisplay.ApplySkillStar(beatmapInfo, EzRulesetReadout.SkillStar(beatmapInfo, change.NewValue));
             }, true);
         }
 

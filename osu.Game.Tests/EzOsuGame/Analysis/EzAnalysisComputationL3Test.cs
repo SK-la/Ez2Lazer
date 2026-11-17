@@ -36,7 +36,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [Test]
-        public void Mania_pass_uses_persisted_sunny_star_for_headline_and_summary()
+        public void Mania_pass_uses_persisted_sunny_star_for_headline()
         {
             var beatmap = new TestBeatmap(new ManiaRuleset().RulesetInfo);
             beatmap.BeatmapInfo.EzRatingData.SunnySR = 9.87;
@@ -45,7 +45,7 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             var result = EzAnalysisComputation.Compute(new TestWorkingBeatmap(beatmap), lookup);
 
             Assert.That(result.RatingOf(EzAnalysisSystem.SSR).StarRating, Is.EqualTo(9.87));
-            Assert.That(result.ManiaSummary?.SunnySR, Is.EqualTo(9.87));
+            Assert.That(result.ManiaSummary, Is.Not.Null);
         }
 
         [Test]

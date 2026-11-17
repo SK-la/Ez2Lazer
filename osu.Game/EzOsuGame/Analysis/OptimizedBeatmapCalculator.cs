@@ -195,28 +195,6 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>
-        /// 快速仅统计列计数与长按计数（单次遍历，避免 KPS 相关开销）。
-        /// </summary>
-        public static EzManiaSummary GetEzManiaSummary(IBeatmap beatmap)
-        {
-            var columnCounts = new Dictionary<int, int>();
-            var holdNoteCounts = new Dictionary<int, int>();
-
-            foreach (var obj in beatmap.HitObjects)
-            {
-                if (obj is IHasColumn columnObj)
-                {
-                    // 统一口径：columnCounts 统计总 note（含 LN），holdNoteCounts 单独统计 LN。
-                    columnCounts[columnObj.Column] = columnCounts.GetValueOrDefault(columnObj.Column) + 1;
-                    if (obj is IHasDuration)
-                        holdNoteCounts[columnObj.Column] = holdNoteCounts.GetValueOrDefault(columnObj.Column) + 1;
-                }
-            }
-
-            return new EzManiaSummary(columnCounts, holdNoteCounts, 0);
-        }
-
-        /// <summary>
         /// 计算粗略 KPS 曲线并返回平均/最大值。使用固定较少的桶（bucket）以快速得到可展示的基线数据。
         /// </summary>
         public static List<double> GetKpsCoarse(IBeatmap beatmap, int buckets = 64)

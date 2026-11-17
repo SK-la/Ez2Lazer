@@ -28,24 +28,9 @@ namespace osu.Game.EzOsuGame.Beatmaps
         /// between the Sunny rating and the Mina rating, and only the Sunny source can be changed by a mod.
         /// </remarks>
         public static double? GetEzStarRating(this BeatmapInfo beatmap)
-            => resolveEzStarRating(beatmap, null, preferAnalysisValues: false);
+            => resolveEzStarRating(beatmap);
 
-        public static EzManiaSummary ToEzManiaSummaryForDisplay(this BeatmapInfo beatmap, EzManiaSummary? analysisSummary = null, bool preferAnalysisValues = false)
-        {
-            double? rating = resolveEzStarRating(beatmap, analysisSummary, preferAnalysisValues);
-
-            if (!analysisSummary.HasValue)
-                return new EzManiaSummary(null, null, rating);
-
-            var summary = analysisSummary.Value;
-
-            return new EzManiaSummary(
-                summary.ColumnCounts,
-                summary.HasHoldNoteCounts ? summary.HoldNoteCounts : null,
-                rating);
-        }
-
-        private static double? resolveEzStarRating(BeatmapInfo beatmap, EzManiaSummary? analysisSummary, bool preferAnalysisValues)
+        private static double? resolveEzStarRating(BeatmapInfo beatmap)
         {
             int rulesetId = beatmap.Ruleset.OnlineID;
 
@@ -55,10 +40,7 @@ namespace osu.Game.EzOsuGame.Beatmaps
             if (EzRulesetReadout.Selected(rulesetId)?.Id != EzRulesetReadout.SUNNY)
                 return finite(beatmap.EzRatingData.MinaSR);
 
-            if (preferAnalysisValues && analysisSummary?.SunnySR is double liveSunnySR)
-                return finite(liveSunnySR);
-
-            return finite(beatmap.GetPersistedSunnyStarRating() ?? analysisSummary?.SunnySR);
+            return finite(beatmap.GetPersistedSunnyStarRating());
         }
 
         /// <summary>
