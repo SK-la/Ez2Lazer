@@ -225,5 +225,14 @@ namespace osu.Game.EzOsuGame.Analysis
 
             return new EzAnalysisResult(commonSummary, ManiaSummary, TagSummary, dictionary, ratings, Dan, radar, SsrPatternRadar, ChartSkillInfo);
         }
+
+        /// <summary>Fills the Sunny skill radar from stored axes without replacing a radar the pass already measured.</summary>
+        public EzAnalysisResult WithPersistedSsrRadar(EzRadarChartData<string> radar)
+        {
+            if (CommonSummary is not KpsSummary commonSummary || SsrPatternRadar != null)
+                return this;
+
+            return new EzAnalysisResult(commonSummary, ManiaSummary, TagSummary, Axes, Ratings, Dan, KeyPatternRadar, radar, ChartSkillInfo);
+        }
     }
 }

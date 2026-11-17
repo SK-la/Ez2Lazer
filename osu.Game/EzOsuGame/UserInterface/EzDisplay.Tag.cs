@@ -16,6 +16,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Threading;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.UI;
@@ -33,8 +34,8 @@ namespace osu.Game.EzOsuGame.UserInterface
     /// <summary>
     /// 难度卡底部标签行：CSI 技能标签（首位）/ 视频 / 故事版 / 用户标签。
     /// Video/Storyboard 标记由 <see cref="BeatmapUpdater"/> 写入 <see cref="BeatmapInfo"/>，此处只读 Realm 字段。
-    /// 技能标签平时读 <see cref="EzSkillProvider.GetChartSkillTagsForHashes"/> 的会话缓存（一次 Realm 批量读取），
-    /// 只有被选中的卡再用 <see cref="EzSkillProvider.TryGetOrComputeChartSkillInfo"/> 复算一次。
+    /// 技能标签平时读 <see cref="EzAnalysisCache.GetChartSkillTags"/>。
+    /// 只有被选中的卡再经 <see cref="EzAnalysisCache.TryGetOrComputeChartSkillTags"/> 补一次。
     /// </summary>
     public partial class EzDisplayTag : CompositeDrawable
     {
@@ -88,7 +89,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         private ISongSelect? songSelect { get; set; }
 
         [Resolved(canBeNull: true)]
-        private EzSkillProvider? skillProvider { get; set; }
+        private EzAnalysisCache? analysisCache { get; set; }
 
         public EzDisplayTag()
         {
@@ -167,16 +168,16 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             int requestId = ++skillTagRequestId;
             var target = beatmap;
-            var provider = skillProvider;
+            var cache = analysisCache;
             string hash = target.Hash;
 
             // Icons / user tags first; skill chips replace the row once the session cache answers.
             rebuildTagFlow([]);
 
-            if (provider == null || target.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(hash))
+            if (cache == null || target.Ruleset.OnlineID != 3 || string.IsNullOrEmpty(hash))
                 return;
 
-            Task.Run(() => getSessionSkillPatterns(provider, hash)).ContinueWith(t =>
+            Task.Run(() => getSessionSkillPatterns(cache, hash)).ContinueWith(t =>
             {
                 string[] cachedPatterns = t.Status == TaskStatus.RanToCompletion ? t.GetResultSafely() : [];
 
@@ -188,7 +189,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                     rebuildTagFlow(cachedPatterns);
 
                     if (selected)
-                        recheckLivePatterns(provider, target, requestId, hash, cachedPatterns);
+                        recheckLivePatterns(cache, target, requestId, hash, cachedPatterns);
                 });
             });
         }
@@ -197,11 +198,11 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// Session dictionary warmed by one Realm pass over every stored ChartSkillInfo row; repeated calls are
         /// dictionary lookups, so a browsing carousel does not issue one Realm read per card.
         /// </summary>
-        private static string[] getSessionSkillPatterns(EzSkillProvider provider, string hash)
+        private static string[] getSessionSkillPatterns(EzAnalysisCache cache, string hash)
         {
             try
             {
-                return provider.GetChartSkillTagsForHashes([hash]).TryGetValue(hash, out string[]? tags) ? tags : [];
+                return cache.GetChartSkillTags(hash);
             }
             catch
             {
@@ -213,7 +214,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// Re-runs the chart skill pass for the selected card only; a chart whose row is already current answers
         /// from the provider's session caches without recomputing.
         /// </summary>
-        private void recheckLivePatterns(EzSkillProvider provider, BeatmapInfo target, int requestId, string hash, string[] cachedPatterns)
+        private void recheckLivePatterns(EzAnalysisCache cache, BeatmapInfo target, int requestId, string hash, string[] cachedPatterns)
         {
             var detached = target.Detach();
 
@@ -221,7 +222,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             {
                 try
                 {
-                    return provider.TryGetOrComputeChartSkillInfo(detached)?.SkillTags;
+                    return cache.TryGetOrComputeChartSkillTags(detached);
                 }
                 catch
                 {

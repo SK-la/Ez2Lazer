@@ -20,6 +20,7 @@ using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Skills;
 using osu.Game.EzOsuGame.Skills.Dan;
+using osu.Game.EzOsuGame.Skills.SSR;
 using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 using osu.Game.Rulesets;
@@ -38,8 +39,8 @@ namespace osu.Game.EzOsuGame.Analysis
     ///
     /// 派发顺序：本会话 store → 即时计算（受 <see cref="Ez2Setting.EzAnalysisRecEnabled"/>）→ 主 SQLite NoMod 切片
     /// （受 <see cref="Ez2Setting.EzAnalysisSqliteEnabled"/>）→ 无结果。
-    /// 已存切片只描述本规则集 NoMod 的 kps/KPC，没有轴、Dan、<see cref="EzAnalysisResult.SsrPatternRadar"/>；
-    /// Rec 关闭时 <see cref="EzAnalysisResult.SsrPatternRadar"/> 仍为空，EKP 多边形可从 L1 五轴加 hold 比合成。有 mod 或换规则集的请求没有已存切片，由即时计算回答。
+    /// 已存切片只描述本规则集 NoMod 的 kps/KPC，没有轴和 Dan。
+    /// Rec 关闭时 Sunny 与 KeyPattern 多边形可从已落库轴合成；Rec 开启时 live pass 覆盖它们。有 mod 或换规则集的请求没有已存切片，由即时计算回答。
     /// 标量（星 / PP / 技能星）经 <see cref="ReadVariantValues"/> 按当前选中系统读取，缺失的半侧才回落到基线列。
     /// <para>
     /// 本 cache 是纯读组件：任何落盘（主 SQLite 切片、Realm 值行与基线列）都由 BDSP、<see cref="BeatmapUpdater"/> 或设置里的手动重算发起。
@@ -56,6 +57,12 @@ namespace osu.Game.EzOsuGame.Analysis
         private static int computeFailCount;
 
         private readonly EzAnalysisLiveCache liveMetrics;
+
+        /// <summary>
+        /// Results from batch passes that run while on-demand analysis is off. <see cref="TryGet"/> does not read this,
+        /// so a profile or dan backfill cannot publish a live pass onto song select.
+        /// </summary>
+        private readonly EzAnalysisLiveCache batchMetrics = new EzAnalysisLiveCache();
 
         /// <summary>
         /// Passes currently running or queued, keyed like <see cref="EzAnalysisLiveCache"/>. A second request for the
@@ -193,7 +200,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (currentMods.Value.Count == 0
                 && beatmapInfo is BeatmapInfo seedBeatmapInfo
                 && analysisDatabase.TryGetStoredSqliteSlice(seedBeatmapInfo, currentRuleset.Value, out var storedSlice))
-                bindable.Value = overlayPersistedKeyPattern(seedBeatmapInfo, storedSlice, currentRuleset.Value.OnlineID);
+                bindable.Value = overlayPersistedRadars(seedBeatmapInfo, storedSlice, currentRuleset.Value.OnlineID);
 
             if (beatmapInfo is BeatmapInfo localBeatmapInfo)
                 updateBindable(bindable, localBeatmapInfo, currentRuleset.Value, currentMods.Value, cancellationToken, computationDelay);
@@ -224,7 +231,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// <remarks>
         /// Dispatch order: this session's store, then a live pass when on-demand computation is enabled, then the
         /// stored SQLite slice. A stored slice is kps/KPC only (no live radar). Rec off therefore yields no
-        /// <see cref="EzAnalysisResult.SsrPatternRadar"/>; KeyPattern radar may still be synthesised from L1 Pattern rows.
+        /// <see cref="EzAnalysisResult.SsrPatternRadar"/> and KeyPattern radar may still be synthesised from stored axes.
         /// A stored slice only describes a NoMod request for the beatmap's own ruleset, so a modded or foreign-ruleset
         /// request is answered by the live pass.
         /// </remarks>
@@ -258,7 +265,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (analysisDatabase.IsSqliteAnalysisEnabled
                 && EzAnalysisDatabase.CanUseStoredAnalysis(lookup.BeatmapInfo, lookup.Ruleset, lookup.OrderedMods)
                 && analysisDatabase.TryGetStoredSqliteSlice(lookup.BeatmapInfo, lookup.Ruleset, out var storedSlice))
-                return overlayPersistedKeyPattern(lookup.BeatmapInfo, storedSlice, lookup.Ruleset.OnlineID);
+                return overlayPersistedRadars(lookup.BeatmapInfo, storedSlice, lookup.Ruleset.OnlineID);
 
             return null;
         }
@@ -327,8 +334,9 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Cached result, or a synchronous pass into the shared store when absent.
         /// </summary>
         /// <remarks>
-        /// Batch callers only (player aggregation). The pass is heavy and synchronous, so calling this from draw/update
-        /// would stall the frame. This path bypasses the Rec setting; UI-facing async lookups remain gated separately.
+        /// Batch callers only (player aggregation, dan backfill). The pass is heavy and synchronous, so calling this
+        /// from draw/update would stall the frame. While on-demand analysis is on, the pass joins the session store.
+        /// While it is off, the result stays in a batch store that <see cref="TryGet"/> does not read.
         /// </remarks>
         public EzAnalysisResult? GetOrCompute(BeatmapInfo beatmap, RulesetInfo ruleset, IReadOnlyList<Mod>? mods)
         {
@@ -343,7 +351,10 @@ namespace osu.Game.EzOsuGame.Analysis
 
             try
             {
-                return ComputeValueAsync(lookup, CancellationToken.None).GetAwaiter().GetResult();
+                if (runtimeAnalysisEnabled.Value)
+                    return ComputeValueAsync(lookup, CancellationToken.None).GetAwaiter().GetResult();
+
+                return computeForBatch(lookup);
             }
             catch (OperationCanceledException)
             {
@@ -375,6 +386,54 @@ namespace osu.Game.EzOsuGame.Analysis
         public IReadOnlyDictionary<string, string[]> GetChartSkillTagsForHashes(IEnumerable<string> beatmapHashes)
             => skillProvider?.GetChartSkillTagsForHashes(beatmapHashes)
                ?? new Dictionary<string, string[]>(StringComparer.Ordinal);
+
+        /// <summary>Stored CSI tags for one chart, from the same batch read as <see cref="GetChartSkillTagsForHashes"/>.</summary>
+        public string[] GetChartSkillTags(string hash)
+        {
+            if (string.IsNullOrEmpty(hash))
+                return [];
+
+            return GetChartSkillTagsForHashes([hash]).TryGetValue(hash, out string[]? tags) ? tags : [];
+        }
+
+        /// <summary>Stored chart skill tags, or a session compute when the stored row is missing. Does not write Realm.</summary>
+        public string[]? TryGetOrComputeChartSkillTags(BeatmapInfo beatmap)
+            => skillProvider?.TryGetOrComputeChartSkillInfo(beatmap)?.SkillTags;
+
+        private EzAnalysisResult? computeForBatch(in EzAnalysisLookupCache lookup)
+        {
+            var key = keyOf(lookup);
+
+            if (batchMetrics.Get(key) is { } cached)
+                return cached;
+
+            var computed = computeAnalysis(lookup);
+
+            if (computed is { } result)
+                batchMetrics.Set(key, result);
+
+            return computed;
+        }
+
+        private EzAnalysisResult overlayPersistedRadars(BeatmapInfo beatmap, EzAnalysisResult slice, int rulesetOnlineId)
+            => overlayPersistedSunnyRadar(beatmap, overlayPersistedKeyPattern(beatmap, slice, rulesetOnlineId), rulesetOnlineId);
+
+        private EzAnalysisResult overlayPersistedSunnyRadar(BeatmapInfo beatmap, EzAnalysisResult slice, int rulesetOnlineId)
+        {
+            if (slice.SsrPatternRadar != null
+                || skillProvider == null
+                || string.IsNullOrEmpty(beatmap.Hash)
+                || !EzSSRUnit.SupportsRuleset(rulesetOnlineId))
+                return slice;
+
+            var skills = skillProvider.ChartStore.GetBeatmapSkills(beatmap.Hash, EzAnalysisSystem.SSR, rulesetOnlineId);
+            var radar = EzSunnySrSkillRadar.TryCreateFromStored(skills);
+
+            if (radar == null)
+                return slice;
+
+            return slice.WithPersistedSsrRadar(radar.Value);
+        }
 
         private EzAnalysisResult overlayPersistedKeyPattern(BeatmapInfo beatmap, EzAnalysisResult slice, int rulesetOnlineId)
         {
