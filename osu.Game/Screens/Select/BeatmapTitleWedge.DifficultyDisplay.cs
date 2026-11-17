@@ -309,7 +309,7 @@ namespace osu.Game.Screens.Select
                     spreadDisplay.Beatmap.Value = beatmap.Value.BeatmapInfo;
 
                     if (beatmap.Value.BeatmapInfo is BeatmapInfo beatmapInfo)
-                        dualDifficultyDisplay.UpdateFromBeatmap(beatmapInfo);
+                        dualDifficultyDisplay.ApplySkillStar(beatmapInfo, ezAnalysisCache.ReadVariantValues(beatmapInfo, mods.Value).SkillStar);
                 }
 
                 // The pp pill follows the same live calculation as the official star pill.

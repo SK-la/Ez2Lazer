@@ -147,9 +147,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
             double? star = live.Star ?? EzReadoutValues.Positive(StoredStar(beatmap, readout.Rating));
             double? performance = live.PerformancePoints ?? EzReadoutValues.Positive(StoredPerformance(beatmap, readout.Rating));
-            double? skillStar = live.SkillStar is double liveStar
-                ? liveSkillStar(readout.SkillRating, liveStar)
-                : EzReadoutValues.Positive(StoredStar(beatmap, readout.SkillRating));
+            double? skillStar = live.SkillStar
+                ?? EzReadoutValues.Positive(StoredStar(beatmap, readout.SkillRating));
 
             return new EzReadoutValues(star, performance, skillStar);
         }

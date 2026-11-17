@@ -5,6 +5,7 @@ using System;
 using NUnit.Framework;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu;
@@ -78,6 +79,33 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
             Assert.That(metrics.KpsList, Is.Empty);
             Assert.That(metrics.ManiaSummary, Is.Null);
             Assert.That(EzRulesetReadout.SkillStar(beatmap, default(EzAnalysisResult)), Is.EqualTo(12.5), "the stored baseline answers for an unfinished pass");
+        }
+
+        [Test]
+        public void Stored_skill_star_follows_the_selected_readout()
+        {
+            var mania = new BeatmapInfo
+            {
+                Ruleset = new ManiaRuleset().RulesetInfo,
+                EzRatingData =
+                {
+                    MinaSR = 8,
+                    SunnySR = 12,
+                    PppSR = 3,
+                },
+            };
+            Assert.That(mania.GetEzStarRating(), Is.EqualTo(8));
+
+            var osuBeatmap = new BeatmapInfo
+            {
+                Ruleset = new OsuRuleset().RulesetInfo,
+                EzRatingData =
+                {
+                    PppSR = 4.5,
+                },
+                StarRating = 9,
+            };
+            Assert.That(osuBeatmap.GetEzStarRating(), Is.EqualTo(4.5));
         }
 
         [Test]

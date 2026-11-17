@@ -200,21 +200,20 @@ namespace osu.Game.Screens.Select
 
         private bool useActiveSongsBranchAsBeatmapSource => ezAnalysisCache.IsActiveSongsBranchFor(ruleset.Value, Criteria?.Mods);
 
-        private bool useEzAnalysisBranchForSunnySROperations => useActiveSongsBranchAsBeatmapSource && ezAnalysisFilter.Value;
-
         /// <summary>
-        /// Whether the active system for this ruleset is the Sunny one and a branch snapshot with mods is in play,
-        /// in which case its star has to come from the branch rather than the NoMod column.
+        /// The songs-branch snapshot stores the SSR star for the active mods. It answers difficulty
+        /// operations only while the selected readout's rating is that system.
         /// </summary>
-        private bool usesSunnyBranchOperations => useEzAnalysisBranchForSunnySROperations
-                                                  && EzRulesetReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Id == EzRulesetReadout.SUNNY;
+        private bool usesBranchStarOperations => useActiveSongsBranchAsBeatmapSource
+                                                 && ezAnalysisFilter.Value
+                                                 && EzRulesetReadout.Selected(ruleset.Value?.OnlineID ?? -1)?.Rating == EzAnalysisSystem.SSR;
 
         private Task<IReadOnlyDictionary<BeatmapInfo, double>> getDifficultiesForOperationsAsync(IEnumerable<BeatmapInfo> beatmaps, CancellationToken cancellationToken)
         {
             if (Criteria == null)
                 return Task.FromResult(empty_operation_difficulties);
 
-            if (usesSunnyBranchOperations)
+            if (usesBranchStarOperations)
                 return getStrictActiveBranchDifficultiesAsync(beatmaps.Distinct().ToList(), Criteria.Mods, cancellationToken);
 
             return Task.FromResult(empty_operation_difficulties);
@@ -339,8 +338,8 @@ namespace osu.Game.Screens.Select
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (activeSongsBranchValues.TryGetValue(beatmap.ID, out double sunnySR))
-                        cachedDifficulties[beatmap.ID] = sunnySR;
+                    if (activeSongsBranchValues.TryGetValue(beatmap.ID, out double star))
+                        cachedDifficulties[beatmap.ID] = star;
                 }
             }
 
@@ -350,8 +349,8 @@ namespace osu.Game.Screens.Select
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                if (cachedDifficulties.TryGetValue(beatmap.ID, out double sunnySR))
-                    resolvedValues[beatmap] = sunnySR;
+                if (cachedDifficulties.TryGetValue(beatmap.ID, out double star))
+                    resolvedValues[beatmap] = star;
             }
 
             return Task.FromResult<IReadOnlyDictionary<BeatmapInfo, double>>(resolvedValues);
@@ -377,7 +376,7 @@ namespace osu.Game.Screens.Select
 
                     // Avoid redundant filters when branch metadata changes but the carousel is not reading the
                     // branch, which is the case unless the active system needs it.
-                    if (!useActiveSongsBranchAsBeatmapSource && !usesSunnyBranchOperations)
+                    if (!useActiveSongsBranchAsBeatmapSource && !usesBranchStarOperations)
                         return;
 
                     Filter(Criteria, true);
