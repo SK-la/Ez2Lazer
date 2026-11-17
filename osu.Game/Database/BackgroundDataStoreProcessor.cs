@@ -2502,7 +2502,7 @@ namespace osu.Game.Database
             int failed = 0;
 
             int workers = Math.Min(analysisWorkerCount, Math.Max(total, 1));
-            using var pending = new BlockingCollection<(Guid Id, BeatmapInfo? Beatmap, EzSunnyMaintenanceResult? Result)>(workers);
+            using var pending = new BlockingCollection<(Guid Id, EzSunnyMaintenanceResult? Result)>(workers);
 
             var writer = new Thread(writePending, 4 * 1024 * 1024)
             {
@@ -2544,11 +2544,11 @@ namespace osu.Game.Database
                 }
             }
 
-            void enqueue(Guid id, BeatmapInfo? beatmap, EzSunnyMaintenanceResult? result)
+            void enqueue(Guid id, EzSunnyMaintenanceResult? result)
             {
                 try
                 {
-                    pending.Add((id, beatmap, result));
+                    pending.Add((id, result));
                 }
                 catch (ObjectDisposedException)
                 {
@@ -2557,6 +2557,7 @@ namespace osu.Game.Database
                 }
                 catch (InvalidOperationException)
                 {
+                    Interlocked.Exchange(ref aborted, 1);
                 }
             }
 
@@ -2579,7 +2580,11 @@ namespace osu.Game.Database
                     {
                         BeatmapInfo? beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
                         EzSunnyMaintenanceResult? result = beatmap == null ? null : compute(beatmap);
-                        enqueue(id, beatmap, result);
+
+                        if (beatmap != null && result is { RequiresStore: true, Star: >= 0 })
+                            ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+
+                        enqueue(id, result);
                     }
                     catch (ObjectDisposedException)
                     {
@@ -2590,7 +2595,7 @@ namespace osu.Game.Database
                     catch (Exception e)
                     {
                         Logger.Log($"Sunny compute failed on {id}: {e}");
-                        enqueue(id, null, null);
+                        enqueue(id, null);
                     }
                 }
             }
@@ -2601,10 +2606,10 @@ namespace osu.Game.Database
                 {
                     foreach (var item in pending.GetConsumingEnumerable())
                     {
-                        if (Volatile.Read(ref aborted) != 0)
-                            break;
-
                         sleepIfRequired();
+
+                        if (Volatile.Read(ref aborted) != 0)
+                            continue;
 
                         try
                         {
@@ -2616,10 +2621,6 @@ namespace osu.Game.Database
                             else if (item.Result.RequiresStore)
                             {
                                 ezSSRUnit.ApplyStore(item.Id, item.Result);
-
-                                if (item.Result.Star >= 0 && item.Beatmap != null)
-                                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(item.Beatmap);
-
                                 processed++;
                             }
                             else
@@ -2631,7 +2632,7 @@ namespace osu.Game.Database
                         catch (ObjectDisposedException)
                         {
                             Interlocked.Exchange(ref aborted, 1);
-                            break;
+                            continue;
                         }
                         catch (Exception e)
                         {
