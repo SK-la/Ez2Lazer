@@ -76,6 +76,14 @@ dotnet_diagnostic.CA1859.severity = suggestion
 # CA1860: Avoid using 'Enumerable.Any()' extension method
 dotnet_diagnostic.CA1860.severity = suggestion
 
+# CA1517: Use ReadOnlySpan for parameters that are not written
+# .NET 11 analyzer; existing helper signatures keep Span for in-place writes
+dotnet_diagnostic.CA1517.severity = suggestion
+
+# CA2027: Task.WhenAny with Task.Delay may leave a timer running
+# .NET 11 analyzer; timeout races in gameplay/online paths are intentional
+dotnet_diagnostic.CA2027.severity = suggestion
+
 # CA1861: Avoid constant arrays as arguments
 # Outdated with collection expressions
 dotnet_diagnostic.CA1861.severity = suggestion

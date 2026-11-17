@@ -37,10 +37,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Install .NET 10.0.x
+      - name: Install .NET 11.0.x
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: "11.0.x"
 
       - name: Cache SonarQube Cloud packages
         uses: actions/cache@v4
@@ -141,10 +141,10 @@ jobs:
           ref: ${{ steps.pr.outputs.head_sha }}
           fetch-depth: 0
 
-      - name: Install .NET 10.0.x
+      - name: Install .NET 11.0.x
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: "11.0.x"
 
       - name: Cache SonarQube Cloud packages
         uses: actions/cache@v4
