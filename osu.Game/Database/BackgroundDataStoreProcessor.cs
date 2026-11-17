@@ -2528,10 +2528,37 @@ namespace osu.Game.Database
             foreach (var thread in threads)
                 thread.Join();
 
-            pending.CompleteAdding();
+            completePending();
             writer.Join();
 
             return new ChartBatchResult(processed + failed, processed, failed, Volatile.Read(ref aborted) != 0);
+
+            void completePending()
+            {
+                try
+                {
+                    pending.CompleteAdding();
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
+
+            void enqueue(Guid id, BeatmapInfo? beatmap, EzSunnyMaintenanceResult? result)
+            {
+                try
+                {
+                    pending.Add((id, beatmap, result));
+                }
+                catch (ObjectDisposedException)
+                {
+                    Interlocked.Exchange(ref aborted, 1);
+                    completePending();
+                }
+                catch (InvalidOperationException)
+                {
+                }
+            }
 
             void runComputeWorker()
             {
@@ -2552,49 +2579,72 @@ namespace osu.Game.Database
                     {
                         BeatmapInfo? beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
                         EzSunnyMaintenanceResult? result = beatmap == null ? null : compute(beatmap);
-                        pending.Add((id, beatmap, result));
+                        enqueue(id, beatmap, result);
                     }
                     catch (ObjectDisposedException)
                     {
                         Interlocked.Exchange(ref aborted, 1);
+                        completePending();
                         return;
                     }
                     catch (Exception e)
                     {
                         Logger.Log($"Sunny compute failed on {id}: {e}");
-                        pending.Add((id, null, null));
+                        enqueue(id, null, null);
                     }
                 }
             }
 
             void writePending()
             {
-                foreach (var item in pending.GetConsumingEnumerable())
+                try
                 {
-                    sleepIfRequired();
-
-                    if (item.Result == null)
+                    foreach (var item in pending.GetConsumingEnumerable())
                     {
-                        markSunnyFailed(item.Id);
-                        failed++;
-                    }
-                    else if (item.Result.RequiresStore)
-                    {
-                        ezSSRUnit.ApplyStore(item.Id, item.Result);
+                        if (Volatile.Read(ref aborted) != 0)
+                            break;
 
-                        if (item.Result.Star >= 0 && item.Beatmap != null)
-                            ((IWorkingBeatmapCache)beatmapManager).Invalidate(item.Beatmap);
+                        sleepIfRequired();
 
-                        processed++;
-                    }
-                    else
-                    {
-                        markSunnyUnsettled(item.Id);
-                        processed++;
-                    }
+                        try
+                        {
+                            if (item.Result == null)
+                            {
+                                markSunnyFailed(item.Id);
+                                failed++;
+                            }
+                            else if (item.Result.RequiresStore)
+                            {
+                                ezSSRUnit.ApplyStore(item.Id, item.Result);
 
-                    int done = processed + failed;
-                    updateNotificationProgress(notification, done, total);
+                                if (item.Result.Star >= 0 && item.Beatmap != null)
+                                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(item.Beatmap);
+
+                                processed++;
+                            }
+                            else
+                            {
+                                markSunnyUnsettled(item.Id);
+                                processed++;
+                            }
+                        }
+                        catch (ObjectDisposedException)
+                        {
+                            Interlocked.Exchange(ref aborted, 1);
+                            break;
+                        }
+                        catch (Exception e)
+                        {
+                            Logger.Log($"Sunny store failed on {item.Id}: {e}");
+                            failed++;
+                        }
+
+                        updateNotificationProgress(notification, processed + failed, total);
+                    }
+                }
+                finally
+                {
+                    completePending();
                 }
             }
 
