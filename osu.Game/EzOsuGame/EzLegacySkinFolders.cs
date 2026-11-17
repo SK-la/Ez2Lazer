@@ -276,6 +276,36 @@ namespace osu.Game.EzOsuGame
             }
         }
 
+        public static void SyncFromExternalEditMount(string mountedPath, string destinationDirectory)
+        {
+            Directory.CreateDirectory(destinationDirectory);
+
+            var mountedFiles = Directory.EnumerateFiles(mountedPath, "*", SearchOption.AllDirectories)
+                                        .Select(file => Path.GetRelativePath(mountedPath, file).Replace('\\', '/'))
+                                        .Where(relative => !string.Equals(relative, meta_filename, StringComparison.OrdinalIgnoreCase))
+                                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string file in Directory.EnumerateFiles(destinationDirectory, "*", SearchOption.AllDirectories))
+            {
+                string relative = Path.GetRelativePath(destinationDirectory, file).Replace('\\', '/');
+
+                if (!string.Equals(relative, meta_filename, StringComparison.OrdinalIgnoreCase) && !mountedFiles.Contains(relative))
+                    File.Delete(file);
+            }
+
+            foreach (string file in Directory.EnumerateFiles(mountedPath, "*", SearchOption.AllDirectories))
+            {
+                string relative = Path.GetRelativePath(mountedPath, file).Replace('\\', '/');
+
+                if (string.Equals(relative, meta_filename, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string destination = Path.Combine(destinationDirectory, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(file, destination, overwrite: true);
+            }
+        }
+
         public static SkinInfo ImportArchive(Storage storage, ArchiveReader archive, IEnumerable<(string original, string shortened)> files)
         {
             BindRoot(storage);

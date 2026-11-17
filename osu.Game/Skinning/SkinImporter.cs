@@ -108,6 +108,12 @@ namespace osu.Game.Skinning
         /// <returns></returns>
         public override async Task<Live<SkinInfo>?> ImportAsUpdate(ProgressNotification notification, ImportTask task, SkinInfo original)
         {
+            if (EzLegacySkinFolders.TryGetDirectory(original, out string folder))
+            {
+                EzLegacySkinFolders.SyncFromExternalEditMount(task.Path, folder);
+                return EzLegacySkinFolders.Scan().FirstOrDefault(s => s.Hash == original.Hash)?.ToLiveUnmanaged();
+            }
+
             return await Realm.WriteAsync<Live<SkinInfo>?>(r =>
             {
                 var skinInfo = r.Find<SkinInfo>(original.ID);
