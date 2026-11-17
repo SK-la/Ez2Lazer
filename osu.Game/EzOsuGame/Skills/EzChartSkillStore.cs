@@ -576,11 +576,34 @@ namespace osu.Game.EzOsuGame.Skills
             if (system == EzAnalysisSystem.KeyPattern)
                 return;
 
-            var beatmapIds = realmAccess.Run(r => r.All<BeatmapInfo>()
-                                                   .Where(b => b.EzRatingData.GetStar(system) >= 0 || b.EzRatingData.GetPerformance(system) >= 0)
-                                                   .ToList()
-                                                   .Select(b => b.ID)
-                                                   .ToList());
+            var beatmapIds = realmAccess.Run(r =>
+            {
+                var beatmaps = r.All<BeatmapInfo>();
+
+                switch (system)
+                {
+                    case EzAnalysisSystem.Official:
+                        beatmaps = beatmaps.Where(b => b.EzRatingData.OfficialSR >= 0 || b.EzRatingData.OfficialPP >= 0);
+                        break;
+
+                    case EzAnalysisSystem.SSR:
+                        beatmaps = beatmaps.Where(b => b.EzRatingData.SunnySR >= 0 || b.EzRatingData.SunnyPP >= 0);
+                        break;
+
+                    case EzAnalysisSystem.PPP:
+                        beatmaps = beatmaps.Where(b => b.EzRatingData.PppSR >= 0 || b.EzRatingData.PppPP >= 0);
+                        break;
+
+                    case EzAnalysisSystem.Mina:
+                        beatmaps = beatmaps.Where(b => b.EzRatingData.MinaSR >= 0 || b.EzRatingData.MinaPP >= 0);
+                        break;
+
+                    default:
+                        return new List<Guid>();
+                }
+
+                return beatmaps.Select(b => b.ID).ToList();
+            });
 
             if (beatmapIds.Count == 0)
                 return;
