@@ -634,23 +634,26 @@ namespace osu.Game.Skinning
             if (ScriptedSkinSupport.IsScriptedSkin(skin.SkinInfo))
                 return SaveScriptedSkinLayout(skin);
 
-            if (EzLegacySkinFolders.TryGetDirectory(skin.SkinInfo.Value, out string legacyDirectory))
+            return skin.SkinInfo.PerformRead(info =>
             {
-                bool written = skinImporter.Save(skin);
-
-                if (written)
+                if (EzLegacySkinFolders.TryGetDirectory(info, out string legacyDirectory))
                 {
-                    Logger.Log($"Wrote legacy skin layout to {legacyDirectory} (skin {skin.SkinInfo.Value.ID}, name {skin.SkinInfo.Value.Name}).",
-                        LoggingTarget.Runtime, LogLevel.Debug);
+                    bool written = skinImporter.Save(skin);
+
+                    if (written)
+                    {
+                        Logger.Log($"Wrote legacy skin layout to {legacyDirectory} (skin {info.ID}, name {info.Name}).",
+                            LoggingTarget.Runtime, LogLevel.Debug);
+                    }
+
+                    return written;
                 }
 
-                return written;
-            }
+                if (!skin.SkinInfo.IsManaged)
+                    throw new InvalidOperationException($"Attempting to save a skin which is not yet tracked. Call {nameof(EnsureMutableSkin)} first.");
 
-            if (!skin.SkinInfo.IsManaged)
-                throw new InvalidOperationException($"Attempting to save a skin which is not yet tracked. Call {nameof(EnsureMutableSkin)} first.");
-
-            return skinImporter.Save(skin);
+                return skinImporter.Save(skin);
+            });
         }
 
         /// <summary>

@@ -327,7 +327,7 @@ namespace osu.Game.EzOsuGame.Layout
                 return;
 
             using (var stream = storage.CreateFileSafely(filename))
-            using (var writer = new StreamWriter(stream, EzLegacySkinFolders.Utf8NoBom))
+            using (var writer = new StreamWriter(stream, EzLegacySkinFolders.UTF8_NO_BOM))
                 writer.Write(contents);
         }
     }

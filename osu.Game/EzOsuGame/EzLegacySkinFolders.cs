@@ -8,6 +8,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
+using osu.Framework.Extensions;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
@@ -29,7 +30,7 @@ namespace osu.Game.EzOsuGame
         private const string meta_filename = "skininfo.json";
         private const string migration_marker = ".migrated";
 
-        public static readonly Encoding Utf8NoBom = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        public static readonly Encoding UTF8_NO_BOM = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
 
         public static string StripUtf8Bom(string text) =>
             text.Length > 0 && text[0] == '\uFEFF' ? text[1..] : text;
@@ -171,6 +172,140 @@ namespace osu.Game.EzOsuGame
             return names;
         }
 
+        private static readonly string[] hashable_file_extensions = { ".ini", ".json" };
+
+        public static string? ComputeContentHash(string directory)
+        {
+            var hashable = new MemoryStream();
+
+            foreach (string relative in Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories)
+                                                 .Select(f => Path.GetRelativePath(directory, f).Replace('\\', '/'))
+                                                 .Where(f => !string.Equals(f, meta_filename, StringComparison.OrdinalIgnoreCase))
+                                                 .Where(f => hashable_file_extensions.Any(ext => f.EndsWith(ext, StringComparison.OrdinalIgnoreCase)))
+                                                 .Order(StringComparer.Ordinal))
+            {
+                using var stream = File.OpenRead(Path.Combine(directory, relative));
+                stream.CopyTo(hashable);
+            }
+
+            if (hashable.Length > 0)
+                return hashable.ComputeSHA2Hash();
+
+            return null;
+        }
+
+        public static bool TryFindDuplicateImport(string? contentHash, string importFastHash, string newDirectory, out SkinInfo existing)
+        {
+            existing = null!;
+
+            if (RootDirectory == null)
+                return false;
+
+            foreach (SkinInfo skin in Scan())
+            {
+                if (!TryGetDirectory(skin, out string directory) || string.Equals(directory, newDirectory, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                FolderMeta? meta = readMeta(directory);
+
+                bool hashMatches;
+
+                if (!string.IsNullOrEmpty(contentHash))
+                {
+                    hashMatches = string.Equals(meta?.ContentHash, contentHash, StringComparison.Ordinal)
+                                  || string.Equals(ComputeContentHash(directory), contentHash, StringComparison.Ordinal);
+                }
+                else
+                    hashMatches = string.Equals(meta?.ImportFastHash, importFastHash, StringComparison.Ordinal);
+
+                if (!hashMatches)
+                    continue;
+
+                if (!dataFilesMatch(directory, newDirectory))
+                    continue;
+
+                existing = createInfo(skin.Hash, directory);
+                return true;
+            }
+
+            return false;
+        }
+
+        public static bool TryDeleteFolder(SkinInfo skin)
+        {
+            if (!TryGetDirectory(skin, out string directory))
+                return false;
+
+            try
+            {
+                Directory.Delete(directory, true);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, $"无法删除重复的传统皮肤导入目录「{skin.Hash}」。");
+                return false;
+            }
+        }
+
+        public static void PersistImportMetadata(string directory, SkinInfo skin, string? contentHash, string importFastHash)
+        {
+            FolderMeta meta = readMeta(directory) ?? new FolderMeta { ID = skin.ID };
+            meta.ID = skin.ID;
+            meta.Name = skin.Name;
+            meta.Creator = skin.Creator;
+            meta.ContentHash = contentHash ?? string.Empty;
+            meta.ImportFastHash = importFastHash;
+            writeMeta(directory, meta);
+        }
+
+        public static void CopyToExternalEditMount(string sourceDirectory, string mountedPath)
+        {
+            Directory.CreateDirectory(mountedPath);
+
+            foreach (string file in Directory.EnumerateFiles(sourceDirectory, "*.*", SearchOption.AllDirectories))
+            {
+                string relative = Path.GetRelativePath(sourceDirectory, file).Replace('\\', '/');
+
+                if (string.Equals(relative, meta_filename, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string destination = Path.Combine(mountedPath, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(file, destination, overwrite: true);
+            }
+        }
+
+        public static void SyncFromExternalEditMount(string mountedPath, string destinationDirectory)
+        {
+            Directory.CreateDirectory(destinationDirectory);
+
+            var mountedFiles = Directory.EnumerateFiles(mountedPath, "*", SearchOption.AllDirectories)
+                                        .Select(file => Path.GetRelativePath(mountedPath, file).Replace('\\', '/'))
+                                        .Where(relative => !string.Equals(relative, meta_filename, StringComparison.OrdinalIgnoreCase))
+                                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string file in Directory.EnumerateFiles(destinationDirectory, "*", SearchOption.AllDirectories))
+            {
+                string relative = Path.GetRelativePath(destinationDirectory, file).Replace('\\', '/');
+
+                if (!string.Equals(relative, meta_filename, StringComparison.OrdinalIgnoreCase) && !mountedFiles.Contains(relative))
+                    File.Delete(file);
+            }
+
+            foreach (string file in Directory.EnumerateFiles(mountedPath, "*", SearchOption.AllDirectories))
+            {
+                string relative = Path.GetRelativePath(mountedPath, file).Replace('\\', '/');
+
+                if (string.Equals(relative, meta_filename, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string destination = Path.Combine(destinationDirectory, relative);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Copy(file, destination, overwrite: true);
+            }
+        }
+
         public static SkinInfo ImportArchive(Storage storage, ArchiveReader archive, IEnumerable<(string original, string shortened)> files)
         {
             BindRoot(storage);
@@ -235,10 +370,10 @@ namespace osu.Game.EzOsuGame
             string path = Path.Combine(directory, "skin.ini");
 
             using var stream = new MemoryStream();
-            using (var writer = new StreamWriter(stream, Utf8NoBom, 1024, leaveOpen: true))
+            using (var writer = new StreamWriter(stream, UTF8_NO_BOM, 1024, leaveOpen: true))
                 new LegacySkinEncoder(skin).Encode(writer);
 
-            writeIfDifferent(path, Utf8NoBom.GetString(stream.ToArray()));
+            writeIfDifferent(path, UTF8_NO_BOM.GetString(stream.ToArray()));
         }
 
         public static string? Rename(SkinInfo info, string newName, IStorageResourceProvider resources)
@@ -371,8 +506,7 @@ namespace osu.Game.EzOsuGame
                     {
                         SkinInfo? row = r.Find<SkinInfo>(id);
 
-                        if (row != null)
-                            row.DeletePending = true;
+                        row?.DeletePending = true;
                     }
                 });
             }
@@ -844,7 +978,7 @@ namespace osu.Game.EzOsuGame
                 if (File.Exists(path) && File.ReadAllText(path) == contents)
                     return false;
 
-                File.WriteAllText(path, contents, Utf8NoBom);
+                File.WriteAllText(path, contents, UTF8_NO_BOM);
                 return true;
             }
             catch (Exception e)
@@ -854,6 +988,37 @@ namespace osu.Game.EzOsuGame
             }
         }
 
+        private static bool dataFilesMatch(string directoryA, string directoryB)
+        {
+            var filesA = listDataFiles(directoryA);
+            var filesB = listDataFiles(directoryB);
+
+            if (!filesA.SequenceEqual(filesB, StringComparer.OrdinalIgnoreCase))
+                return false;
+
+            foreach (string relative in filesA)
+            {
+                string pathA = Path.Combine(directoryA, relative);
+                string pathB = Path.Combine(directoryB, relative);
+
+                if (new global::System.IO.FileInfo(pathA).Length != new global::System.IO.FileInfo(pathB).Length)
+                    return false;
+
+                if (!File.ReadAllBytes(pathA).AsSpan().SequenceEqual(File.ReadAllBytes(pathB)))
+                    return false;
+            }
+
+            return true;
+        }
+
+        private static IEnumerable<string> listDataFiles(string directory)
+        {
+            return Directory.EnumerateFiles(directory, "*.*", SearchOption.AllDirectories)
+                            .Select(f => Path.GetRelativePath(directory, f).Replace('\\', '/'))
+                            .Where(f => !string.Equals(f, meta_filename, StringComparison.OrdinalIgnoreCase))
+                            .Order(StringComparer.OrdinalIgnoreCase);
+        }
+
         private sealed class FolderMeta
         {
             public Guid ID { get; set; }
@@ -861,6 +1026,10 @@ namespace osu.Game.EzOsuGame
             public string Name { get; set; } = string.Empty;
 
             public string Creator { get; set; } = string.Empty;
+
+            public string ContentHash { get; set; } = string.Empty;
+
+            public string ImportFastHash { get; set; } = string.Empty;
         }
 
         private sealed class MigrationSource
