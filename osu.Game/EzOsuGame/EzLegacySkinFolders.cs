@@ -74,7 +74,7 @@ namespace osu.Game.EzOsuGame
 
             try
             {
-                if (RootDirectory == null || string.IsNullOrEmpty(skin.Hash) || skin.InstantiationInfo != legacy_instantiation)
+                if (RootDirectory == null || string.IsNullOrEmpty(skin.Hash))
                     return false;
 
                 string candidate = Path.Combine(RootDirectory, skin.Hash);
@@ -256,7 +256,37 @@ namespace osu.Game.EzOsuGame
             meta.Creator = skin.Creator;
             meta.ContentHash = contentHash ?? string.Empty;
             meta.ImportFastHash = importFastHash;
+            meta.InstantiationInfo = string.IsNullOrEmpty(skin.InstantiationInfo) ? ReadInstantiationInfo(directory) : skin.InstantiationInfo;
             writeMeta(directory, meta);
+        }
+
+        public static string ReadInstantiationInfo(string directory)
+        {
+            string path = Path.Combine(directory, meta_filename);
+
+            if (!File.Exists(path))
+                return legacy_instantiation;
+
+            try
+            {
+                string json = File.ReadAllText(path);
+
+                var deserialisedSkin = JsonConvert.DeserializeObject<SkinInfo>(json);
+
+                if (!string.IsNullOrEmpty(deserialisedSkin?.InstantiationInfo))
+                    return deserialisedSkin.InstantiationInfo;
+
+                var meta = JsonConvert.DeserializeObject<FolderMeta>(json);
+
+                if (!string.IsNullOrEmpty(meta?.InstantiationInfo))
+                    return meta.InstantiationInfo;
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"无法从 {path} 读取 InstantiationInfo：{e.Message}", LoggingTarget.Database, LogLevel.Error);
+            }
+
+            return legacy_instantiation;
         }
 
         public static void CopyToExternalEditMount(string sourceDirectory, string mountedPath)
@@ -357,6 +387,7 @@ namespace osu.Game.EzOsuGame
             meta.ID = info.ID == Guid.Empty ? meta.ID : info.ID;
             meta.Name = info.Name;
             meta.Creator = info.Creator;
+            meta.InstantiationInfo = string.IsNullOrEmpty(info.InstantiationInfo) ? meta.InstantiationInfo : info.InstantiationInfo;
             changed |= writeMeta(directory, meta);
 
             foreach (var layout in skin.LayoutInfos)
@@ -399,6 +430,7 @@ namespace osu.Game.EzOsuGame
             meta.ID = info.ID;
             meta.Name = updatedName;
             meta.Creator = info.Creator;
+            meta.InstantiationInfo = string.IsNullOrEmpty(info.InstantiationInfo) ? meta.InstantiationInfo : info.InstantiationInfo;
             writeMeta(directory, meta);
 
             string renamed = nextFolderName(sanitize(updatedName), info.Hash);
@@ -633,7 +665,7 @@ namespace osu.Game.EzOsuGame
                 Creator = firstNonEmpty(iniCreator, meta?.Creator),
                 Hash = folderName,
                 Protected = false,
-                InstantiationInfo = legacy_instantiation,
+                InstantiationInfo = ReadInstantiationInfo(directory),
             };
         }
 
@@ -1026,6 +1058,8 @@ namespace osu.Game.EzOsuGame
             public string Name { get; set; } = string.Empty;
 
             public string Creator { get; set; } = string.Empty;
+
+            public string InstantiationInfo { get; set; } = string.Empty;
 
             public string ContentHash { get; set; } = string.Empty;
 

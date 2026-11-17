@@ -442,7 +442,7 @@ namespace osu.Game.Tests.Skins.IO
                     Assert.That(new DirectoryInfo(externalEdit.MountedPath).GetFiles().Select(f => f.Name), Is.EquivalentTo(new[]
                     {
                         "skin.ini",
-                        "test.png"
+                        "test_.png"
                     }));
 
                     Task finishTask = Task.CompletedTask;

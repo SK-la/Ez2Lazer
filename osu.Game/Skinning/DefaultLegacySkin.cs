@@ -27,7 +27,12 @@ namespace osu.Game.Skinning
 
         [UsedImplicitly(ImplicitUseKindFlags.InstantiatedWithFixedConstructorSignature)]
         public DefaultLegacySkin(SkinInfo skin, IStorageResourceProvider resources)
-            : base(skin, resources, new NamespacedResourceStore<byte[]>(resources.Resources, "Skins/Legacy"))
+            : this(skin, resources, null)
+        {
+        }
+
+        public DefaultLegacySkin(SkinInfo skin, IStorageResourceProvider resources, IResourceStore<byte[]>? fallbackStore)
+            : base(skin, resources, fallbackStore ?? new NamespacedResourceStore<byte[]>(resources.Resources, "Skins/Legacy"))
         {
         }
 
