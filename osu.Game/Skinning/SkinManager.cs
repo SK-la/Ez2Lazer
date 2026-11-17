@@ -726,7 +726,10 @@ namespace osu.Game.Skinning
 
             var previous = RetroSkin;
             RetroSkin = GetSkin(RetroSkinInfo.Value);
-            previous?.Dispose();
+
+            if (previous != null && !ReferenceEquals(previous, RetroSkin)
+                && previous != trianglesSkin && previous != argonSkin && previous != DefaultClassicSkin)
+                previous.Dispose();
         }
 
         public void IntroduceLegacySkinStorage(IDialogOverlay dialogs)
