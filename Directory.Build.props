@@ -10,6 +10,11 @@
     <!-- https://github.com/dotnet/runtime/issues/129562 -->
     <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
   </PropertyGroup>
+  <PropertyGroup Label="Runtime Async" Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net11.0'))">
+    <!-- 关闭：注释下行、取消注释 UseRuntimeAsync -->
+    <Features>$(Features);runtime-async=on</Features>
+    <!-- <UseRuntimeAsync>false</UseRuntimeAsync> -->
+  </PropertyGroup>
   <PropertyGroup>
     <ApplicationManifest>$(MSBuildThisFileDirectory)app.manifest</ApplicationManifest>
   </PropertyGroup>
