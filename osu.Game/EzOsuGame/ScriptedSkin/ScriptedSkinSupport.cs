@@ -106,7 +106,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
 
                 try
                 {
-                    File.WriteAllText(path, json, EzLegacySkinFolders.Utf8NoBom);
+                    File.WriteAllText(path, json, EzLegacySkinFolders.UTF8_NO_BOM);
                     hadChanges = true;
                 }
                 catch (Exception ex)

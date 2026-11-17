@@ -330,7 +330,7 @@ namespace osu.Game.Database
             if (parameters.Batch && archive != null)
             {
                 // this is a fast bail condition to improve large import performance.
-                item.Hash = computeHashFast(archive);
+                item.Hash = ComputeHashFast(archive);
 
                 existing = CheckForExisting(item, realm);
 
@@ -500,7 +500,7 @@ namespace osu.Game.Database
             return item.Hash;
         }
 
-        private string computeHashFast(ArchiveReader reader)
+        protected string ComputeHashFast(ArchiveReader reader)
         {
             MemoryStream hashable = new MemoryStream();
 

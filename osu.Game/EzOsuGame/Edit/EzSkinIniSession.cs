@@ -94,7 +94,7 @@ namespace osu.Game.EzOsuGame.Edit
                         return;
 
                     LastBackupFilename = backupFolderSkinIni(directory, savedTextForBackup);
-                    File.WriteAllText(Path.Combine(directory, @"skin.ini"), textToCommit, EzLegacySkinFolders.Utf8NoBom);
+                    File.WriteAllText(Path.Combine(directory, @"skin.ini"), textToCommit, EzLegacySkinFolders.UTF8_NO_BOM);
                 });
 
                 skinManager.ReloadCurrentLegacyFolderSkinIfActive();
@@ -163,7 +163,7 @@ namespace osu.Game.EzOsuGame.Edit
             string backupFilename = FormattableString.Invariant($"Backup/skin.ini.{DateTime.Now:yyyyMMdd_HHmmss}");
             string backupPath = Path.Combine(directory, backupFilename);
             Directory.CreateDirectory(Path.GetDirectoryName(backupPath)!);
-            File.WriteAllText(backupPath, savedText, EzLegacySkinFolders.Utf8NoBom);
+            File.WriteAllText(backupPath, savedText, EzLegacySkinFolders.UTF8_NO_BOM);
             return backupFilename;
         }
 

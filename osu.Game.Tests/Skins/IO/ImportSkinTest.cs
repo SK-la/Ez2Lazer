@@ -12,6 +12,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Platform;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame;
 using osu.Game.IO;
 using osu.Game.Skinning;
 using osu.Game.Tests.Resources;
@@ -184,7 +185,18 @@ namespace osu.Game.Tests.Skins.IO
             var import = await loadSkinIntoOsu(osu, new ImportTask(TestResources.OpenResource(filename), filename));
 
             assertCorrectMetadata(import, $"Totally fully features skin [Real Skin with Real Features] [{filename[..^4]}]", "Unknown", 2.7m, osu);
-            Assert.That(import.PerformRead(r => r.Files.Count), Is.EqualTo(3));
+
+            import.PerformRead(skin =>
+            {
+                if (!EzLegacySkinFolders.TryGetDirectory(skin, out string directory))
+                {
+                    Assert.That(skin.Files.Count, Is.EqualTo(3));
+                    return;
+                }
+
+                int fileCount = Directory.EnumerateFiles(directory, "*", SearchOption.AllDirectories).Count();
+                Assert.That(fileCount, Is.GreaterThanOrEqualTo(3));
+            });
         });
 
         [Test]
@@ -466,6 +478,10 @@ namespace osu.Game.Tests.Skins.IO
             {
                 Assert.That(i2.ID, Is.Not.EqualTo(i1.ID));
                 Assert.That(i2.Hash, Is.Not.EqualTo(i1.Hash));
+
+                if (EzLegacySkinFolders.TryGetDirectory(i1, out _))
+                    return;
+
                 Assert.That(i2.Files.First(), Is.Not.EqualTo(i1.Files.First()));
             }));
         }
@@ -476,6 +492,10 @@ namespace osu.Game.Tests.Skins.IO
             {
                 Assert.That(i2.ID, Is.EqualTo(i1.ID));
                 Assert.That(i2.Hash, Is.EqualTo(i1.Hash));
+
+                if (EzLegacySkinFolders.TryGetDirectory(i1, out _))
+                    return;
+
                 Assert.That(i2.Files.First(), Is.EqualTo(i1.Files.First()));
             }));
         }

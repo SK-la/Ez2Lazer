@@ -47,13 +47,52 @@ namespace osu.Game.Skinning
 
         protected override bool ShouldDeleteArchive(string path) => false;
 
+        public new Task<ExternalEditOperation<SkinInfo>> BeginExternalEditing(SkinInfo model)
+        {
+            if (EzLegacySkinFolders.TryGetDirectory(model, out string sourceDirectory))
+            {
+                string mountedPath = Path.Combine(Path.GetTempPath(), model.Hash);
+
+                if (Directory.Exists(mountedPath))
+                    Directory.Delete(mountedPath, true);
+
+                EzLegacySkinFolders.CopyToExternalEditMount(sourceDirectory, mountedPath);
+                return Task.FromResult(new ExternalEditOperation<SkinInfo>(this, model, mountedPath));
+            }
+
+            return base.BeginExternalEditing(model);
+        }
+
         public override Live<SkinInfo>? ImportModel(SkinInfo item, ArchiveReader? archive = null, ImportParameters parameters = default, CancellationToken cancellationToken = default)
         {
             if (archive == null)
                 return base.ImportModel(item, archive, parameters, cancellationToken);
 
-            SkinInfo imported = EzLegacySkinFolders.ImportArchive(gameStorage, archive, GetShortenedFilenames(archive));
-            return imported.ToLiveUnmanaged();
+            return Realm.Run(realm =>
+            {
+                string importFastHash = ComputeHashFast(archive);
+
+                SkinInfo imported = EzLegacySkinFolders.ImportArchive(gameStorage, archive, GetShortenedFilenames(archive));
+
+                if (!string.IsNullOrEmpty(archive.Name))
+                    imported.Name = archive.Name;
+
+                checkSkinIniMetadata(imported, realm);
+
+                if (!EzLegacySkinFolders.TryGetDirectory(imported, out string directory))
+                    return imported.ToLiveUnmanaged();
+
+                string? contentHash = EzLegacySkinFolders.ComputeContentHash(directory);
+
+                if (EzLegacySkinFolders.TryFindDuplicateImport(contentHash, importFastHash, directory, out SkinInfo existing))
+                {
+                    EzLegacySkinFolders.TryDeleteFolder(imported);
+                    return existing.ToLiveUnmanaged();
+                }
+
+                EzLegacySkinFolders.PersistImportMetadata(directory, imported, contentHash, importFastHash);
+                return imported.ToLiveUnmanaged();
+            });
         }
 
         protected override SkinInfo CreateModel(ArchiveReader archive, ImportParameters parameters) => new SkinInfo { Name = archive.Name ?? @"No name" };
@@ -177,7 +216,7 @@ namespace osu.Game.Skinning
             // By this point, the metadata in SkinInfo will be correct.
             // Regardless of whether this is an import or not, let's write the skin.ini if non-existing or non-matching.
             // This is (weirdly) done inside ComputeHash to avoid adding a new method to handle this case. After switching to realm it can be moved into another place.
-            if (skinIniSourcedName != item.Name)
+            if (skinIniSourcedName != item.Name || skinIniSourcedCreator != item.Creator)
                 UpdateSkinIniMetadata(item, realm);
         }
 
@@ -241,8 +280,16 @@ namespace osu.Game.Skinning
         /// <returns>Whether any change actually occurred.</returns>
         public bool Save(Skin skin)
         {
-            if (EzLegacySkinFolders.TryGetDirectory(skin.SkinInfo.Value, out string directory))
-                return EzLegacySkinFolders.Save(skin, directory);
+            string? legacyDirectory = skin.SkinInfo.PerformRead(info =>
+            {
+                if (EzLegacySkinFolders.TryGetDirectory(info, out string directory))
+                    return directory;
+
+                return null;
+            });
+
+            if (legacyDirectory != null)
+                return EzLegacySkinFolders.Save(skin, legacyDirectory);
 
             bool hadChanges = false;
 

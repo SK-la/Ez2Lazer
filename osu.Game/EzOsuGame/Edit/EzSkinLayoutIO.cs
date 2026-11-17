@@ -37,7 +37,7 @@ namespace osu.Game.EzOsuGame.Edit
             string json = JsonConvert.SerializeObject(layout, json_settings);
 
             using (var stream = exportRoot.GetStorageForDirectory("layout-layers").CreateFileSafely(fileName))
-            using (var writer = new StreamWriter(stream, EzLegacySkinFolders.Utf8NoBom))
+            using (var writer = new StreamWriter(stream, EzLegacySkinFolders.UTF8_NO_BOM))
                 writer.Write(json);
 
             return exportRoot.GetFullPath(relativeDest);
