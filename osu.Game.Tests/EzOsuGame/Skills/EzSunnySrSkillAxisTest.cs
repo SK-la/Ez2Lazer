@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.SSR;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
@@ -29,6 +30,12 @@ namespace osu.Game.Tests.EzOsuGame.Skills
                 complete[id] = 1.5;
 
             Assert.That(EzSunnySrSkillRadar.TryCreateFromStored(complete)?.Count, Is.EqualTo(6));
+
+            var slice = new EzAnalysisResult(new KpsSummary(1, 2, null));
+            var overlaid = slice.WithPersistedSsrRadar(EzSunnySrSkillRadar.TryCreateFromStored(complete)!.Value);
+
+            Assert.That(overlaid.SsrPatternRadar?.Count, Is.EqualTo(6));
+            Assert.That(overlaid.WithPersistedSsrRadar(default).SsrPatternRadar?.Count, Is.EqualTo(6));
         }
     }
 }
