@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -1047,7 +1048,7 @@ namespace osu.Game.Database
                 EzAnalysisNotificationStrings.SUNNY_RUNNING,
                 EzAnalysisNotificationStrings.SUNNY_COMPLETED);
 
-            ChartBatchResult batch = runSunnyComputeParallelWriteSerial(beatmapIds.ToList(), notification, beatmap => ezSSRUnit.TryCompute(beatmap, CancellationToken.None));
+            ChartBatchResult batch = runSunnyMaintenance(beatmapIds.ToList(), notification, beatmap => ezSSRUnit.TryCompute(beatmap, CancellationToken.None));
 
             completeNotification(notification, batch.Processed, beatmapIds.Count, batch.Failed);
 
@@ -2483,21 +2484,35 @@ namespace osu.Game.Database
         }
 
         /// <summary>
-        /// Runs Sunny maintenance: parallel load+compute, serial Realm writes (Realm serialises writers on one file).
+        /// Sunny maintenance: workers compute, and a single writer stores each chart as soon as its compute returns.
         /// </summary>
-        private ChartBatchResult runSunnyComputeParallelWriteSerial(
+        /// <remarks>
+        /// The queue is bounded by the worker count, so a pass cannot retain the whole library. Cancellation stops
+        /// workers from taking new charts; charts already computed are still stored.
+        /// </remarks>
+        private ChartBatchResult runSunnyMaintenance(
             IReadOnlyList<Guid> work,
             ProgressNotification? notification,
             Func<BeatmapInfo, EzSunnyMaintenanceResult?> compute)
         {
-            var computed = new System.Collections.Concurrent.ConcurrentDictionary<Guid, EzSunnyMaintenanceResult?>();
             int total = work.Count;
             int next = -1;
             int aborted = 0;
-            int computedCount = 0;
+            int processed = 0;
+            int failed = 0;
 
-            int workers = Math.Min(analysisWorkerCount, total);
+            int workers = Math.Min(analysisWorkerCount, Math.Max(total, 1));
+            using var pending = new BlockingCollection<(Guid Id, BeatmapInfo? Beatmap, EzSunnyMaintenanceResult? Result)>(workers);
+
+            var writer = new Thread(writePending, 4 * 1024 * 1024)
+            {
+                IsBackground = true,
+                Name = "ez-sunny-write",
+            };
+
             var threads = new Thread[workers];
+
+            writer.Start();
 
             for (int i = 0; i < workers; i++)
             {
@@ -2513,59 +2528,10 @@ namespace osu.Game.Database
             foreach (var thread in threads)
                 thread.Join();
 
-            if (Volatile.Read(ref aborted) != 0)
-                return new ChartBatchResult(0, 0, 0, true);
+            pending.CompleteAdding();
+            writer.Join();
 
-            int processed = 0;
-            int failed = 0;
-
-            for (int i = 0; i < total; i++)
-            {
-                if (notification?.State == ProgressNotificationState.Cancelled)
-                    break;
-
-                Guid id = work[i];
-                sleepIfRequired();
-
-                if (!computed.TryGetValue(id, out EzSunnyMaintenanceResult? payload) || payload == null)
-                {
-                    realmAccess.Write(r =>
-                    {
-                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo live)
-                            EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
-                    });
-
-                    failed++;
-                    updateNotificationProgress(notification, i + 1, total, progressStart: 0.5f, progressScale: 0.5f);
-                    continue;
-                }
-
-                if (payload.RequiresStore)
-                {
-                    ezSSRUnit.ApplyStore(id, payload);
-
-                    if (payload.Star >= 0)
-                    {
-                        var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
-
-                        if (beatmap != null)
-                            ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
-                    }
-                }
-                else
-                {
-                    realmAccess.Write(r =>
-                    {
-                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo live && live.EzRatingData.SunnySR < 0)
-                            EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
-                    });
-                }
-
-                processed++;
-                updateNotificationProgress(notification, i + 1, total, progressStart: 0.5f, progressScale: 0.5f);
-            }
-
-            return new ChartBatchResult(total, processed, failed, false);
+            return new ChartBatchResult(processed + failed, processed, failed, Volatile.Read(ref aborted) != 0);
 
             void runComputeWorker()
             {
@@ -2584,17 +2550,9 @@ namespace osu.Game.Database
 
                     try
                     {
-                        var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
-
-                        if (beatmap == null)
-                        {
-                            computed[id] = null;
-                            reportComputeProgress();
-                            continue;
-                        }
-
-                        computed[id] = compute(beatmap);
-                        reportComputeProgress();
+                        BeatmapInfo? beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+                        EzSunnyMaintenanceResult? result = beatmap == null ? null : compute(beatmap);
+                        pending.Add((id, beatmap, result));
                     }
                     catch (ObjectDisposedException)
                     {
@@ -2604,16 +2562,58 @@ namespace osu.Game.Database
                     catch (Exception e)
                     {
                         Logger.Log($"Sunny compute failed on {id}: {e}");
-                        computed[id] = null;
-                        reportComputeProgress();
+                        pending.Add((id, null, null));
                     }
                 }
             }
 
-            void reportComputeProgress()
+            void writePending()
             {
-                int current = Interlocked.Increment(ref computedCount);
-                updateNotificationProgress(notification, current, total, progressScale: 0.5f);
+                foreach (var item in pending.GetConsumingEnumerable())
+                {
+                    sleepIfRequired();
+
+                    if (item.Result == null)
+                    {
+                        markSunnyFailed(item.Id);
+                        failed++;
+                    }
+                    else if (item.Result.RequiresStore)
+                    {
+                        ezSSRUnit.ApplyStore(item.Id, item.Result);
+
+                        if (item.Result.Star >= 0 && item.Beatmap != null)
+                            ((IWorkingBeatmapCache)beatmapManager).Invalidate(item.Beatmap);
+
+                        processed++;
+                    }
+                    else
+                    {
+                        markSunnyUnsettled(item.Id);
+                        processed++;
+                    }
+
+                    int done = processed + failed;
+                    updateNotificationProgress(notification, done, total);
+                }
+            }
+
+            void markSunnyFailed(Guid id)
+            {
+                realmAccess.Write(r =>
+                {
+                    if (r.Find<BeatmapInfo>(id) is BeatmapInfo live)
+                        EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+                });
+            }
+
+            void markSunnyUnsettled(Guid id)
+            {
+                realmAccess.Write(r =>
+                {
+                    if (r.Find<BeatmapInfo>(id) is BeatmapInfo live && live.EzRatingData.SunnySR < 0)
+                        EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+                });
             }
         }
 
@@ -2624,7 +2624,7 @@ namespace osu.Game.Database
         /// The per-chart work is CPU bound and independent, so a single thread leaves most of the machine idle: one
         /// chart is a beatmap load, a conversion, and then the systems that read it. Workers are real threads rather
         /// than pool tasks because the engines behind them are per-thread state, and one core is left for the UI.
-        /// Sunny SR uses <see cref="runSunnyComputeParallelWriteSerial"/> because Realm still serialises writes to one file.
+        /// Sunny SR uses <see cref="runSunnyMaintenance"/>: compute stays parallel, and each chart is stored when its compute returns.
         /// </remarks>
         private static int analysisWorkerCount => Math.Clamp(Environment.ProcessorCount - 1, 1, 8);
 
