@@ -44,7 +44,7 @@ namespace osu.Game.EzOsuGame.Analysis
     }
 
     /// <summary>
-    /// Mania-specific analysis summary for Mania (column-based) beatmaps.
+    /// Column layout for a mania chart. Stars and pp are <see cref="EzAnalysisResult.Ratings"/>.
     ///
     /// Contract (unified):
     /// - <see cref="ColumnCounts"/> contains the total number of hit objects in each column, including long notes (LNs).
@@ -63,14 +63,7 @@ namespace osu.Game.EzOsuGame.Analysis
         private readonly Dictionary<int, int>? columnCounts;
         private readonly Dictionary<int, int>? holdNoteCounts;
 
-        public static readonly EzManiaSummary EMPTY = new EzManiaSummary(null, null, null);
-
-        public double? SunnySR { get; }
-
-        // TODO: 仅预留字段。当前阶段不参与计算、不参与持久化版本升级，也不接入 UI / 本地化。
-        public double? SunnySRFullLN4 { get; }
-
-        public double? SunnySRFullLN8 { get; }
+        public static readonly EzManiaSummary EMPTY = new EzManiaSummary(null, null);
 
         /// <summary>
         /// Total number of hit objects in each column (includes both regular notes and LNs).
@@ -90,14 +83,10 @@ namespace osu.Game.EzOsuGame.Analysis
         /// </summary>
         public bool HasHoldNoteCounts => holdNoteCounts != null;
 
-        public EzManiaSummary(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts, double? sunnySR,
-                              double? sunnySRFullLN4 = null, double? sunnySRFullLN8 = null)
+        public EzManiaSummary(Dictionary<int, int>? columnCounts, Dictionary<int, int>? holdNoteCounts)
         {
             this.columnCounts = columnCounts;
             this.holdNoteCounts = holdNoteCounts;
-            SunnySR = sunnySR;
-            SunnySRFullLN4 = sunnySRFullLN4;
-            SunnySRFullLN8 = sunnySRFullLN8;
         }
     }
 
@@ -218,7 +207,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (CommonSummary is not KpsSummary commonSummary)
                 return this;
 
-            var axes = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(Axes)
+            var dictionary = new Dictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>>(Axes)
             {
                 [EzAnalysisSystem.KeyPattern] = patternAxes,
             };
@@ -234,7 +223,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 };
             }
 
-            return new EzAnalysisResult(commonSummary, ManiaSummary, TagSummary, axes, ratings, Dan, radar, SsrPatternRadar, ChartSkillInfo);
+            return new EzAnalysisResult(commonSummary, ManiaSummary, TagSummary, dictionary, ratings, Dan, radar, SsrPatternRadar, ChartSkillInfo);
         }
     }
 }

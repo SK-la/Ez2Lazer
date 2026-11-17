@@ -19,7 +19,7 @@ namespace osu.Game.EzOsuGame.UserInterface
     {
         public StarRatingDisplay Official { get; }
 
-        public EzDisplaySR SunnySR{ get; }
+        public EzDisplaySR SunnySR { get; }
 
         public EzDisplayPP Performance { get; }
 
@@ -36,7 +36,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 Scale = new Vector2(scale),
             };
 
-            SunnySR = new EzDisplaySR(EzManiaSummary.EMPTY, size, animated)
+            SunnySR = new EzDisplaySR(null, size, animated)
             {
                 Anchor = Anchor.CentreLeft,
                 Origin = Anchor.CentreLeft,
@@ -64,24 +64,15 @@ namespace osu.Game.EzOsuGame.UserInterface
         public void UpdateOfficial(StarDifficulty starDifficulty) => Official.Current.Value = starDifficulty;
 
         /// <summary>
-        /// Star-only surface (gameplay metadata): the stored Sunny rating.
+        /// Stored skill star for the selected readout, before a live pass is applied.
         /// </summary>
         public void UpdateFromBeatmap(BeatmapInfo beatmap)
-        {
-            if (!ShouldShowSunnySRDisplay(beatmap))
-            {
-                ResetSunnySR();
-                return;
-            }
-
-            SunnySR.Show();
-            SunnySR.Current.Value = beatmap.ToEzManiaSummaryForDisplay();
-        }
+            => ApplySkillStar(beatmap, beatmap.GetEzStarRating());
 
         /// <summary>
-        /// The Sunny star for surfaces without a live analysis pass (gameplay metadata).
+        /// Skill star beside the official one. Null still shows the pill when this ruleset has a skill readout.
         /// </summary>
-        public void ApplyAnalysisMetrics(BeatmapInfo beatmap, in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+        public void ApplySkillStar(BeatmapInfo beatmap, double? skillStar)
         {
             if (!ShouldShowSunnySRDisplay(beatmap))
             {
@@ -91,15 +82,13 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             SunnySR.Show();
 
-            var summaryForDisplay = metrics.ManiaSummary ?? beatmap.ToEzManiaSummaryForDisplay();
-
-            if (SunnySR.Current.Value.SunnySR != summaryForDisplay.SunnySR)
-                SunnySR.Current.Value = summaryForDisplay;
+            if (SunnySR.Current.Value != skillStar)
+                SunnySR.Current.Value = skillStar;
         }
 
         public void ResetSunnySR()
         {
-            SunnySR.Current.Value = EzManiaSummary.EMPTY;
+            SunnySR.Current.Value = null;
             SunnySR.Hide();
         }
 

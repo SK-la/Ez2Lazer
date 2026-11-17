@@ -340,7 +340,7 @@ namespace osu.Game.Screens.Select
                 applyVariantPerformance(beatmap.Value.BeatmapInfo, starDifficulty);
             }
 
-            public void ApplyKpcMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics)
+            public void ApplyKpcMetrics(in EzSongSelectAnalysisDisplay.PanelMetrics metrics, double? skillStar)
             {
                 if (beatmap.IsDefault || beatmap.Value.BeatmapInfo is not BeatmapInfo beatmapInfo)
                 {
@@ -362,7 +362,7 @@ namespace osu.Game.Screens.Select
                     ezDisplayKpc.Hide();
                 }
 
-                dualDifficultyDisplay.ApplyAnalysisMetrics(beatmapInfo, metrics);
+                dualDifficultyDisplay.ApplySkillStar(beatmapInfo, skillStar);
                 applyVariantPerformance(beatmapInfo, liveDifficulty.Value);
             }
 

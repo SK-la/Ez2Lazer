@@ -10,7 +10,6 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.UserInterface;
 using osu.Game.Beatmaps.Drawables;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Utils;
@@ -22,18 +21,18 @@ using osu.Framework.Extensions.LocalisationExtensions;
 namespace osu.Game.EzOsuGame.UserInterface
 {
     /// <summary>
-    /// 模仿 StarRatingDisplay 形式的显示SunnySR
+    /// Skill-star pill. The value is the selected readout's star, supplied by the caller.
     /// </summary>
-    public partial class EzDisplaySR : CompositeDrawable, IHasCurrentValue<EzManiaSummary>
+    public partial class EzDisplaySR : CompositeDrawable, IHasCurrentValue<double?>
     {
         private readonly bool animated;
         private readonly Box background;
         private readonly SpriteIcon srIcon;
         private readonly OsuSpriteText srText;
 
-        private readonly BindableWithCurrent<EzManiaSummary> current = new BindableWithCurrent<EzManiaSummary>();
+        private readonly BindableWithCurrent<double?> current = new BindableWithCurrent<double?>();
 
-        public Bindable<EzManiaSummary> Current
+        public Bindable<double?> Current
         {
             get => current.Current;
             set => current.Current = value;
@@ -51,11 +50,11 @@ namespace osu.Game.EzOsuGame.UserInterface
         [Resolved]
         private OsuColour colours { get; set; } = null!;
 
-        public EzDisplaySR(EzManiaSummary ezAnalysisResult, StarRatingDisplaySize size = StarRatingDisplaySize.Regular, bool animated = false)
+        public EzDisplaySR(double? skillStar = null, StarRatingDisplaySize size = StarRatingDisplaySize.Regular, bool animated = false)
         {
             this.animated = animated;
 
-            Current.Value = ezAnalysisResult;
+            Current.Value = skillStar;
 
             AutoSizeAxes = Axes.Both;
 
@@ -133,20 +132,19 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             Current.BindValueChanged(c =>
             {
-                sr = c.NewValue.SunnySR ?? 0;
+                double previous = c.OldValue ?? 0;
+                sr = c.NewValue ?? 0;
 
                 if (animated)
                 {
-                    double diff = sr - c.OldValue.SunnySR ?? 0;
+                    double diff = sr - previous;
                     this.TransformBindableTo(displayedStars, sr, 100 + 80 * Math.Abs(diff), Easing.OutQuint);
                 }
                 else
                     displayedStars.Value = sr;
-
-                // updateDisplay(c.NewValue.ManiaSummary?.SunnySR);
             }, true);
 
-            displayedStars.Value = Current.Value.SunnySR ?? 0;
+            displayedStars.Value = Current.Value ?? 0;
 
             displayedStars.BindValueChanged(s =>
             {

@@ -376,7 +376,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (columnRuleset)
             {
                 padColumnCounts(lookup, columnCounts, holdNoteCounts);
-                maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, sunnySR: null);
+                maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts);
             }
 
             return new EzAnalysisResult(commonSummary, maniaSummary);
@@ -469,7 +469,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (columnRuleset)
                 padColumnCounts(lookup, columnCounts, holdNoteCounts);
 
-            var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts, sunnySR);
+            var maniaSummary = new EzManiaSummary(columnCounts, holdNoteCounts);
 
             IReadOnlyDictionary<EzAnalysisSystem, IReadOnlyDictionary<string, double>> axes;
             IReadOnlyDictionary<EzAnalysisSystem, EzScalarRating> ratings;

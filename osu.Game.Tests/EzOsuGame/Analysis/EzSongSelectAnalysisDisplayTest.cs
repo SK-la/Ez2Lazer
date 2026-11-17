@@ -67,14 +67,17 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
                 Ruleset = new ManiaRuleset().RulesetInfo,
                 Difficulty = new BeatmapDifficulty { CircleSize = 4 },
                 DifficultyName = "test",
+                EzRatingData =
+                {
+                    MinaSR = 12.5,
+                },
             };
-
-            beatmap.EzRatingData.MinaSR = 12.5;
 
             var metrics = EzSongSelectAnalysisDisplay.Resolve(beatmap, default(EzAnalysisResult), Array.Empty<Mod>());
 
             Assert.That(metrics.KpsList, Is.Empty);
-            Assert.That(metrics.ManiaSummary?.SunnySR, Is.EqualTo(12.5), "the stored baseline answers for an unfinished pass");
+            Assert.That(metrics.ManiaSummary, Is.Null);
+            Assert.That(EzRulesetReadout.SkillStar(beatmap, default(EzAnalysisResult)), Is.EqualTo(12.5), "the stored baseline answers for an unfinished pass");
         }
 
         [Test]
