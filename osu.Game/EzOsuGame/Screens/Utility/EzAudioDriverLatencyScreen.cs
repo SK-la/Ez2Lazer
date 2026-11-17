@@ -437,6 +437,9 @@ namespace osu.Game.EzOsuGame.Screens.Utility
                     return;
 
                 outputReady = false;
+                roundActive = false;
+                roundToken++;
+                noteLayer.Clear();
                 status.Text = "这个输出没有起来";
                 addResultCard(deviceLabel(selectedDevice.Value), info.Message);
             });
