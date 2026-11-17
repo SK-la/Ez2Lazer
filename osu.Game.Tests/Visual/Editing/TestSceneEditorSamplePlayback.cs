@@ -36,6 +36,9 @@ namespace osu.Game.Tests.Visual.Editing
                 onceOffSamples = slider.ChildrenOfType<PoolableSkinnableSample>().Where(s => !s.Looping).ToArray();
                 loopingSamples = slider.ChildrenOfType<PoolableSkinnableSample>().Where(s => s.Looping).ToArray();
 
+                if (onceOffSamples.Length < 4 || loopingSamples.Length < 1)
+                    return false;
+
                 if (!loopingSamples.Any(s => s.Playing))
                     return false;
 
