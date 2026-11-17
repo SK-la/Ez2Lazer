@@ -732,7 +732,7 @@ namespace osu.Game.Database
                         EzSSRTuningSnapshot.Record();
                 }
 
-                sunnyFillFinished = populateMissingSunnyStarRatings();
+                (sunnyFillFinished, int sunnyStarDebt) = populateMissingSunnyStarRatings();
 
                 if (!sunnyFillFinished)
                     Logger.Log("Sunny rating pass did not finish; downstream chart skills stay until Sunny finishes.");
@@ -742,7 +742,8 @@ namespace osu.Game.Database
                     Logger.Log($"Sunny fill finished; resetting downstream of SSR: {string.Join(", ", skillStore.InvalidateDownstream(EzAnalysisSystem.SSR))}.");
                 }
 
-                if (sunnyFillFinished && !populateMissingSunnySrSkillAxes())
+                // Star-debt charts already wrote SR4 axes in the same compute pass.
+                if (sunnyFillFinished && sunnyStarDebt == 0 && !populateMissingSunnySrSkillAxes())
                     Logger.Log("Sunny SR4 skill axis pass did not finish; remaining charts are picked up next launch.");
 
                 populateMissingMultiSystemBaselines();
@@ -1014,7 +1015,7 @@ namespace osu.Game.Database
         /// is whether a chart has a rating: a pass that is cancelled leaves the rest missing, and the next launch
         /// continues from there instead of retiring everything again.
         /// </remarks>
-        private bool populateMissingSunnyStarRatings()
+        private (bool completed, int starDebtCount) populateMissingSunnyStarRatings()
         {
             HashSet<Guid> beatmapIds = new HashSet<Guid>();
 
@@ -1038,7 +1039,7 @@ namespace osu.Game.Database
             });
 
             if (beatmapIds.Count == 0)
-                return true;
+                return (true, 0);
 
             Logger.Log($"Found {beatmapIds.Count} beatmaps which require SunnyStarRating reprocessing.");
 
@@ -1046,42 +1047,12 @@ namespace osu.Game.Database
                 EzAnalysisNotificationStrings.SUNNY_RUNNING,
                 EzAnalysisNotificationStrings.SUNNY_COMPLETED);
 
-            ChartBatchResult batch = runChartBatch(beatmapIds.ToList(), processSunnyRating, notification);
+            ChartBatchResult batch = runSunnyComputeParallelWriteSerial(beatmapIds.ToList(), notification, beatmap => ezSSRUnit.TryCompute(beatmap, CancellationToken.None));
 
             completeNotification(notification, batch.Processed, beatmapIds.Count, batch.Failed);
 
-            return !batch.Aborted && notification?.State != ProgressNotificationState.Cancelled;
-
-            bool processSunnyRating(Guid id)
-            {
-                var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
-
-                if (beatmap == null)
-                    return false;
-
-                bool computed = ezSSRUnit.ComputeAndStore(beatmap, CancellationToken.None);
-
-                // Load failures and "nothing to rate" paths must leave a settled star (>= 0), or the same chart is
-                // selected again on every launch. Zero is the failure / N/A stamp; a manual SSR rebuild clears it.
-                bool settled = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.EzRatingData.SunnySR >= 0);
-
-                if (!settled)
-                {
-                    realmAccess.Write(r =>
-                    {
-                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo live)
-                            EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
-                    });
-                }
-
-                if (!computed)
-                    return false;
-
-                if (settled)
-                    ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
-
-                return true;
-            }
+            bool completed = !batch.Aborted && notification?.State != ProgressNotificationState.Cancelled;
+            return (completed, beatmapIds.Count);
         }
 
         /// <summary>
@@ -2512,12 +2483,130 @@ namespace osu.Game.Database
         }
 
         /// <summary>
+        /// Runs Sunny maintenance: parallel load+compute, serial Realm writes (Realm serialises writers on one file).
+        /// </summary>
+        private ChartBatchResult runSunnyComputeParallelWriteSerial(
+            IReadOnlyList<Guid> work,
+            ProgressNotification? notification,
+            Func<BeatmapInfo, EzSunnyMaintenanceResult?> compute)
+        {
+            var computed = new System.Collections.Concurrent.ConcurrentDictionary<Guid, EzSunnyMaintenanceResult?>();
+            int total = work.Count;
+            int next = -1;
+            int aborted = 0;
+
+            int workers = Math.Min(analysisWorkerCount, total);
+            var threads = new Thread[workers];
+
+            for (int i = 0; i < workers; i++)
+            {
+                threads[i] = new Thread(runComputeWorker, 4 * 1024 * 1024)
+                {
+                    IsBackground = true,
+                    Name = $"ez-sunny-compute-{i}",
+                };
+
+                threads[i].Start();
+            }
+
+            foreach (var thread in threads)
+                thread.Join();
+
+            if (Volatile.Read(ref aborted) != 0)
+                return new ChartBatchResult(0, 0, 0, true);
+
+            int processed = 0;
+            int failed = 0;
+
+            for (int i = 0; i < total; i++)
+            {
+                if (notification?.State == ProgressNotificationState.Cancelled)
+                    break;
+
+                Guid id = work[i];
+                sleepIfRequired();
+
+                if (!computed.TryGetValue(id, out EzSunnyMaintenanceResult? payload) || payload == null)
+                {
+                    realmAccess.Write(r =>
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo live)
+                            EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+                    });
+
+                    failed++;
+                    updateNotificationProgress(notification, i + 1, total);
+                    continue;
+                }
+
+                if (payload.RequiresStore)
+                {
+                    ezSSRUnit.ApplyStore(id, payload);
+
+                    if (payload.Star >= 0)
+                    {
+                        var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                        if (beatmap != null)
+                            ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
+                    }
+                }
+
+                processed++;
+                updateNotificationProgress(notification, i + 1, total);
+            }
+
+            return new ChartBatchResult(total, processed, failed, false);
+
+            void runComputeWorker()
+            {
+                while (Volatile.Read(ref aborted) == 0)
+                {
+                    if (notification?.State == ProgressNotificationState.Cancelled)
+                        return;
+
+                    int index = Interlocked.Increment(ref next);
+
+                    if (index >= total)
+                        return;
+
+                    sleepIfRequired();
+                    Guid id = work[index];
+
+                    try
+                    {
+                        var beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+
+                        if (beatmap == null)
+                        {
+                            computed[id] = null;
+                            continue;
+                        }
+
+                        computed[id] = compute(beatmap);
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        Interlocked.Exchange(ref aborted, 1);
+                        return;
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.Log($"Sunny compute failed on {id}: {e}");
+                        computed[id] = null;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
         /// How many charts the analysis passes compute at once.
         /// </summary>
         /// <remarks>
         /// The per-chart work is CPU bound and independent, so a single thread leaves most of the machine idle: one
         /// chart is a beatmap load, a conversion, and then the systems that read it. Workers are real threads rather
         /// than pool tasks because the engines behind them are per-thread state, and one core is left for the UI.
+        /// Sunny SR uses <see cref="runSunnyComputeParallelWriteSerial"/> because Realm still serialises writes to one file.
         /// </remarks>
         private static int analysisWorkerCount => Math.Clamp(Environment.ProcessorCount - 1, 1, 8);
 

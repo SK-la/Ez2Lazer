@@ -296,32 +296,96 @@ namespace osu.Game.EzOsuGame.Skills
             int version = algorithmVersion ?? system.CurrentVersion();
             string systemId = system.ToStorageId();
 
+            realmAccess.Write(r => replaceBeatmapSystemSkills(r, beatmapHash, system, skills, beatmapId, at, version, skillVersions, rulesetOnlineId));
+        }
+
+        /// <summary>Writes one Sunny maintenance bundle in a single transaction.</summary>
+        public void ApplySunnyMaintenanceResult(Guid beatmapId, EzSunnyMaintenanceResult result)
+        {
+            if (!result.RequiresStore)
+                return;
+
+            DateTimeOffset at = DateTimeOffset.UtcNow;
+
             realmAccess.Write(r =>
             {
-                var existing = r.All<EzBeatmapSkillValue>()
-                                .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId)
-                                .ToList();
+                if (r.Find<BeatmapInfo>(beatmapId) is not BeatmapInfo live)
+                    return;
 
-                foreach (var row in existing)
-                    r.Remove(row);
+                EzRatingWriter.Write(live, EzAnalysisSystem.SSR, result.Star, result.SunnyPp);
 
-                foreach (var (skillId, value) in skills)
+                if (result.OfficialStar != null || result.OfficialPp != null)
+                    EzRatingWriter.Write(live, EzAnalysisSystem.Official, result.OfficialStar, result.OfficialPp);
+
+                if (string.IsNullOrEmpty(result.BeatmapHash))
+                    return;
+
+                if (result.SsrSkillAxes != null)
                 {
-                    int rowVersion = rowVersionFor(system, skillId, version, skillVersions, rulesetOnlineId);
+                    replaceBeatmapSystemSkills(
+                        r,
+                        result.BeatmapHash,
+                        EzAnalysisSystem.SSR,
+                        result.SsrSkillAxes,
+                        beatmapId,
+                        at,
+                        EzSSRUnit.VERSION,
+                        null,
+                        EzLocalProfileConstants.MANIA_RULESET_ID);
+                }
 
-                    r.Add(new EzBeatmapSkillValue
-                    {
-                        BeatmapHash = beatmapHash,
-                        BeatmapId = beatmapId,
-                        SystemId = systemId,
-                        RulesetOnlineId = rulesetOnlineId,
-                        SkillId = skillId,
-                        Value = value,
-                        AlgorithmVersion = rowVersion,
-                        ComputedAt = at,
-                    });
+                if (result.KeyPatternSkillAxes != null)
+                {
+                    replaceBeatmapSystemSkills(
+                        r,
+                        result.BeatmapHash,
+                        EzAnalysisSystem.KeyPattern,
+                        result.KeyPatternSkillAxes,
+                        beatmapId,
+                        at,
+                        EzKeyPatternUnit.VERSION,
+                        null,
+                        EzLocalProfileConstants.MANIA_RULESET_ID);
                 }
             });
+        }
+
+        private static void replaceBeatmapSystemSkills(
+            Realm r,
+            string beatmapHash,
+            EzAnalysisSystem system,
+            IReadOnlyDictionary<string, double> skills,
+            Guid beatmapId,
+            DateTimeOffset computedAt,
+            int algorithmVersion,
+            IReadOnlyDictionary<string, int>? skillVersions,
+            int rulesetOnlineId)
+        {
+            string systemId = system.ToStorageId();
+
+            var existing = r.All<EzBeatmapSkillValue>()
+                            .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId)
+                            .ToList();
+
+            foreach (var row in existing)
+                r.Remove(row);
+
+            foreach (var (skillId, value) in skills)
+            {
+                int rowVersion = rowVersionFor(system, skillId, algorithmVersion, skillVersions, rulesetOnlineId);
+
+                r.Add(new EzBeatmapSkillValue
+                {
+                    BeatmapHash = beatmapHash,
+                    BeatmapId = beatmapId,
+                    SystemId = systemId,
+                    RulesetOnlineId = rulesetOnlineId,
+                    SkillId = skillId,
+                    Value = value,
+                    AlgorithmVersion = rowVersion,
+                    ComputedAt = computedAt,
+                });
+            }
         }
 
         /// <summary>

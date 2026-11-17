@@ -90,21 +90,33 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
             if (string.IsNullOrEmpty(beatmapInfo.Hash))
                 return;
 
-            var relative = ComputeRadar(chart, cancellationToken);
-            bool emptyChart = chart.Notes.Count == 0;
+            var skills = BuildSkillsForPersistence(chart, sunnySR, cancellationToken);
 
-            if (!emptyChart && !IsQuantifiableSunny(sunnySR))
+            if (skills == null)
                 return;
-
-            var stored = emptyChart ? relative : Quantify(relative, sunnySR);
 
             skillStore.WriteBeatmapSystemSkills(
                 beatmapInfo.Hash,
                 EzAnalysisSystem.KeyPattern,
-                ToSkills(stored),
+                skills,
                 beatmapInfo.ID,
                 algorithmVersion: VERSION,
                 rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
+        }
+
+        /// <summary>Skill rows for persistence without touching Realm.</summary>
+        public static IReadOnlyDictionary<string, double>? BuildSkillsForPersistence(EzManiaChartInput chart, double sunnySR, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(chart);
+
+            var relative = ComputeRadar(chart, cancellationToken);
+            bool emptyChart = chart.Notes.Count == 0;
+
+            if (!emptyChart && !IsQuantifiableSunny(sunnySR))
+                return null;
+
+            var stored = emptyChart ? relative : Quantify(relative, sunnySR);
+            return ToSkills(stored);
         }
 
         /// <summary>Relative 0–10 scores for the five persistable axes. No LN%.</summary>
