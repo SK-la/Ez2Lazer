@@ -222,6 +222,15 @@ namespace osu.Game.Tests.EzOsuGame.Textures
         }
 
         [Test]
+        public void GifSingleImageFallback()
+        {
+            AddStep("准备资源", createResourceStore);
+            AddStep("单张 gif", () => writeGif("EzResources/Alone/Loop.gif", 22));
+
+            AddAssert("按无后缀名可取到 gif 单帧", () => expect(new[] { 22 }, "Alone/Loop"));
+        }
+
+        [Test]
         public void SingleImageFallbackAndExplicitTemplate()
         {
             AddStep("准备资源", createResourceStore);
@@ -334,6 +343,13 @@ namespace osu.Game.Tests.EzOsuGame.Textures
             using var image = new Image<Rgba32>(size, size);
             using var stream = LocalStorage.GetStream(path, FileAccess.Write);
             image.SaveAsPng(stream);
+        }
+
+        private void writeGif(string path, int size)
+        {
+            using var image = new Image<Rgba32>(size, size);
+            using var stream = LocalStorage.GetStream(path, FileAccess.Write);
+            image.SaveAsGif(stream);
         }
 
         protected override void Dispose(bool isDisposing)

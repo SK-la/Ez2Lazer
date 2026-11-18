@@ -24,8 +24,6 @@ using osu.Game.EzOsuGame.WarmUp;
 using osu.Game.Localisation.SkinComponents;
 using osu.Game.Overlays.Settings;
 using osu.Game.Skinning;
-using osu.Game.Utils;
-
 namespace osu.Game.EzOsuGame.HUD
 {
     /// <summary>
@@ -411,7 +409,6 @@ namespace osu.Game.EzOsuGame.HUD
                     if (Directory.Exists(fullDir))
                     {
                         string[] rawFileNames = Directory.GetFiles(fullDir)
-                                                         .Where(file => SupportedExtensions.IMAGE_EXTENSIONS.Contains(Path.GetExtension(file).ToLowerInvariant()))
                                                          .Select(file => Path.GetFileNameWithoutExtension(file))
                                                          .Where(name => !string.IsNullOrEmpty(name))
                                                          .ToArray();
