@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Skills.Mina;
+using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Skills.Dan
@@ -35,33 +36,124 @@ namespace osu.Game.EzOsuGame.Skills.Dan
         /// </summary>
         public bool ComputeAndStoreFromStored(BeatmapInfo beatmapInfo)
         {
+            var section = TryComputeFromStored(beatmapInfo);
+
+            if (section is EzDanMaintenanceSection.Upsert(var persisted))
+            {
+                skillStore?.UpsertChartDan(persisted);
+                return true;
+            }
+
+            return section is not EzDanMaintenanceSection.TransientFailure;
+        }
+
+        /// <summary>Reads Mina / CSI from Realm — use only when those stages were not computed in the same iteration.</summary>
+        public EzDanMaintenanceSection? TryComputeFromStored(BeatmapInfo beatmapInfo)
+        {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
             if (skillStore == null)
-                return false;
+                return new EzDanMaintenanceSection.TransientFailure();
 
             string hash = beatmapInfo.Hash;
             var msd = skillStore.GetBeatmapSkills(hash, EzAnalysisSystem.Mina);
 
-            // The chain's owed set already filtered on a complete Mina; re-check guards a version change mid-run.
             if (!EzMinaUnit.IsCurrentMinaCache(msd))
-                return false;
+                return new EzDanMaintenanceSection.TransientFailure();
 
-            if (!EzDanEngine.TryResolveStoredInputs(beatmapInfo, out int keyCount, out double holdRatio, out double? sunnySR, out int holdCount))
-                return false;
-
-            // An unavailable stub is not usable input; fall back to the Mina-derived values.
             skillStore.TryGetChartSkillInfo(hash, out var chartInfo);
+
             if (chartInfo is { IsUnavailable: true })
                 chartInfo = null;
 
-            var persisted = EzPersistedChartDan.TryComputeFromStored(hash, beatmapInfo.ID, msd, keyCount, holdRatio, sunnySR, chartInfo, holdCount);
+            return tryComputeFromInputs(beatmapInfo, msd, chartInfo);
+        }
+
+        /// <summary>
+        /// Derives dan from in-memory Mina / CSI sections when the chart chain computed them in the same iteration.
+        /// </summary>
+        public EzDanMaintenanceSection? TryComputeFromInputs(
+            BeatmapInfo beatmapInfo,
+            EzMinaMaintenanceSection? inMemoryMina,
+            EzCsiMaintenanceSection? inMemoryCsi,
+            bool allowStoredMinaFallback,
+            IBeatmap? playable = null)
+        {
+            ArgumentNullException.ThrowIfNull(beatmapInfo);
+
+            if (inMemoryMina is EzMinaMaintenanceSection.Unrateable)
+                return new EzDanMaintenanceSection.Skipped();
+
+            IReadOnlyDictionary<string, double>? msd = resolveMsd(beatmapInfo.Hash, inMemoryMina, allowStoredMinaFallback);
+            EzChartSkillInfo? chartInfo = resolveChartInfo(beatmapInfo.Hash, inMemoryCsi, allowStoredCsiFallback: inMemoryCsi == null);
+
+            if (msd == null || !EzMinaUnit.IsCurrentMinaCache(msd))
+                return new EzDanMaintenanceSection.TransientFailure();
+
+            return tryComputeFromInputs(beatmapInfo, msd, chartInfo, playable);
+        }
+
+        private EzDanMaintenanceSection? tryComputeFromInputs(BeatmapInfo beatmapInfo, IReadOnlyDictionary<string, double> msd, EzChartSkillInfo? chartInfo, IBeatmap? playable = null)
+        {
+            int keyCount;
+            double holdRatio;
+            double? sunnySR;
+            int holdCount;
+
+            if (playable != null)
+            {
+                keyCount = EzHoldMetrics.ResolveKeyCount(playable);
+                holdRatio = EzHoldMetrics.HoldRatioOr(playable, beatmapInfo);
+
+                if (double.IsNaN(holdRatio))
+                    holdRatio = 0;
+
+                sunnySR = beatmapInfo.EzRatingData.SunnySR >= 0 ? beatmapInfo.EzRatingData.SunnySR : null;
+                holdCount = EzHoldMetrics.ComputeHoldCount(playable);
+            }
+            else if (!EzDanEngine.TryResolveStoredInputs(beatmapInfo, out keyCount, out holdRatio, out sunnySR, out holdCount))
+            {
+                return new EzDanMaintenanceSection.TransientFailure();
+            }
+
+            var persisted = EzPersistedChartDan.TryComputeFromStored(beatmapInfo.Hash, beatmapInfo.ID, msd, keyCount, holdRatio, sunnySR, chartInfo, holdCount);
 
             if (persisted == null)
-                return false;
+                return new EzDanMaintenanceSection.TransientFailure();
 
-            skillStore.UpsertChartDan(persisted);
-            return true;
+            return new EzDanMaintenanceSection.Upsert(persisted);
+        }
+
+        private IReadOnlyDictionary<string, double>? resolveMsd(string hash, EzMinaMaintenanceSection? inMemoryMina, bool allowStoredFallback)
+        {
+            if (inMemoryMina is EzMinaMaintenanceSection.Vector(var data, _))
+                return EzMinaUnit.ToSkillDictionary(data);
+
+            if (inMemoryMina is EzMinaMaintenanceSection.Unrateable)
+                return null;
+
+            if (!allowStoredFallback || skillStore == null)
+                return null;
+
+            var msd = skillStore.GetBeatmapSkills(hash, EzAnalysisSystem.Mina);
+            return EzMinaUnit.IsCurrentMinaCache(msd) ? msd : null;
+        }
+
+        private EzChartSkillInfo? resolveChartInfo(string hash, EzCsiMaintenanceSection? inMemoryCsi, bool allowStoredCsiFallback)
+        {
+            if (inMemoryCsi is EzCsiMaintenanceSection.Computed(var info, _))
+                return info;
+
+            if (inMemoryCsi is EzCsiMaintenanceSection.Unavailable)
+                return null;
+
+            if (!allowStoredCsiFallback || skillStore == null)
+                return null;
+
+            if (skillStore.TryGetChartSkillInfo(hash, out var chartInfo) && chartInfo is { IsUnavailable: false })
+                return chartInfo;
+
+            return null;
         }
 
         /// <summary>

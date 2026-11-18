@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
-using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Mods;
@@ -30,12 +29,24 @@ namespace osu.Game.EzOsuGame.Skills.PPP
 
         public IReadOnlyDictionary<string, double>? ComputeAndStore(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
         {
+            var section = TryCompute(beatmapInfo, mods);
+
+            if (section is not EzPppMaintenanceSection.Skills skills)
+                return null;
+
+            skillStore.ApplyPppSection(beatmapInfo.ID, beatmapInfo.Hash, skills);
+            return skills.Values;
+        }
+
+        /// <summary>CPU-only half of PPP maintenance.</summary>
+        public EzPppMaintenanceSection? TryCompute(BeatmapInfo beatmapInfo, IReadOnlyList<Mod>? mods = null)
+        {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
             int rulesetId = beatmapInfo.Ruleset.OnlineID;
 
             if (!EzPPPSkillCatalog.SupportsRuleset(rulesetId))
-                return null;
+                return new EzPppMaintenanceSection.Skipped();
 
             if (!beatmapInfo.Ruleset.Available)
                 beatmapInfo.Ruleset.Available = true;
@@ -48,35 +59,25 @@ namespace osu.Game.EzOsuGame.Skills.PPP
                     working.BeatmapInfo.Ruleset.Available = true;
 
                 IReadOnlyList<Mod> modList = mods ?? Array.Empty<Mod>();
-                // One conversion per chart: the shared cache is the same conversion this would have run, and CSi /
-                // Mina already converted the same inputs, so re-converting here doubled the load cost per chart.
                 var playable = EzPlayableBeatmapCache.GetShared(working, beatmapInfo.Ruleset, modList);
                 var skills = engine.CalculateChart(playable, modList);
 
-                skillStore.WriteBeatmapSystemSkills(
-                    beatmapInfo.Hash,
-                    EzAnalysisSystem.PPP,
-                    skills,
-                    beatmapInfo.ID,
-                    rulesetOnlineId: rulesetId);
+                double? star = skills.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double starValue) && starValue > 0 ? starValue : null;
+                double? pp = null;
 
-                writeRating(beatmapInfo, rulesetId, playable, modList, skills);
+                if (star != null)
+                {
+                    double computed = EzPPPPerformanceCalculators.Calculate(rulesetId, skills, playable, modList, 1);
+                    pp = computed > 0 ? computed : null;
+                }
 
-                return skills;
+                return new EzPppMaintenanceSection.Skills(skills, rulesetId, star, pp);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {
                 Logger.Log($"[EzSkills] PPP chart compute failed for {beatmapInfo}: {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-                return null;
+                return new EzPppMaintenanceSection.TransientFailure();
             }
-        }
-        private void writeRating(BeatmapInfo beatmapInfo, int rulesetId, IBeatmap playable, IReadOnlyList<Mod> mods, IReadOnlyDictionary<string, double> skills)
-        {
-            if (!skills.TryGetValue(EzPPPSkillCatalog.STAR_RATING, out double star) || star <= 0)
-                return;
-
-            double pp = EzPPPPerformanceCalculators.Calculate(rulesetId, skills, playable, mods, 1);
-            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.PPP, star, pp > 0 ? pp : null);
         }
     }
 }
