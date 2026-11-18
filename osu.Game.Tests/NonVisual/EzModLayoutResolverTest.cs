@@ -208,6 +208,30 @@ namespace osu.Game.Tests.NonVisual
         }
 
         [Test]
+        public void TestShearOnlySaveUsesDefaultLayout()
+        {
+            var saved = new EzRulesetModLayout
+            {
+                ColumnShear = 0.12f,
+            };
+
+            var layout = EzModLayoutResolver.Resolve(saved, new[]
+            {
+                mod("FL", ModType.Fun),
+                mod("NF", ModType.DifficultyReduction),
+            });
+
+            Assert.That(layout.ColumnShear, Is.EqualTo(0.12f));
+            Assert.That(layout.Hidden!, Is.Empty);
+            Assert.That(layout.Groups!.Select(group => group.SeedType), Is.EqualTo(new[]
+            {
+                nameof(ModType.DifficultyReduction),
+                nameof(ModType.Fun),
+            }));
+            Assert.That(layout.Groups!.SelectMany(group => group.Acronyms!), Is.EquivalentTo(new[] { "FL", "NF" }));
+        }
+
+        [Test]
         public void TestColumnShearRoundTrip()
         {
             var saved = new EzRulesetModLayout

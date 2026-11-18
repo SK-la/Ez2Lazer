@@ -185,8 +185,12 @@ namespace osu.Game.EzOsuGame.Mods
                 ordered.Add(mod);
             }
 
-            if (saved == null)
-                return createDefault(ordered);
+            if (saved == null || ((saved.Groups?.Count ?? 0) == 0 && (saved.Hidden?.Count ?? 0) == 0))
+            {
+                var defaults = createDefault(ordered);
+                defaults.ColumnShear = saved?.ColumnShear;
+                return defaults;
+            }
 
             saved.EnsureMutableLists();
 
