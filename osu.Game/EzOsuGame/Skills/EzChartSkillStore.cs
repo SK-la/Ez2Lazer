@@ -384,7 +384,7 @@ namespace osu.Game.EzOsuGame.Skills
             if (!result.RequiresStore)
                 return;
 
-            ApplyKeyPatternMaintenanceBatch(new[] { (beatmapId, result) });
+            ApplyKeyPatternMaintenanceBatch(new[] { (beatmapId, (EzKeyPatternMaintenanceResult?)result) });
         }
 
         /// <summary>Writes many KeyPattern axis outcomes in one Realm transaction.</summary>
