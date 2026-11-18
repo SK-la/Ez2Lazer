@@ -8,7 +8,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Testing;
-using osu.Game.EzOsuGame.Statistics;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Screens.Footer;
 using osuTK;
@@ -32,7 +32,9 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
         private ScreenFooterButton nub => offsetButton.ChildrenOfType<ScreenFooterButton>().Single(button => button != offsetButton);
 
-        private float centreX => (offsetButton.DrawWidth - nub.DrawWidth) / 2;
+        private float centreX => offsetButton.DrawWidth / 2;
+
+        private float nubCentreX => nub.X + nub.DrawWidth / 2;
 
         [SetUpSteps]
         public void SetUpSteps()
@@ -54,14 +56,14 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         [Test]
         public void TestDragAndReset()
         {
-            AddAssert("slider starts centred", () => Math.Abs(nub.X - centreX) < 1);
+            AddAssert("slider starts centred", () => Math.Abs(nubCentreX - centreX) < 1);
 
             pressSlider();
 
             AddStep("drag right", () => InputManager.MoveMouseTo(nub.ScreenSpaceDrawQuad.Centre + new Vector2(60, 0)));
 
             AddUntilStep("offset increased", () => current.Value > 100);
-            AddAssert("slider moved right", () => nub.X > centreX + 40);
+            AddAssert("slider moved right", () => nubCentreX > centreX + 40);
 
             AddStep("release", () => InputManager.ReleaseButton(MouseButton.Left));
 
@@ -72,7 +74,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             });
 
             AddUntilStep("offset reset", () => current.Value == 0);
-            AddAssert("slider back to centre", () => Math.Abs(nub.X - centreX) < 1);
+            AddAssert("slider back to centre", () => Math.Abs(nubCentreX - centreX) < 1);
         }
 
         [Test]
@@ -82,11 +84,11 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
             AddStep("drag far right", () => InputManager.MoveMouseTo(nub.ScreenSpaceDrawQuad.Centre + new Vector2(500, 0)));
             AddUntilStep("offset at maximum", () => current.Value == current.MaxValue);
-            AddAssert("slider inside slot", () => nub.X + nub.DrawWidth <= offsetButton.DrawWidth);
+            AddAssert("slider inside slot", () => nubCentreX + nub.DrawWidth * 0.5f <= offsetButton.DrawWidth);
 
             AddStep("drag far left", () => InputManager.MoveMouseTo(nub.ScreenSpaceDrawQuad.Centre - new Vector2(1000, 0)));
             AddUntilStep("offset at minimum", () => current.Value == current.MinValue);
-            AddAssert("slider inside slot", () => nub.X >= 0);
+            AddAssert("slider inside slot", () => nubCentreX - nub.DrawWidth * 0.5f >= 0);
 
             AddStep("release", () => InputManager.ReleaseButton(MouseButton.Left));
         }
@@ -95,7 +97,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         public void TestClickOnTrackResets()
         {
             AddStep("set offset", () => current.Value = 120);
-            AddUntilStep("slider moved right", () => nub.X > centreX + 10);
+            AddUntilStep("slider moved right", () => nubCentreX > centreX + 10);
 
             AddStep("click track", () =>
             {
