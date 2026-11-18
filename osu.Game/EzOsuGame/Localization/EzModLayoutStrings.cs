@@ -14,5 +14,10 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString NEW_GROUP = new EzLocalizationManager.EzLocalisableString("新分组");
 
         public static readonly EzLocalizationManager.EzLocalisableString HIDDEN_MODS = new EzLocalizationManager.EzLocalisableString("隐藏的 Mod");
+
+        public static readonly EzLocalizationManager.EzLocalisableString COLUMN_SHEAR = new EzLocalizationManager.EzLocalisableString("倾斜角度");
+
+        public static readonly EzLocalizationManager.EzLocalisableString COLUMN_SHEAR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "左右拖动调整列倾斜，单击重置", "Drag left/right to adjust column shear, click to reset");
     }
 }
