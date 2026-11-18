@@ -44,7 +44,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             enterEditMode();
             AddUntilStep("editing", () => shearControl.Alpha > 0);
 
-            AddStep("done editing", clickEditButton);
+            AddStep("done editing", clickEditToggle);
             AddUntilStep("shear hidden", () => shearControl.Alpha == 0);
             AddUntilStep("new group hidden", () => newGroupButton.Alpha == 0);
         }
@@ -58,14 +58,15 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         private ShearedButton newGroupButton => modOverlay.ChildrenOfType<ShearedButton>()
                                                           .First(b => b.Text.ToString() == EzModLayoutStrings.NEW_GROUP.ToString());
 
-        private void enterEditMode() => AddStep("enter edit mode", clickEditButton);
+        private ShearedButton editToggleButton => modOverlay.ChildrenOfType<FillFlowContainer>()
+                                                            .Single(flow => flow.ChildrenOfType<EzModLayoutShearControl>().Any())
+                                                            .ChildrenOfType<ShearedButton>().First();
 
-        private void clickEditButton()
+        private void enterEditMode() => AddStep("enter edit mode", clickEditToggle);
+
+        private void clickEditToggle()
         {
-            var editButton = modOverlay.ChildrenOfType<ShearedButton>()
-                                       .First(b => b.Text.ToString() == EzModLayoutStrings.EDIT.ToString());
-
-            InputManager.MoveMouseTo(editButton);
+            InputManager.MoveMouseTo(editToggleButton);
             InputManager.Click(MouseButton.Left);
         }
     }
