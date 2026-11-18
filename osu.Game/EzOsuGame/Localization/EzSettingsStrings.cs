@@ -458,21 +458,21 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("刷新分析数据状态", "Refresh analysis data status");
 
         public static readonly EzLocalizationManager.EzLocalisableString SKILL_DATA_STATUS_REFRESH_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "按规则集重新统计各分析系统（官方 / Sunny / PP+ / Mina / CSI / Dan）已落盘的覆盖情况并刷新状态标记。"
+            "按规则集重新统计各分析系统（原版 / Sunny / PP+ / Mina / CSI / Dan）已落盘的覆盖情况并刷新状态标记。"
             + "\n补算完成后可用此按钮再查；大库可能耗时数秒。"
             + "\n就绪 = 已是当前版本；不可评分 = 该谱面确定算不出，已结算不再重试；"
             + "过期 = 旧版本留下的行（改过算法后会出现）；缺失 = 还没算过。"
             + "\n待补算 = 过期 + 缺失。各系统独立统计，上游换版会使其下游整体变为过期。"
-            + "\n没有版本号列的系统（官方星级 / PP 等）只区分已填 / 未填。"
+            + "\n没有版本号列的系统（原版星级 / PP 等）只区分已填 / 未填。"
             + "\n玩家技能 = 玩家链（成绩 → SunnySR/Dan），没有组合版本号：一局结算后其技能行会被标为过期，"
             + "由手动「计算本地成绩」（及图表链回折）刷新；这里显示还有多少玩家待刷新。"
             + "\n蓝色 = 已对齐；橙色 = 仍有待补算；红色 = 统计失败。",
-            "Re-measures stored coverage of every analysis system (official / Sunny / PP+ / Mina / CSI / Dan) per ruleset."
+            "Re-measures stored coverage of every analysis system (original / Sunny / PP+ / Mina / CSI / Dan) per ruleset."
             + "\nUse this button to re-check after a backfill. May take a few seconds on a large library."
             + "\nready = already at the current revision; unrateable = deterministically unratable and settled (no longer retried);"
             + " stale = a row left by an older revision (appears after an algorithm change); missing = never computed."
             + "\nPending = stale + missing. Each system is counted independently; bumping an upstream one turns its downstream facets stale."
-            + "\nSystems with no revision column (official star / pp, ...) only distinguish filled from unfilled."
+            + "\nSystems with no revision column (original star / pp, ...) only distinguish filled from unfilled."
             + "\nPlayer skills = the player chain (plays -> SunnySR/Dan), which has no composed revision: a settled play flags the player's"
             + " rows and the manual compute / chart-chain follow-up refreshes them. This shows how many players are still waiting."
             + "\nBlue = in sync; orange = work still pending; red = measurement failed.");
@@ -520,7 +520,7 @@ namespace osu.Game.EzOsuGame.Localization
             new EzLocalizationManager.EzLocalisableString("值写于", "values written");
 
         public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_OFFICIAL =
-            new EzLocalizationManager.EzLocalisableString("官方", "Official");
+            new EzLocalizationManager.EzLocalisableString("原版", "Original");
 
         public static readonly EzLocalizationManager.EzLocalisableString PANEL_VARIANT_MINA =
             new EzLocalizationManager.EzLocalisableString("Mina", "Mina");

@@ -88,7 +88,7 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_NAME = new EzLocalizationManager.EzLocalisableString("原版 Max PP", "Original Max PP");
         public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_DETAIL = new EzLocalizationManager.EzLocalisableString(
-            "Perfect 成绩的 PP 列，读官方难度", "Perfect-play PP column; reads official difficulty");
+            "Perfect 成绩的 PP 列，读原版难度", "Perfect-play PP column; reads original difficulty");
 
         public static readonly LocalisableString DATA_REBUILD_ACTION_TAGS_NAME = new EzLocalizationManager.EzLocalisableString("谱面标签", "Chart tags");
         public static readonly LocalisableString DATA_REBUILD_ACTION_TAGS_DETAIL = new EzLocalizationManager.EzLocalisableString(

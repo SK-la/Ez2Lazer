@@ -28,8 +28,8 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString KEYPATTERN_COMPLETED =
             new EzLocalizationManager.EzLocalisableString("谱面 EKP 已更新", "beatmaps' EKP updated");
 
-        public static readonly LocalisableString OFFICIAL_RUNNING = new EzLocalizationManager.EzLocalisableString("补算官方 SR / PP", "Filling official SR / PP");
-        public static readonly LocalisableString OFFICIAL_COMPLETED = new EzLocalizationManager.EzLocalisableString("官方 SR / PP 已更新", "beatmaps' official SR / PP updated");
+        public static readonly LocalisableString OFFICIAL_RUNNING = new EzLocalizationManager.EzLocalisableString("补算原版 SR / PP", "Filling original SR / PP");
+        public static readonly LocalisableString OFFICIAL_COMPLETED = new EzLocalizationManager.EzLocalisableString("原版 SR / PP 已更新", "beatmaps' original SR / PP updated");
 
         public static readonly LocalisableString BASELINE_RUNNING = new EzLocalizationManager.EzLocalisableString(
             "补算 Sunny PP、Mina SR", "Filling Sunny PP and Mina SR");
