@@ -411,6 +411,87 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.Mods
             }
         }
 
+        /// <summary>
+        /// 谱面中间有一大段没有任何物件的空档时，扩展长条不许跨过去，只能收到空档之前的最后一行。
+        /// </summary>
+        [Test]
+        public void TestExtendedHoldStopsAtBlankSection()
+        {
+            const double blank_start = 1500;
+            const double resume_time = 8000;
+
+            bool found = false;
+
+            for (int seed = 1; seed <= 20; seed++)
+            {
+                ManiaBeatmap beatmap = createBlankSectionChart();
+
+                new ManiaModExtendKeys { TargetKeys = { Value = 5 }, Seed = { Value = seed } }.ApplyToBeatmap(beatmap);
+
+                foreach (var hold in beatmap.HitObjects.Where(h => h.Column == 0).OfType<HoldNote>())
+                {
+                    if (hold.StartTime >= resume_time)
+                        continue;
+
+                    Assert.That(hold.EndTime, Is.LessThanOrEqualTo(blank_start + 0.001),
+                                $"种子 {seed}：{hold.StartTime} 起的长条跨过了 {blank_start}～{resume_time} 的空白段");
+
+                    found = true;
+                }
+            }
+
+            Assert.That(found, Is.True, "前置条件：这组种子必须产出空白段之前的扩展长条");
+        }
+
+        /// <summary>
+        /// 间隔被长条身体盖住时不算空白段，长条图里的长条不能被自己的身子截断。
+        /// </summary>
+        [Test]
+        public void TestHoldCoveredGapIsNotBlank()
+        {
+            bool found = false;
+
+            for (int seed = 1; seed <= 20; seed++)
+            {
+                ManiaBeatmap beatmap = createEmptyBeatmap(4);
+
+                // 两条 2000ms 长条，中间 1000ms 的间隔落在长条自身的身体里。
+                beatmap.HitObjects.Add(new HoldNote { StartTime = 1000, Column = 0, Duration = 2000 });
+                beatmap.HitObjects.Add(new HoldNote { StartTime = 4000, Column = 0, Duration = 2000 });
+
+                new ManiaModExtendKeys { TargetKeys = { Value = 5 }, Seed = { Value = seed } }.ApplyToBeatmap(beatmap);
+
+                foreach (var hold in beatmap.HitObjects.Where(h => h.Column == 0).OfType<HoldNote>())
+                    found |= hold.Duration > 1000;
+            }
+
+            Assert.That(found, Is.True, "被长条盖住的间隔不该按空白段把扩展长条截成单点");
+        }
+
+        /// <summary>
+        /// 4K：1000～1500 物件密排，之后到 8000 完全空白，8000 起再排一段。
+        /// </summary>
+        private static ManiaBeatmap createBlankSectionChart()
+        {
+            ManiaBeatmap beatmap = createEmptyBeatmap(4);
+            var objects = beatmap.HitObjects;
+
+            for (int i = 0; i <= 4; i++)
+                objects.Add(new Note { StartTime = 1000 + i * 125, Column = 1 });
+
+            // 空白段前最后一条长条的尾也停在 1500，避免行的边界落在断言之外。
+            for (int i = 0; i <= 3; i++)
+                objects.Add(new HoldNote { StartTime = 1000 + i * 125, Duration = 125, Column = 0 });
+
+            for (int i = 0; i <= 8; i++)
+            {
+                objects.Add(new Note { StartTime = 8000 + i * 125, Column = 1 });
+                objects.Add(new HoldNote { StartTime = 8000 + i * 125, Duration = 125, Column = 0 });
+            }
+
+            return beatmap;
+        }
+
         private static ManiaBeatmap convert(Scenario scenario)
         {
             ManiaBeatmap beatmap = createChart(scenario.SourceKeys);
