@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
@@ -42,30 +43,58 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         /// </summary>
         public bool TryEnsure(BeatmapInfo beatmapInfo)
         {
-            if (beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
-                return true;
+            var section = TryCompute(beatmapInfo);
 
-            // An unrateable Mina settles the whole chain, so the stub form is what belongs here. A complete row in
-            // that state was derived from the stub axis by an earlier pass and is replaced.
-            if (isSettledUnrateableMina(beatmapInfo.Hash))
+            if (section == null)
+                return false;
+
+            switch (section)
             {
-                if (!skillStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var settled) || settled == null || !settled.IsUnavailable)
-                {
-                    Logger.Log($"[EzSkills] CSI not derived for {beatmapInfo}: Mina settled as unrateable; settling as unavailable.",
-                        Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                    skillStore.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
+                case EzCsiMaintenanceSection.Computed:
+                case EzCsiMaintenanceSection.Unavailable:
+                    skillStore.ApplyCsiSection(beatmapInfo.Hash, beatmapInfo.ID, section);
                     liveCache.InvalidateSubject(beatmapInfo.Hash);
+                    sessionMisses.TryRemove(beatmapInfo.Hash, out _);
+                    return true;
+
+                case EzCsiMaintenanceSection.Skipped:
+                    liveCache.InvalidateSubject(beatmapInfo.Hash);
+                    return true;
+
+                case EzCsiMaintenanceSection.TransientFailure:
+                    recordSessionMiss(beatmapInfo.Hash);
+                    return false;
+
+                default:
+                    return true;
+            }
+        }
+
+        /// <summary>
+        /// CPU-only half of CSI maintenance. Uses in-memory Mina when supplied so same-iteration chain stages need no Realm read.
+        /// </summary>
+        /// <param name="chartChainPass">When true, skips Realm settled-row reads; the writer applies DTO-only stubs.</param>
+        public EzCsiMaintenanceSection? TryCompute(BeatmapInfo beatmapInfo, EzMinaMaintenanceSection? inMemoryMina = null, bool chartChainPass = false)
+        {
+            if (beatmapInfo.Ruleset.OnlineID != EzLocalProfileConstants.MANIA_RULESET_ID)
+                return new EzCsiMaintenanceSection.Skipped();
+
+            if (isUnrateableMina(beatmapInfo.Hash, inMemoryMina, chartChainPass))
+            {
+                if (!chartChainPass)
+                {
+                    if (!skillStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var settled) || settled == null || !settled.IsUnavailable)
+                    {
+                        Logger.Log($"[EzSkills] CSI not derived for {beatmapInfo}: Mina settled as unrateable; settling as unavailable.",
+                            Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
+                    }
                 }
 
-                return true;
+                return new EzCsiMaintenanceSection.Unavailable();
             }
 
-            // Complete row, or a stub a previous backfill already settled.
-            if (skillStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
-            {
-                liveCache.InvalidateSubject(beatmapInfo.Hash);
-                return true;
-            }
+            if (!chartChainPass && skillStore.TryGetChartSkillInfo(beatmapInfo.Hash, out var stored) && stored != null)
+                return new EzCsiMaintenanceSection.Skipped();
 
             IBeatmap map;
 
@@ -75,51 +104,61 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {
-                // Content-addressed: the file backing this hash will not become loadable on its own, so settle it
-                // rather than re-converting it on every backfill. Re-importing produces a new hash, and a full
-                // rebuild clears the stub.
                 Logger.Log($"[EzSkills] CSI backfill cannot load {beatmapInfo} ({e.Message}); settling as unavailable.",
                     Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                skillStore.WriteChartSkillInfoUnavailable(beatmapInfo.Hash, beatmapInfo.ID);
-                liveCache.InvalidateSubject(beatmapInfo.Hash);
-                return true;
+                return new EzCsiMaintenanceSection.Unavailable();
             }
 
             try
             {
                 var input = EzCSIEngine.FromPlayable(map);
-                // Motion / pattern shares are rate-invariant; always measure at 1.0x like hub.
                 var axes = EzCSIEngine.ComputeAxes(input, out var info);
-                skillStore.UpsertChartSkillInfo(beatmapInfo.Hash, info, beatmapInfo.ID);
-                // The typed row carries the tags; the axis table is what a reader draws, so both are written here,
-                // by the one pass that measured them.
-                skillStore.WriteBeatmapSystemSkills(
-                    beatmapInfo.Hash,
-                    EzAnalysisSystem.CSI,
-                    axes,
-                    beatmapInfo.ID,
-                    rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
-
-                sessionMisses.TryRemove(beatmapInfo.Hash, out _);
-                liveCache.InvalidateSubject(beatmapInfo.Hash);
-                return true;
+                return new EzCsiMaintenanceSection.Computed(info, axes);
             }
             catch (Exception e)
             {
-                // Analysis-side failure: leave it unstamped so the next backfill retries it.
                 Logger.Log($"[EzSkills] CSI backfill analysis failed for {beatmapInfo} ({e.Message}); will retry.",
                     Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-                recordSessionMiss(beatmapInfo.Hash);
-                return false;
+                return new EzCsiMaintenanceSection.TransientFailure();
             }
         }
 
-        private bool isSettledUnrateableMina(string beatmapHash)
-            => skillStore.GetBeatmapSystemState(beatmapHash, EzAnalysisSystem.Mina) == EzSkillRowState.Unrateable;
+        /// <summary>Invalidates live cache subjects once per hash after a maintenance batch.</summary>
+        public void InvalidateSubjectsAfterBatch(IEnumerable<string> beatmapHashes)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (string hash in beatmapHashes)
+            {
+                if (string.IsNullOrEmpty(hash) || !seen.Add(hash))
+                    continue;
+
+                liveCache.InvalidateSubject(hash);
+            }
+        }
+
+        /// <summary>Records a transient CSI miss after the maintenance writer committed (chart-chain batch).</summary>
+        public void RecordSessionMissAfterCommit(string beatmapHash) => recordSessionMiss(beatmapHash);
+
+        private bool isUnrateableMina(string beatmapHash, EzMinaMaintenanceSection? inMemoryMina, bool chartChainPass)
+        {
+            switch (inMemoryMina)
+            {
+                case EzMinaMaintenanceSection.Unrateable:
+                    return true;
+
+                case EzMinaMaintenanceSection.Vector:
+                    return false;
+
+                case EzMinaMaintenanceSection.TransientFailure when chartChainPass:
+                    return false;
+            }
+
+            return skillStore.GetBeatmapSystemState(beatmapHash, EzAnalysisSystem.Mina) == EzSkillRowState.Unrateable;
+        }
 
         private void recordSessionMiss(string beatmapHash)
         {
-            // Several analysis workers settle charts at once, so this is written concurrently.
             if (sessionMisses.Count >= 1024)
                 sessionMisses.Clear();
 

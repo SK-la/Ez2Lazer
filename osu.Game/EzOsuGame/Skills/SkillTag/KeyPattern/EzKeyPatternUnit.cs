@@ -50,15 +50,40 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
         /// </summary>
         public bool ComputeAndStore(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
         {
+            var result = TryCompute(beatmapInfo, cancellationToken);
+
+            if (result == null)
+                return false;
+
+            if (!result.RequiresStore)
+                return true;
+
+            if (result.Skills != null && result.BeatmapHash != null)
+            {
+                skillStore.WriteBeatmapSystemSkills(
+                    result.BeatmapHash,
+                    EzAnalysisSystem.KeyPattern,
+                    result.Skills,
+                    beatmapInfo.ID,
+                    algorithmVersion: VERSION,
+                    rulesetOnlineId: EzLocalProfileConstants.MANIA_RULESET_ID);
+            }
+
+            return true;
+        }
+
+        /// <summary>CPU-only half of KeyPattern axis backfill.</summary>
+        public EzKeyPatternMaintenanceResult? TryCompute(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
+        {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
             if (!SupportsRuleset(beatmapInfo.Ruleset.OnlineID) || string.IsNullOrEmpty(beatmapInfo.Hash))
-                return true;
+                return EzKeyPatternMaintenanceResult.NoStoreRequired;
 
             double sunnySR = beatmapInfo.EzRatingData.SunnySR;
 
             if (!double.IsFinite(sunnySR) || sunnySR < 0)
-                return true;
+                return EzKeyPatternMaintenanceResult.NoStoreRequired;
 
             IBeatmap playable;
 
@@ -68,12 +93,16 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {
-                return false;
+                return null;
             }
 
             var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
-            Write(skillStore, beatmapInfo, chart, sunnySR, cancellationToken);
-            return true;
+            var skills = BuildSkillsForPersistence(chart, sunnySR, cancellationToken);
+
+            if (skills == null)
+                return EzKeyPatternMaintenanceResult.NoStoreRequired;
+
+            return new EzKeyPatternMaintenanceResult(true, beatmapInfo.Hash, skills);
         }
 
         public static void Write(

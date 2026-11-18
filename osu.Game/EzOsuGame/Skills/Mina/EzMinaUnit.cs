@@ -34,10 +34,35 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
         public IReadOnlyDictionary<string, double>? ComputeAndStore(BeatmapInfo beatmapInfo)
         {
+            var section = TryCompute(beatmapInfo);
+
+            if (section == null)
+                return null;
+
+            switch (section)
+            {
+                case EzMinaMaintenanceSection.Vector(var vector, _):
+                    skillStore.ApplyMinaSection(beatmapInfo.Hash, beatmapInfo.ID, section);
+                    return toDictionary(vector);
+
+                case EzMinaMaintenanceSection.Unrateable:
+                    skillStore.ApplyMinaSection(beatmapInfo.Hash, beatmapInfo.ID, section);
+                    return null;
+
+                case EzMinaMaintenanceSection.Skipped:
+                case EzMinaMaintenanceSection.TransientFailure:
+                default:
+                    return null;
+            }
+        }
+
+        /// <summary>CPU-only half of Mina maintenance for parallel passes.</summary>
+        public EzMinaMaintenanceSection? TryCompute(BeatmapInfo beatmapInfo)
+        {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
             if (beatmapInfo.Ruleset.OnlineID != 3)
-                return null;
+                return new EzMinaMaintenanceSection.Skipped();
 
             if (!beatmapInfo.Ruleset.Available)
                 beatmapInfo.Ruleset.Available = true;
@@ -55,54 +80,37 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {
-                // Content-addressed: the file backing this hash will not become loadable on its own, so it is
-                // settled rather than retried on every backfill (mirrors the CSI stage). Re-importing produces a
-                // new hash and 「完全重算」 clears the marker.
                 Logger.Log($"[EzSkills] Mina cannot load {beatmapInfo} ({e.Message}); settling as unrateable.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
-                return null;
+                return new EzMinaMaintenanceSection.Unrateable();
             }
 
             int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
 
-            // The engine returns a zero vector for a column count outside its range rather than throwing, so the
-            // gate has to be read here: without it those charts stay row-less and every reader counts them as
-            // "still missing" forever.
             if (!EzMinaEngine.IsSupportedKeyCount(keyCount))
             {
                 Logger.Log($"[EzSkills] Mina unsupported keymode {keyCount} for {beatmapInfo}; settling as unrateable.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Important);
-                skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID);
-                return null;
+                return new EzMinaMaintenanceSection.Unrateable();
             }
 
-            var computed = computeVector(playable, beatmapInfo, keyCount, _ => skillStore.WriteBeatmapMsdUnrateable(beatmapInfo.Hash, beatmapInfo.ID));
+            var computed = computeVector(playable, beatmapInfo, keyCount);
 
             if (computed == null)
-                return null;
+                return new EzMinaMaintenanceSection.TransientFailure();
 
-            skillStore.WriteBeatmapMsd(beatmapInfo.Hash, computed.Value, beatmapInfo.ID);
-            writeRating(beatmapInfo, computed.Value);
+            if (computed.Value.Overall <= 0 && computed.Value.Stream <= 0)
+            {
+                Logger.Log($"[EzSkills] Mina zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
+                return new EzMinaMaintenanceSection.Unrateable();
+            }
 
-            return toDictionary(computed.Value);
+            double? star = computed.Value.Overall > 0
+                ? EzMinaStarRatingScale.ToStarRating(computed.Value.Overall)
+                : null;
+
+            return new EzMinaMaintenanceSection.Vector(computed.Value, star);
         }
 
-        /// <summary>
-        /// Mirrors the engine's overall onto the chart's Mina star. The engine scale is converted here, at the write,
-        /// so every reader of the stored rating sees a star.
-        /// </summary>
-        private void writeRating(BeatmapInfo beatmapInfo, EzMinaSkillAxisData vector)
-        {
-            if (vector.Overall <= 0)
-                return;
-
-            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.Mina, EzMinaStarRatingScale.ToStarRating(vector.Overall));
-        }
-
-        private static EzMinaSkillAxisData? computeVector(
-            IBeatmap playable,
-            BeatmapInfo beatmapInfo,
-            int keyCount,
-            Action<EzMinaSkillAxisData> onSettledMiss)
+        private static EzMinaSkillAxisData? computeVector(IBeatmap playable, BeatmapInfo beatmapInfo, int keyCount)
         {
             var calc = EzMinaEnginePool.Rent();
             EzMinaSkillAxisData vector;
@@ -113,16 +121,7 @@ namespace osu.Game.EzOsuGame.Skills.Mina
             }
             catch (Exception e)
             {
-                // Transient: the engine rebuilds itself and the next pass retries. Settling here would retire a
-                // chart the engine can very likely still rate.
                 Logger.Log($"[EzSkills] Mina compute failed for {beatmapInfo} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-                return null;
-            }
-
-            if (vector.Overall <= 0 && vector.Stream <= 0)
-            {
-                Logger.Log($"[EzSkills] Mina zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
-                onSettledMiss(vector);
                 return null;
             }
 
@@ -138,6 +137,8 @@ namespace osu.Game.EzOsuGame.Skills.Mina
 
             return result;
         }
+
+        public static IReadOnlyDictionary<string, double> ToSkillDictionary(EzMinaSkillAxisData vector) => toDictionary(vector);
 
         /// <summary>
         /// Requires every axis the Mina engine declares. Adding an axis cannot leave this check silently accepting
