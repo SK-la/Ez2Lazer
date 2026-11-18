@@ -177,12 +177,12 @@ namespace osu.Game.EzOsuGame.Overlays
 
             SearchTextBox.Current.BindValueChanged(term => pool.SearchTerm = term.NewValue, true);
 
-            Ruleset.BindValueChanged(_ =>
+            Ruleset.BindValueChanged(change =>
             {
-                if (!editing.Value)
+                if (editing.Value && working != null)
                 {
-                    working = null;
-                    return;
+                    string oldKey = string.IsNullOrEmpty(change.OldValue?.ShortName) ? "osu" : change.OldValue.ShortName;
+                    configStore.SaveModLayout(oldKey, working);
                 }
 
                 editing.Value = false;
