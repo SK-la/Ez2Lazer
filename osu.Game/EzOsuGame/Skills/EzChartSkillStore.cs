@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
@@ -305,20 +306,75 @@ namespace osu.Game.EzOsuGame.Skills
             if (!result.RequiresStore)
                 return;
 
+            ApplySunnyMaintenanceBatch(new[] { (beatmapId, (EzSunnyMaintenanceResult?)result) });
+        }
+
+        /// <summary>Writes many Sunny maintenance outcomes in one Realm transaction.</summary>
+        public (int Processed, int Failed) ApplySunnyMaintenanceBatch(IReadOnlyList<(Guid BeatmapId, EzSunnyMaintenanceResult? Result)> items)
+        {
+            if (items.Count == 0)
+                return (0, 0);
+
+            int processed = 0;
+            int failed = 0;
             DateTimeOffset at = DateTimeOffset.UtcNow;
 
             realmAccess.Write(r =>
             {
-                if (r.Find<BeatmapInfo>(beatmapId) is not BeatmapInfo live)
-                    return;
+                foreach (var (beatmapId, result) in items)
+                {
+                    switch (applySunnyMaintenanceInTransaction(r, beatmapId, result, at))
+                    {
+                        case SunnyMaintenanceApplyOutcome.Processed:
+                            processed++;
+                            break;
 
-                EzRatingWriter.Write(live, EzAnalysisSystem.SSR, result.Star, result.SunnyPp);
+                        case SunnyMaintenanceApplyOutcome.Failed:
+                            failed++;
+                            break;
+                    }
+                }
+            });
+
+            return (processed, failed);
+        }
+
+        private enum SunnyMaintenanceApplyOutcome
+        {
+            Processed,
+            Failed,
+        }
+
+        private static SunnyMaintenanceApplyOutcome applySunnyMaintenanceInTransaction(Realm r, Guid beatmapId, EzSunnyMaintenanceResult? result, DateTimeOffset at)
+        {
+            try
+            {
+                if (result == null)
+                {
+                    if (r.Find<BeatmapInfo>(beatmapId) is BeatmapInfo live)
+                        EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+
+                    return SunnyMaintenanceApplyOutcome.Failed;
+                }
+
+                if (!result.RequiresStore)
+                {
+                    if (r.Find<BeatmapInfo>(beatmapId) is BeatmapInfo live && live.EzRatingData.SunnySR < 0)
+                        EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+
+                    return SunnyMaintenanceApplyOutcome.Processed;
+                }
+
+                if (r.Find<BeatmapInfo>(beatmapId) is not BeatmapInfo stored)
+                    return SunnyMaintenanceApplyOutcome.Failed;
+
+                EzRatingWriter.Write(stored, EzAnalysisSystem.SSR, result.Star, result.SunnyPp);
 
                 if (result.OfficialStar != null || result.OfficialPp != null)
-                    EzRatingWriter.Write(live, EzAnalysisSystem.Official, result.OfficialStar, result.OfficialPp);
+                    EzRatingWriter.Write(stored, EzAnalysisSystem.Official, result.OfficialStar, result.OfficialPp);
 
                 if (string.IsNullOrEmpty(result.BeatmapHash))
-                    return;
+                    return SunnyMaintenanceApplyOutcome.Processed;
 
                 if (result.SsrSkillAxes != null)
                 {
@@ -347,7 +403,25 @@ namespace osu.Game.EzOsuGame.Skills
                         null,
                         EzLocalProfileConstants.MANIA_RULESET_ID);
                 }
-            });
+
+                return SunnyMaintenanceApplyOutcome.Processed;
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"Sunny maintenance store failed on {beatmapId}: {e}");
+
+                try
+                {
+                    if (r.Find<BeatmapInfo>(beatmapId) is BeatmapInfo live)
+                        EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+                }
+                catch (Exception markFailed)
+                {
+                    Logger.Log($"Sunny maintenance could not mark failure on {beatmapId}: {markFailed}");
+                }
+
+                return SunnyMaintenanceApplyOutcome.Failed;
+            }
         }
 
         private static void replaceBeatmapSystemSkills(
