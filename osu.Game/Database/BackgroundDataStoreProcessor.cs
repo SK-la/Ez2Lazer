@@ -2739,7 +2739,7 @@ namespace osu.Game.Database
             int workers = Math.Min(analysisWorkerCount, Math.Max(work.Count, 1));
             var pending = new BlockingCollection<(Guid Id, EzSunnyAxesMaintenanceResult? Result)>(sunny_maintenance_queue_capacity);
 
-            lastSunnyMaintenanceProgressBatch = -1;
+            lastSunnyAxesMaintenanceProgressBatch = -1;
 
             try
             {
@@ -2791,7 +2791,9 @@ namespace osu.Game.Database
                     return (processed + stored, failed + storeFailed);
                 },
                 beatmap => ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap),
-                r => r is { RequiresStore: true });
+                r => r is { RequiresStore: true },
+                (n, committed, total, final) =>
+                    updateMaintenanceBatchProgress(n, committed, total, final, ref lastSunnyAxesMaintenanceProgressBatch, "Sunny skill axes maintenance"));
 
         private ChartBatchResult runKeyPatternAxesMaintenance(
             IReadOnlyList<Guid> work,
@@ -2801,7 +2803,7 @@ namespace osu.Game.Database
             int workers = Math.Min(analysisWorkerCount, Math.Max(work.Count, 1));
             var pending = new BlockingCollection<(Guid Id, EzKeyPatternMaintenanceResult? Result)>(sunny_maintenance_queue_capacity);
 
-            lastSunnyMaintenanceProgressBatch = -1;
+            lastKeyPatternAxesMaintenanceProgressBatch = -1;
 
             try
             {
@@ -2853,7 +2855,9 @@ namespace osu.Game.Database
                     return (processed + stored, failed + storeFailed);
                 },
                 beatmap => ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap),
-                r => r is { RequiresStore: true });
+                r => r is { RequiresStore: true },
+                (n, committed, total, final) =>
+                    updateMaintenanceBatchProgress(n, committed, total, final, ref lastKeyPatternAxesMaintenanceProgressBatch, "KeyPattern axes maintenance"));
 
         private ChartBatchResult runGuidMaintenanceWithQueue<TBatchResult>(
             IReadOnlyList<Guid> work,
@@ -2864,7 +2868,8 @@ namespace osu.Game.Database
             string threadPrefix,
             Func<IReadOnlyList<(Guid Id, TBatchResult? Result)>, (int Processed, int Failed)> applyBatch,
             Action<BeatmapInfo> invalidateBeatmap,
-            Func<TBatchResult?, bool> shouldInvalidateBeatmap)
+            Func<TBatchResult?, bool> shouldInvalidateBeatmap,
+            Action<ProgressNotification?, int, int, bool> reportBatchProgress)
         {
             int total = work.Count;
             int next = -1;
@@ -3021,7 +3026,7 @@ namespace osu.Game.Database
                     }
 
                     if (Volatile.Read(ref realmShutdown) == 0)
-                        updateSunnyMaintenanceBatchProgress(notification, processed + failed, total, finalProgress);
+                        reportBatchProgress(notification, processed + failed, total, finalProgress);
                 }
                 catch (ObjectDisposedException)
                 {
@@ -3328,6 +3333,10 @@ namespace osu.Game.Database
 
         private int lastChartChainMaintenanceProgressBatch = -1;
 
+        private int lastSunnyAxesMaintenanceProgressBatch = -1;
+
+        private int lastKeyPatternAxesMaintenanceProgressBatch = -1;
+
         private const int notification_progress_update_interval = 25;
 
         /// <summary>
@@ -3384,29 +3393,18 @@ namespace osu.Game.Database
         }
 
         private void updateSunnyMaintenanceBatchProgress(ProgressNotification? notification, int committedCount, int totalCount, bool finalProgressUpdate)
-        {
-            if (notification == null)
-                return;
-
-            int completedBatches = committedCount / sunny_maintenance_store_batch_size;
-
-            if (!finalProgressUpdate)
-            {
-                if (committedCount == 0 || completedBatches <= Volatile.Read(ref lastSunnyMaintenanceProgressBatch))
-                    return;
-            }
-
-            int displayCount = finalProgressUpdate ? committedCount : completedBatches * sunny_maintenance_store_batch_size;
-
-            if (!finalProgressUpdate && displayCount == 0)
-                return;
-
-            Volatile.Write(ref lastSunnyMaintenanceProgressBatch, completedBatches);
-
-            updateMaintenanceBatchProgressUi(notification, displayCount, totalCount, finalProgressUpdate);
-        }
+            => updateMaintenanceBatchProgress(notification, committedCount, totalCount, finalProgressUpdate, ref lastSunnyMaintenanceProgressBatch, "Sunny maintenance");
 
         private void updateChartChainMaintenanceBatchProgress(ProgressNotification? notification, int committedCount, int totalCount, bool finalProgressUpdate)
+            => updateMaintenanceBatchProgress(notification, committedCount, totalCount, finalProgressUpdate, ref lastChartChainMaintenanceProgressBatch, "Chart chain maintenance");
+
+        private void updateMaintenanceBatchProgress(
+            ProgressNotification? notification,
+            int committedCount,
+            int totalCount,
+            bool finalProgressUpdate,
+            ref int lastCompletedBatches,
+            string progressLogLabel)
         {
             if (notification == null)
                 return;
@@ -3415,7 +3413,7 @@ namespace osu.Game.Database
 
             if (!finalProgressUpdate)
             {
-                if (committedCount == 0 || completedBatches <= Volatile.Read(ref lastChartChainMaintenanceProgressBatch))
+                if (committedCount == 0 || completedBatches <= Volatile.Read(ref lastCompletedBatches))
                     return;
             }
 
@@ -3424,12 +3422,12 @@ namespace osu.Game.Database
             if (!finalProgressUpdate && displayCount == 0)
                 return;
 
-            Volatile.Write(ref lastChartChainMaintenanceProgressBatch, completedBatches);
+            Volatile.Write(ref lastCompletedBatches, completedBatches);
 
-            updateMaintenanceBatchProgressUi(notification, displayCount, totalCount, finalProgressUpdate);
+            updateMaintenanceBatchProgressUi(notification, displayCount, totalCount, finalProgressUpdate, progressLogLabel);
         }
 
-        private void updateMaintenanceBatchProgressUi(ProgressNotification? notification, int displayCount, int totalCount, bool finalProgressUpdate)
+        private void updateMaintenanceBatchProgressUi(ProgressNotification? notification, int displayCount, int totalCount, bool finalProgressUpdate, string progressLogLabel)
         {
             if (notification == null)
                 return;
@@ -3456,7 +3454,7 @@ namespace osu.Game.Database
                 notification.Progress = progress;
 
                 if (displayCount > 0 && displayCount % sunny_maintenance_store_batch_size == 0)
-                    Logger.Log($"Sunny maintenance progress: {displayCount} of {totalCount}");
+                    Logger.Log($"{progressLogLabel} progress: {displayCount} of {totalCount}");
             });
         }
 
