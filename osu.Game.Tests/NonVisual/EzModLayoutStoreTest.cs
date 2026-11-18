@@ -4,6 +4,7 @@
 using System.Collections.Generic;
 using System.IO;
 using NUnit.Framework;
+using Newtonsoft.Json;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Layout;
@@ -26,11 +27,11 @@ namespace osu.Game.Tests.NonVisual
         }
 
         [Test]
-        public void TestSaveWritesBesideLayoutSets()
+        public void TestSaveWritesDocumentWithRulesetsAndGlobalShear()
         {
             using var storage = new TemporaryNativeStorage("ez-mod-layout-save");
             var store = new EzConfigStore(storage);
-            store.SaveModLayout("mania", new EzRulesetModLayout
+            store.SaveModLayout("osu", new EzRulesetModLayout
             {
                 Groups = new List<EzModGroupLayout>
                 {
@@ -43,6 +44,7 @@ namespace osu.Game.Tests.NonVisual
                     },
                 },
                 Hidden = new List<string> { "FL" },
+                ColumnShear = 0.1f,
             });
 
             string configFile = path(storage, EzModifyPath.CONFIG_ROOT_PATH, EzModLayoutDocument.FILENAME);
@@ -51,12 +53,52 @@ namespace osu.Game.Tests.NonVisual
             Assert.That(File.Exists(configFile), Is.True);
             Assert.That(File.Exists(layoutFile), Is.False);
 
-            var loaded = new EzConfigStore(storage).GetModLayout("mania");
+            var doc = JsonConvert.DeserializeObject<EzModLayoutDocument>(File.ReadAllText(configFile));
+            Assert.That(doc, Is.Not.Null);
+            Assert.That(doc!.Rulesets, Is.Not.Null);
+            Assert.That(doc.Rulesets!.ContainsKey("osu"), Is.True);
+            Assert.That(doc.ColumnShear, Is.EqualTo(0.1f));
+
+            var loaded = new EzConfigStore(storage).GetModLayout("osu");
 
             Assert.That(loaded, Is.Not.Null);
-            Assert.That(loaded!.Groups[0].Acronyms, Is.EqualTo(new[] { "EZ" }));
-            Assert.That(loaded.Hidden, Is.EqualTo(new[] { "FL" }));
-            Assert.That(loaded.Groups[0].Name, Is.EqualTo("Easy"));
+            Assert.That(loaded!.Groups![0].Acronyms!, Is.EqualTo(new[] { "EZ" }));
+            Assert.That(loaded.Hidden!, Is.EqualTo(new[] { "FL" }));
+            Assert.That(loaded.Groups![0].Name, Is.EqualTo("Easy"));
+            Assert.That(loaded.ColumnShear, Is.EqualTo(0.1f));
+        }
+
+        [Test]
+        public void TestPerRulesetListsShareGlobalShear()
+        {
+            using var storage = new TemporaryNativeStorage("ez-mod-layout-rulesets");
+            var store = new EzConfigStore(storage);
+
+            store.SaveModLayout("osu", new EzRulesetModLayout
+            {
+                ColumnShear = 0.12f,
+                Groups = new List<EzModGroupLayout>
+                {
+                    new EzModGroupLayout { Id = "a", Name = "Osu", Acronyms = new List<string> { "HD" } },
+                },
+            });
+
+            store.SaveModLayout("mania", new EzRulesetModLayout
+            {
+                ColumnShear = 0.12f,
+                Groups = new List<EzModGroupLayout>
+                {
+                    new EzModGroupLayout { Id = "b", Name = "Mania", Acronyms = new List<string> { "MR" } },
+                },
+            });
+
+            var osu = new EzConfigStore(storage).GetModLayout("osu");
+            var mania = new EzConfigStore(storage).GetModLayout("mania");
+
+            Assert.That(osu!.Groups![0].Acronyms!, Is.EqualTo(new[] { "HD" }));
+            Assert.That(mania!.Groups![0].Acronyms!, Is.EqualTo(new[] { "MR" }));
+            Assert.That(osu.ColumnShear, Is.EqualTo(0.12f));
+            Assert.That(mania.ColumnShear, Is.EqualTo(0.12f));
         }
 
         private static string path(TemporaryNativeStorage storage, string directory, string filename) =>

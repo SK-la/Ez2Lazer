@@ -38,24 +38,26 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly List<ModState> hiddenStates = new List<ModState>();
 
         private EzConfigStore configStore = null!;
-        private OsuGameBase game = null!;
         private EzModHiddenPool pool = null!;
         private ShearedButton editButton = null!;
         private ShearedButton newGroupButton = null!;
+        private EzModLayoutShearControl shearControl = null!;
+        private FillFlowContainer editToolbar = null!;
         private DragGhost dragGhost = null!;
 
         private EzRulesetModLayout? working;
-        private string? loadedRuleset;
         private string? draggingAcronym;
         private EzModGroupColumn? draggingColumn;
         private Vector2 lastDragPosition;
         private bool applyScheduled;
 
+        private string modLayoutRulesetKey =>
+            string.IsNullOrEmpty(Ruleset.Value?.ShortName) ? "osu" : Ruleset.Value.ShortName;
+
         [BackgroundDependencyLoader]
-        private void loadLayout(EzConfigStore modLayoutStore, OsuGameBase osuGame)
+        private void loadLayout(EzConfigStore modLayoutStore)
         {
             configStore = modLayoutStore;
-            game = osuGame;
             loadEzSongSelectKeyboardHandler();
         }
 
@@ -72,18 +74,11 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override void AssignModsToColumns()
         {
-            string? ruleset = currentRuleset();
-
-            if (editing.Value && loadedRuleset != null && loadedRuleset != ruleset)
-                saveWorking();
-
             var entries = new List<EzModLayoutMod>();
             var states = collectStates(entries);
-            bool sameRuleset = loadedRuleset != null && loadedRuleset == ruleset;
-            EzRulesetModLayout? source = sameRuleset ? working : ruleset == null ? null : configStore.GetModLayout(ruleset);
+            EzRulesetModLayout? source = editing.Value && working != null ? working : configStore.GetModLayout(modLayoutRulesetKey);
 
-            working = EzModLayoutResolver.Resolve(source, entries);
-            loadedRuleset = ruleset;
+            working = EzModLayoutResolver.Resolve(source, entries, preserveUnavailable: true);
             applyLayout(states);
         }
 
@@ -125,7 +120,6 @@ namespace osu.Game.EzOsuGame.Overlays
                 Width = 110,
                 Height = 42,
                 TextSize = 16,
-                Position = new Vector2(312, 0),
                 Action = toggleEditing,
             };
             newGroupButton = new ShearedButton
@@ -134,23 +128,43 @@ namespace osu.Game.EzOsuGame.Overlays
                 Width = 140,
                 Height = 42,
                 TextSize = 16,
-                Position = new Vector2(430, 0),
                 Alpha = 0,
                 Action = addGroup,
             };
-            AddAboveColumns(editButton);
-            AddAboveColumns(newGroupButton);
+            shearControl = new EzModLayoutShearControl { Alpha = 0 };
+
+            editToolbar = new FillFlowContainer
+            {
+                Direction = FillDirection.Horizontal,
+                Spacing = new Vector2(10, 0),
+                AutoSizeAxes = Axes.Both,
+                Position = new Vector2(312, 0),
+                Children = new Drawable[] { editButton, newGroupButton, shearControl },
+            };
+
+            AddAboveColumns(editToolbar);
 
             base.LoadComplete();
+
+            shearControl.Current.BindValueChanged(change =>
+            {
+                if (working == null)
+                    return;
+
+                working.ColumnShear = (float)change.NewValue;
+                SetEzColumnFlowShearX(working.ColumnShear.Value);
+            });
 
             editing.BindValueChanged(change =>
             {
                 editButton.Text = change.NewValue ? EzModLayoutStrings.DONE : EzModLayoutStrings.EDIT;
                 newGroupButton.Alpha = change.NewValue ? 1 : 0;
+                shearControl.Alpha = change.NewValue ? 1 : 0;
                 SetColumnFlowBottomPadding(change.NewValue ? pool_height + 8 : column_padding_rest);
 
                 if (change.NewValue)
                 {
+                    shearControl.Current.Value = EzModLayoutResolver.NormaliseColumnShear(working?.ColumnShear);
                     pool.MoveToY(16);
                     pool.FadeIn(180);
                     pool.MoveToY(0, 220, Easing.OutQuint);
@@ -162,6 +176,18 @@ namespace osu.Game.EzOsuGame.Overlays
             }, true);
 
             SearchTextBox.Current.BindValueChanged(term => pool.SearchTerm = term.NewValue, true);
+
+            Ruleset.BindValueChanged(change =>
+            {
+                if (editing.Value && working != null)
+                {
+                    string oldKey = string.IsNullOrEmpty(change.OldValue?.ShortName) ? "osu" : change.OldValue.ShortName;
+                    configStore.SaveModLayout(oldKey, working);
+                }
+
+                editing.Value = false;
+                working = null;
+            });
         }
 
         private void toggleEditing()
@@ -186,26 +212,19 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!editing.Value || working == null)
                 return;
 
-            EzModLayoutResolver.AddGroup(working, EzModLayoutStrings.NEW_GROUP.ToString());
+            EzModLayoutResolver.AddGroup(working, EzModLayoutStrings.NEW_GROUP);
             scheduleApply();
         }
 
         private void saveWorking()
         {
-            if (loadedRuleset == null || working == null)
+            if (working == null)
                 return;
 
-            configStore.SaveModLayout(loadedRuleset, working);
-        }
-
-        private string? currentRuleset()
-        {
-            var ruleset = game.Ruleset.Value;
-
-            if (ruleset == null || string.IsNullOrEmpty(ruleset.ShortName))
-                return null;
-
-            return ruleset.ShortName;
+            var entries = new List<EzModLayoutMod>();
+            collectStates(entries);
+            working = EzModLayoutResolver.Resolve(working, entries, preserveUnavailable: true);
+            configStore.SaveModLayout(modLayoutRulesetKey, working);
         }
 
         private Dictionary<string, ModState> collectStates(List<EzModLayoutMod>? entries)
@@ -231,6 +250,8 @@ namespace osu.Game.EzOsuGame.Overlays
             if (working == null)
                 return;
 
+            working.EnsureMutableLists();
+
             hiddenStates.Clear();
 
             foreach (string acronym in working.Hidden)
@@ -245,7 +266,8 @@ namespace osu.Game.EzOsuGame.Overlays
 
             foreach (var group in working.Groups)
             {
-                var mods = new List<ModState>(group.Acronyms.Count);
+                group.EnsureMutableLists();
+                var mods = new List<ModState>();
 
                 foreach (string acronym in group.Acronyms)
                 {
@@ -277,6 +299,18 @@ namespace osu.Game.EzOsuGame.Overlays
 
             ReplaceModColumns(next);
             pool.SetMods(hiddenStates);
+            applyWorkingColumnShear();
+        }
+
+        private void applyWorkingColumnShear()
+        {
+            float shear = EzModLayoutResolver.NormaliseColumnShear(working?.ColumnShear);
+            SetEzColumnFlowShearX(shear);
+
+            if (!editing.Value)
+                return;
+
+            shearControl.Current.Value = shear;
         }
 
         private void scheduleApply()
@@ -391,6 +425,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 return;
 
             EzModLayoutResolver.RenameGroup(working, column.GroupId, name);
+            working.EnsureMutableLists();
 
             for (int i = 0; i < working.Groups.Count; i++)
             {
