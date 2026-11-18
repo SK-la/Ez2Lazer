@@ -85,7 +85,7 @@ namespace osu.Game.EzOsuGame.Skills.Dan
                 return new EzDanMaintenanceSection.Skipped();
 
             IReadOnlyDictionary<string, double>? msd = resolveMsd(beatmapInfo.Hash, inMemoryMina, allowStoredMinaFallback);
-            EzChartSkillInfo? chartInfo = resolveChartInfo(beatmapInfo.Hash, inMemoryCsi, allowStoredCsiFallback: allowStoredMinaFallback && inMemoryCsi == null);
+            EzChartSkillInfo? chartInfo = resolveChartInfo(beatmapInfo.Hash, inMemoryCsi, allowStoredCsiFallback: inMemoryCsi == null);
 
             if (msd == null || !EzMinaUnit.IsCurrentMinaCache(msd))
                 return new EzDanMaintenanceSection.TransientFailure();
