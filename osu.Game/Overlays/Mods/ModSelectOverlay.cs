@@ -759,7 +759,8 @@ namespace osu.Game.Overlays.Mods
                     // DrawWidth/DrawPosition do not include shear effects, and we want to know the full extents of the columns post-shear,
                     // so we have to manually compensate.
                     var topLeft = column.ToSpaceOfOtherDrawable(Vector2.Zero, ScrollContent);
-                    var bottomRight = column.ToSpaceOfOtherDrawable(new Vector2(column.DrawWidth - column.DrawHeight * OsuGame.SHEAR.X, 0), ScrollContent);
+                    float columnFlowShearX = Child.Shear.X;
+                    var bottomRight = column.ToSpaceOfOtherDrawable(new Vector2(column.DrawWidth - column.DrawHeight * columnFlowShearX, 0), ScrollContent);
 
                     bool isCurrentlyVisible = Precision.AlmostBigger(topLeft.X, leftVisibleBound)
                                               && Precision.DefinitelyBigger(rightVisibleBound, bottomRight.X);

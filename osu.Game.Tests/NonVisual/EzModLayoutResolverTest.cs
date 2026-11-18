@@ -23,15 +23,15 @@ namespace osu.Game.Tests.NonVisual
                 mod("EZ", ModType.DifficultyReduction),
             });
 
-            Assert.That(layout.Hidden, Is.Empty);
-            Assert.That(layout.Groups.Select(group => group.SeedType).ToArray(), Is.EqualTo(new[]
+            Assert.That(layout.Hidden!, Is.Empty);
+            Assert.That(layout.Groups!.Select(group => group.SeedType).ToArray(), Is.EqualTo(new[]
             {
                 nameof(ModType.DifficultyReduction),
                 nameof(ModType.Fun),
             }));
-            Assert.That(layout.Groups[0].Name, Is.EqualTo(ModType.DifficultyReduction.Humanize(LetterCasing.Title)));
-            Assert.That(layout.Groups[0].Acronyms, Is.EqualTo(new[] { "NF", "EZ" }));
-            Assert.That(layout.Groups[1].Acronyms, Is.EqualTo(new[] { "FL" }));
+            Assert.That(layout.Groups![0].Name, Is.EqualTo(ModType.DifficultyReduction.Humanize(LetterCasing.Title)));
+            Assert.That(layout.Groups![0].Acronyms!, Is.EqualTo(new[] { "NF", "EZ" }));
+            Assert.That(layout.Groups![1].Acronyms!, Is.EqualTo(new[] { "FL" }));
         }
 
         [Test]
@@ -58,8 +58,36 @@ namespace osu.Game.Tests.NonVisual
                 mod("NF", ModType.DifficultyReduction),
             });
 
-            Assert.That(layout.Groups[0].Acronyms, Is.EqualTo(new[] { "EZ" }));
-            Assert.That(layout.Hidden, Is.EqualTo(new[] { "NF" }));
+            Assert.That(layout.Groups![0].Acronyms!, Is.EqualTo(new[] { "EZ" }));
+            Assert.That(layout.Hidden!, Is.EqualTo(new[] { "NF" }));
+        }
+
+        [Test]
+        public void TestUnavailableAcronymsCanBePreserved()
+        {
+            var saved = new EzRulesetModLayout
+            {
+                Groups = new List<EzModGroupLayout>
+                {
+                    new EzModGroupLayout
+                    {
+                        Id = "reduction",
+                        Name = "Easy",
+                        SeedType = nameof(ModType.DifficultyReduction),
+                        Acronyms = new List<string> { "OTHER", "EZ" },
+                    },
+                },
+                Hidden = new List<string> { "OTHER-HIDDEN", "NF" },
+            };
+
+            var layout = EzModLayoutResolver.Resolve(saved, new[]
+            {
+                mod("EZ", ModType.DifficultyReduction),
+                mod("NF", ModType.DifficultyReduction),
+            }, preserveUnavailable: true);
+
+            Assert.That(layout.Groups![0].Acronyms!, Is.EqualTo(new[] { "OTHER", "EZ" }));
+            Assert.That(layout.Hidden!, Is.EqualTo(new[] { "OTHER-HIDDEN", "NF" }));
         }
 
         [Test]
@@ -85,9 +113,9 @@ namespace osu.Game.Tests.NonVisual
                 mod("NF", ModType.DifficultyReduction),
             });
 
-            Assert.That(layout.Groups, Has.Count.EqualTo(1));
-            Assert.That(layout.Groups[0].Acronyms, Is.EqualTo(new[] { "EZ", "NF" }));
-            Assert.That(layout.Hidden, Is.Empty);
+            Assert.That(layout.Groups!, Has.Count.EqualTo(1));
+            Assert.That(layout.Groups![0].Acronyms!, Is.EqualTo(new[] { "EZ", "NF" }));
+            Assert.That(layout.Hidden!, Is.Empty);
         }
 
         [Test]
@@ -113,9 +141,9 @@ namespace osu.Game.Tests.NonVisual
                 mod("NF", ModType.DifficultyReduction),
             });
 
-            Assert.That(layout.Hidden, Is.Empty);
-            Assert.That(layout.Groups, Has.Count.EqualTo(1));
-            Assert.That(layout.Groups[0].Acronyms, Is.EqualTo(new[] { "FL", "NF" }));
+            Assert.That(layout.Hidden!, Is.Empty);
+            Assert.That(layout.Groups!, Has.Count.EqualTo(1));
+            Assert.That(layout.Groups![0].Acronyms!, Is.EqualTo(new[] { "FL", "NF" }));
         }
 
         [Test]
@@ -126,8 +154,8 @@ namespace osu.Game.Tests.NonVisual
 
             EzModLayoutResolver.MoveMod(layout, "HD", null, 0);
 
-            Assert.That(layout.Hidden, Does.Contain("HD"));
-            Assert.That(layout.Groups.SelectMany(group => group.Acronyms), Does.Not.Contain("HD"));
+            Assert.That(layout.Hidden!, Does.Contain("HD"));
+            Assert.That(layout.Groups!.SelectMany(group => group.Acronyms!), Does.Not.Contain("HD"));
             Assert.That(selected, Does.Contain("HD"));
         }
 
@@ -140,11 +168,62 @@ namespace osu.Game.Tests.NonVisual
                 mod("HR", ModType.DifficultyIncrease),
             });
 
-            string reductionId = layout.Groups.Single(group => group.SeedType == nameof(ModType.DifficultyReduction)).Id;
+            string reductionId = layout.Groups!.Single(group => group.SeedType == nameof(ModType.DifficultyReduction)).Id;
             EzModLayoutResolver.RemoveGroup(layout, reductionId);
 
-            Assert.That(layout.Groups.SelectMany(group => group.Acronyms), Is.EqualTo(new[] { "HR" }));
-            Assert.That(layout.Hidden, Is.EqualTo(new[] { "EZ" }));
+            Assert.That(layout.Groups!.SelectMany(group => group.Acronyms!), Is.EqualTo(new[] { "HR" }));
+            Assert.That(layout.Hidden!, Is.EqualTo(new[] { "EZ" }));
+        }
+
+        [Test]
+        public void TestNullListsAndStaleAcronymsDoNotThrow()
+        {
+            var saved = new EzRulesetModLayout
+            {
+                Groups = null!,
+                Hidden = null!,
+            };
+
+            Assert.DoesNotThrow(() => EzModLayoutResolver.Resolve(saved, new[] { mod("EZ", ModType.DifficultyReduction) }));
+        }
+
+        [Test]
+        public void TestRemovedModDroppedAndNewModPlaced()
+        {
+            var saved = new EzRulesetModLayout
+            {
+                Groups = new List<EzModGroupLayout>
+                {
+                    new EzModGroupLayout { Id = "g1", Name = "G", Acronyms = new List<string> { "OLD", "EZ" } },
+                },
+                Hidden = new List<string> { "REMOVED" },
+            };
+
+            var layout = EzModLayoutResolver.Resolve(saved, new[] { mod("EZ", ModType.DifficultyReduction), mod("NF", ModType.DifficultyReduction) });
+
+            Assert.That(layout.Groups!.SelectMany(g => g.Acronyms!), Does.Not.Contain("OLD"));
+            Assert.That(layout.Hidden!, Does.Not.Contain("REMOVED"));
+            Assert.That(layout.Groups!.SelectMany(g => g.Acronyms!), Does.Contain("EZ"));
+            Assert.That(layout.Groups!.SelectMany(g => g.Acronyms!), Does.Contain("NF"));
+        }
+
+        [Test]
+        public void TestColumnShearRoundTrip()
+        {
+            var saved = new EzRulesetModLayout
+            {
+                ColumnShear = 0.1f,
+                Groups = new List<EzModGroupLayout>
+                {
+                    new EzModGroupLayout { Id = "fun", Name = "Fun", SeedType = nameof(ModType.Fun), Acronyms = new List<string> { "FL" } },
+                },
+            };
+
+            var layout = EzModLayoutResolver.Resolve(saved, new[] { mod("FL", ModType.Fun) });
+
+            Assert.That(layout.ColumnShear, Is.EqualTo(0.1f));
+            Assert.That(EzModLayoutResolver.NormaliseColumnShear(null), Is.EqualTo(EzModLayoutResolver.DEFAULT_COLUMN_SHEAR));
+            Assert.That(EzModLayoutResolver.NormaliseColumnShear(0.05f), Is.EqualTo(0.05f));
         }
 
         private static EzModLayoutMod mod(string acronym, ModType type) => new EzModLayoutMod(acronym, type);

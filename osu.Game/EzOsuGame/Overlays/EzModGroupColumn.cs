@@ -87,6 +87,16 @@ namespace osu.Game.EzOsuGame.Overlays
             HeaderText = name;
         }
 
+        internal void ApplyEzLayoutShearExtras(float shearX)
+        {
+            if (!IsLoaded)
+                return;
+
+            var counter = new Vector2(-shearX, 0);
+            renameBox.Shear = counter;
+            deleteButton.Shear = counter;
+        }
+
         protected override bool HidesWhenEmpty => !editing.Value;
 
         protected override ModPanel CreateModPanel(ModState mod)
