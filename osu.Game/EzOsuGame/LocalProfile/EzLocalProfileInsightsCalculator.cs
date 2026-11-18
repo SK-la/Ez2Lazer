@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Game.Extensions;
 
 namespace osu.Game.EzOsuGame.LocalProfile
 {
@@ -41,8 +42,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                 if (play.KeyCount > 0)
                 {
-                    keyCounts.TryGetValue(play.KeyCount, out int existing);
-                    keyCounts[play.KeyCount] = existing + 1;
+                    keyCounts.Increment(play.KeyCount);
                 }
 
                 if (play.IsConvert)
@@ -51,8 +51,9 @@ namespace osu.Game.EzOsuGame.LocalProfile
                 }
                 else if (play.KeyCount > 0)
                 {
-                    if (!keyPpByKey.TryGetValue(play.KeyCount, out var bucket))
-                        keyPpByKey[play.KeyCount] = bucket = new List<(int, double)>();
+                    ref var bucket = ref keyPpByKey.GetValueRefOrAddDefault(play.KeyCount, out bool exists);
+                    if (!exists || bucket == null)
+                        bucket = [];
 
                     int beatmapId = play.BeatmapOnlineId > 0 ? play.BeatmapOnlineId : -(index + 1);
                     bucket.Add((beatmapId, play.Pp));
@@ -64,8 +65,7 @@ namespace osu.Game.EzOsuGame.LocalProfile
 
                     foreach (string mod in play.ModAcronyms)
                     {
-                        modCounts.TryGetValue(mod, out int count);
-                        modCounts[mod] = count + 1;
+                        modCounts.Increment(mod);
                     }
                 }
 
