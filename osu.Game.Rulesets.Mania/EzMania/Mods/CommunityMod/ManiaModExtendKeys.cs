@@ -73,6 +73,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 yield return (ExtendKeysStrings.MIDDLE_SIDE_LABEL, $"{MiddleSide.Value}");
                 yield return (ExtendKeysStrings.MAX_JACK_LABEL, $"{MaxJackInterval.Value}");
                 yield return (ExtendKeysStrings.MIN_GAP_LABEL, $"{MinGap.Value:0.##}");
+                yield return (ExtendKeysStrings.BLANK_GAP_LABEL, $"{MaxBlankGap.Value:0.##}");
                 yield return (EzCommonModStrings.SEED_LABEL, $"{(Seed.Value == null ? "Null" : Seed.Value)}");
                 yield return (EzCommonModStrings.APPLY_ORDER_LABEL, $"{ApplyOrderIndex.Value}");
             }
@@ -102,6 +103,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         {
             MinValue = 1,
             MaxValue = 500,
+            Precision = 1,
+        };
+
+        [SettingSource(typeof(ExtendKeysStrings), nameof(ExtendKeysStrings.BLANK_GAP_LABEL), nameof(ExtendKeysStrings.BLANK_GAP_DESCRIPTION))]
+        public BindableNumber<double> MaxBlankGap { get; } = new BindableDouble(1000)
+        {
+            MinValue = 0,
+            MaxValue = 10000,
             Precision = 1,
         };
 
@@ -171,7 +180,8 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             var left = resolveSide(currentColumns, true);
             var right = resolveSide(currentColumns, false);
 
-            var builder = new ColumnBuilder(matrix, hitObjects, rowTimes, extension, LnGaps.Resolve(hitObjects), MaxJackInterval.Value, MinGap.Value, new Random(EzModSeed.Resolve(Seed)));
+            var builder = new ColumnBuilder(matrix, hitObjects, rowTimes, extension, LnGaps.Resolve(hitObjects), MaxJackInterval.Value, MinGap.Value, MaxBlankGap.Value,
+                                            new Random(EzModSeed.Resolve(Seed)));
 
             // 同一侧的多条外列共享同一份密度与 jack 间隔，但各自独立掷骰。
             var leftDensity = left.Length > 0 ? buildDensity(matrix, hitObjects, left) : null;
@@ -428,6 +438,9 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             private readonly double minGap;
             private readonly Random rng;
 
+            // 每行能收到的最晚时刻：该行之后第一段空白之前的最后一行。
+            private readonly double[] blankLimits;
+
             // 每列的源 LN 尾时刻，已排序：挑收尾候选时按窗口二分，避免每次扫全表。
             private readonly List<double>[] tailTimes;
 
@@ -436,7 +449,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
             private readonly List<double> tailCandidates = new List<double>();
 
             public ColumnBuilder(NoteMatrix matrix, List<ManiaHitObject> hitObjects, double[] rowTimes, List<ManiaHitObject> extension, LnGaps lnGaps,
-                                 double maxJackInterval, double minGap, Random rng)
+                                 double maxJackInterval, double minGap, double maxBlankGap, Random rng)
             {
                 this.matrix = matrix;
                 this.hitObjects = hitObjects;
@@ -446,6 +459,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 this.maxJackInterval = maxJackInterval;
                 this.minGap = minGap;
                 this.rng = rng;
+                blankLimits = buildBlankLimits(maxBlankGap);
 
                 tailTimes = new List<double>[matrix.Cols];
 
@@ -513,6 +527,53 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 return next;
             }
 
+            /// <summary>
+            /// 每行的收尾上限：该行之后第一段「间隔超过阈值、且没有被任何长条身体盖住」的空白段之前的最后一行。
+            /// 长条身体盖住的长间隔不算空白，否则长条图会被自己的长条截断。
+            /// </summary>
+            private double[] buildBlankLimits(double maxBlankGap)
+            {
+                var limits = new double[matrix.Rows];
+
+                if (maxBlankGap <= 0)
+                {
+                    for (int i = 0; i < limits.Length; i++)
+                        limits[i] = double.PositiveInfinity;
+
+                    return limits;
+                }
+
+                // 每行结束时还盖着的长条最远到哪：判断间隔是否落在长条身体里要用它。
+                var coverEnd = new double[matrix.Rows];
+                double covering = double.NegativeInfinity;
+
+                for (int row = 0; row < matrix.Rows; row++)
+                {
+                    for (int column = 0; column < matrix.Cols; column++)
+                    {
+                        int cell = matrix[row, column];
+
+                        if (cell >= 0 && hitObjects[cell] is HoldNote hold && hold.EndTime > covering)
+                            covering = hold.EndTime;
+                    }
+
+                    coverEnd[row] = covering;
+                }
+
+                limits[matrix.Rows - 1] = rowTimes[matrix.Rows - 1];
+
+                for (int row = matrix.Rows - 2; row >= 0; row--)
+                {
+                    double nextTime = rowTimes[row + 1];
+
+                    limits[row] = nextTime - rowTimes[row] > maxBlankGap && coverEnd[row] < nextTime
+                        ? rowTimes[row]
+                        : limits[row + 1];
+                }
+
+                return limits;
+            }
+
             private bool[] selectRows(RowDensity density, double[] jackMap)
             {
                 var selected = new bool[matrix.Rows];
@@ -569,7 +630,7 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
                 var origin = (HoldNote)hitObjects[candidates[rng.Next(candidates.Count)]];
 
                 // 镜像源的尾是默认收尾时刻，实际用哪个由源谱的缝分布决定。
-                double close = resolveClose(side, origin.Column, rowTime, rowTime + origin.Duration, nextRow);
+                double close = resolveClose(side, origin.Column, rowTime, rowTime + origin.Duration, nextRow, blankLimits[row]);
 
                 if (double.IsNaN(close) || close - rowTime <= 0)
                     return false;
@@ -592,19 +653,21 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
 
             /// <summary>
             /// 决定这条扩展长条在哪收尾。缝要跟源谱一致，所以收尾不早于「头 + 最小缝」，
-            /// 也不晚于「外列的下一个按键 - 最小缝」；最小缝另有 100ms 下限。
+            /// 也不晚于「外列的下一个按键 - 最小缝」；两者都还受空白段前最后一行的限制。
             /// </summary>
-            private double resolveClose(SideRange side, int originColumn, double headTime, double sourceTail, int nextRow)
+            private double resolveClose(SideRange side, int originColumn, double headTime, double sourceTail, int nextRow, double blankLimit)
             {
-                // 后面没有按键了，没有缝要照顾，直接沿用源的尾。
+                // 后面没有按键了，没有缝要照顾，收到源的尾或空白段边界为止。
                 if (nextRow < 0)
-                    return sourceTail;
+                    return Math.Min(sourceTail, blankLimit);
 
                 double gap = Math.Max(lnGaps.Min, minGap);
                 double nextTime = rowTimes[nextRow];
 
                 double earliest = headTime + gap;
-                double latest = nextTime - gap;
+
+                // 空白段边界也算进最晚收尾，否则长条会一路跨到空白之后的第一个按键。
+                double latest = Math.Min(nextTime - gap, blankLimit);
 
                 // 这一段放不下两侧都留缝的长条，退化成单点。
                 if (latest <= earliest)
@@ -698,6 +761,14 @@ namespace osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod
         public static readonly LocalisableString MIN_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "源谱 LN 尾到下个按键的间距比它窄时按它算，避免极短的缝把扩展列挤成一串碎条",
             "Lower bound, in milliseconds, for the gap between an LN tail and the next press.");
+
+        public static readonly LocalisableString BLANK_GAP_LABEL = new EzLocalizationManager.EzLocalisableString(
+            "空白段阈值",
+            "Blank Section Gap");
+
+        public static readonly LocalisableString BLANK_GAP_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
+            "相邻两行间隔超过这个毫秒数、且这段空档没有被任何长条盖住时算作空白段，扩展长条最远收到空白段之前的最后一行；0 表示不限",
+            "Consecutive rows further apart than this many milliseconds count as a blank section, and extension LNs end at the last row before it. 0 disables the check.");
 
         public static readonly LocalisableString MIDDLE_SIDE_DESCRIPTION = new EzLocalizationManager.EzLocalisableString(
             "奇数键谱面中间列计入哪一侧的密度统计；两侧都算时左右扩展列都会镜像它",
