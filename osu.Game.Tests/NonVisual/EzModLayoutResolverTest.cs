@@ -3,8 +3,8 @@
 
 using System.Collections.Generic;
 using System.Linq;
-using Humanizer;
 using NUnit.Framework;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Rulesets.Mods;
 
@@ -29,7 +29,7 @@ namespace osu.Game.Tests.NonVisual
                 nameof(ModType.DifficultyReduction),
                 nameof(ModType.Fun),
             }));
-            Assert.That(layout.Groups![0].Name, Is.EqualTo(ModType.DifficultyReduction.Humanize(LetterCasing.Title)));
+            Assert.That(layout.Groups![0].Name, Is.EqualTo(EzModLayoutStrings.SeedGroupName(ModType.DifficultyReduction)));
             Assert.That(layout.Groups![0].Acronyms!, Is.EqualTo(new[] { "NF", "EZ" }));
             Assert.That(layout.Groups![1].Acronyms!, Is.EqualTo(new[] { "FL" }));
         }

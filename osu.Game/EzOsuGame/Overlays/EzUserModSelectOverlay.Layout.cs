@@ -212,7 +212,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (!editing.Value || working == null)
                 return;
 
-            EzModLayoutResolver.AddGroup(working, EzModLayoutStrings.NEW_GROUP.ToString());
+            EzModLayoutResolver.AddGroup(working, EzModLayoutStrings.NEW_GROUP);
             scheduleApply();
         }
 

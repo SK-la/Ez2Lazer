@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using Humanizer;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 
@@ -454,7 +454,7 @@ namespace osu.Game.EzOsuGame.Mods
         private static EzModGroupLayout createGroup(ModType type) => new EzModGroupLayout
         {
             Id = $"type:{(int)type}",
-            Name = type.Humanize(LetterCasing.Title),
+            Name = EzModLayoutStrings.SeedGroupName(type),
             SeedType = type.ToString(),
             Acronyms = new List<string>(),
         };

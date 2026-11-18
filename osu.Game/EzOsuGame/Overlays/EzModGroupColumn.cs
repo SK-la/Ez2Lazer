@@ -8,6 +8,7 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -178,6 +179,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         Shear = -OsuGame.SHEAR,
                         Alpha = 0,
                         CommitOnFocusLost = true,
+                        PlaceholderText = EzModLayoutStrings.GROUP_NAME_PLACEHOLDER,
                     },
                     deleteButton = new OsuClickableContainer
                     {
@@ -187,6 +189,7 @@ namespace osu.Game.EzOsuGame.Overlays
                         Margin = new MarginPadding { Right = 8 },
                         Shear = -OsuGame.SHEAR,
                         Alpha = 0,
+                        TooltipText = EzModLayoutStrings.DELETE_GROUP,
                         Action = () => DeleteRequested?.Invoke(this),
                         Child = new SpriteIcon
                         {
