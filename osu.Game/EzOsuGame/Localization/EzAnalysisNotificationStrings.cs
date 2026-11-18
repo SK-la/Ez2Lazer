@@ -52,6 +52,35 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString MAINTENANCE_NOTHING_PENDING = new EzLocalizationManager.EzLocalisableString(
             "所选项目无待补算", "Nothing pending for the selected maintenance item(s)");
 
+        /// <summary>L2：选歌分析 SQLite 主库 NoMod 切片（KPS/KPC 等），不是 Realm 谱面链。</summary>
+        public static readonly LocalisableString SQLITE_MAIN_SLICE_RUNNING = new EzLocalizationManager.EzLocalisableString(
+            "补算选歌分析切片（KPS/KPC）", "Filling song-select analysis slice (KPS/KPC)");
+
+        public static readonly LocalisableString SQLITE_MAIN_SLICE_COMPLETED = new EzLocalizationManager.EzLocalisableString(
+            "选歌分析切片已更新", "Song-select analysis slices updated");
+
+        public static LocalisableString SqliteMainSliceQueuedWithBacklog(int total, int remaining)
+            => new EzLocalizationManager.EzLocalisableString(
+                $"已排队 {total} 张谱的选歌分析切片（KPS/KPC），后台仍在处理 {remaining} 张",
+                $"Queued song-select analysis slices (KPS/KPC) for {total} beatmaps; {remaining} still in the backlog.");
+
+        /// <summary>L2：分支曲库 Mod 快照，依赖主库切片。</summary>
+        public static LocalisableString SqliteBranchesQueued(int branchCount, int beatmapEstimate)
+            => new EzLocalizationManager.EzLocalisableString(
+                $"补算分支曲库快照（{branchCount} 个分支，约 {beatmapEstimate} 张谱）",
+                $"Refreshing songs-branch snapshots ({branchCount} branches, ~{beatmapEstimate} beatmaps)");
+
+        public static readonly LocalisableString SQLITE_BRANCHES_SIMPLE_QUEUED = new EzLocalizationManager.EzLocalisableString(
+            "已排队分支曲库快照刷新", "Songs-branch snapshot refresh queued");
+
+        public static readonly LocalisableString SQLITE_BRANCHES_COMPLETED = new EzLocalizationManager.EzLocalisableString(
+            "分支曲库快照已更新", "Songs-branch snapshots updated");
+
+        public static LocalisableString SqliteBranchesRefreshing(string branchName, int processedBeatmaps, int branchTotal, int branchIndex, int branchCount)
+            => new EzLocalizationManager.EzLocalisableString(
+                $"分支「{branchName}」快照（{processedBeatmaps} / {branchTotal}）— 分支 {branchIndex} / {branchCount}",
+                $"Branch \"{branchName}\" snapshot ({processedBeatmaps} / {branchTotal}) — branch {branchIndex} / {branchCount}");
+
         /// <summary>Chart chain, naming the stages that are actually running.</summary>
         public static LocalisableString ChartChainRunning(bool msd, bool csi, bool dan, bool ppp)
             => new EzLocalizationManager.EzLocalisableString(
