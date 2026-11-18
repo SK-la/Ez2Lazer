@@ -2496,14 +2496,31 @@ namespace osu.Game.Database
             ProgressNotification? notification,
             Func<BeatmapInfo, EzSunnyMaintenanceResult?> compute)
         {
+            int workers = Math.Min(analysisWorkerCount, Math.Max(work.Count, 1));
+            var pending = new BlockingCollection<(Guid Id, EzSunnyMaintenanceResult? Result)>(workers);
+
+            try
+            {
+                return runSunnyMaintenanceWithQueue(work, notification, compute, pending, workers);
+            }
+            finally
+            {
+                pending.Dispose();
+            }
+        }
+
+        private ChartBatchResult runSunnyMaintenanceWithQueue(
+            IReadOnlyList<Guid> work,
+            ProgressNotification? notification,
+            Func<BeatmapInfo, EzSunnyMaintenanceResult?> compute,
+            BlockingCollection<(Guid Id, EzSunnyMaintenanceResult? Result)> pending,
+            int workers)
+        {
             int total = work.Count;
             int next = -1;
             int aborted = 0;
             int processed = 0;
             int failed = 0;
-
-            int workers = Math.Min(analysisWorkerCount, Math.Max(total, 1));
-            using var pending = new BlockingCollection<(Guid Id, EzSunnyMaintenanceResult? Result)>(workers);
 
             var writer = new Thread(writePending, 4 * 1024 * 1024)
             {
