@@ -6,6 +6,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics.Sprites;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Rulesets;
 using osu.Game.Screens.Footer;
 

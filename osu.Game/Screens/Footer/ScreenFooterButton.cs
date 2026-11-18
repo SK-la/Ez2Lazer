@@ -214,7 +214,13 @@ namespace osu.Game.Screens.Footer
             return base.OnClick(e);
         }
 
-        protected virtual void Flash() => flashLayer.FadeOutFromOne(800, Easing.OutQuint);
+        public Colour4 FlashLayerColour { get; set; } = Colour4.White.Opacity(0.9f);
+
+        protected virtual void Flash()
+        {
+            flashLayer.Colour = FlashLayerColour;
+            flashLayer.FadeOutFromOne(800, Easing.OutQuint);
+        }
 
         protected override bool OnHover(HoverEvent e)
         {
@@ -234,7 +240,7 @@ namespace osu.Game.Screens.Footer
 
         public virtual void OnReleased(KeyBindingReleaseEvent<GlobalAction> e) { }
 
-        public void UpdateDisplay()
+        public virtual void UpdateDisplay()
         {
             Color4 backgroundColour = OverlayState.Value == Visibility.Visible ? buttonAccentColour : colourProvider.Background3;
             Color4 textColour = OverlayState.Value == Visibility.Visible ? colourProvider.Background6 : colourProvider.Content1;
