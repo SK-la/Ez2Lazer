@@ -1021,9 +1021,9 @@ namespace osu.Game.Database
         {
             Logger.Log("Querying for beatmaps with missing SunnyStarRatings...");
 
-            var beatmaps = realmAccess.Run(r =>
+            var beatmapIds = realmAccess.Run(r =>
             {
-                var list = new List<BeatmapInfo>();
+                var list = new List<Guid>();
 
                 foreach (var b in r.All<BeatmapInfo>())
                 {
@@ -1036,27 +1036,27 @@ namespace osu.Game.Database
                     if (!EzSSRUnit.SupportsRuleset(b.Ruleset.OnlineID))
                         continue;
 
-                    list.Add(b.Detach());
+                    list.Add(b.ID);
                 }
 
                 return list;
             });
 
-            if (beatmaps.Count == 0)
+            if (beatmapIds.Count == 0)
                 return (true, 0);
 
-            Logger.Log($"Found {beatmaps.Count} beatmaps which require SunnyStarRating reprocessing.");
+            Logger.Log($"Found {beatmapIds.Count} beatmaps which require SunnyStarRating reprocessing.");
 
-            var notification = showProgressNotification(beatmaps.Count,
+            var notification = showProgressNotification(beatmapIds.Count,
                 EzAnalysisNotificationStrings.SUNNY_RUNNING,
                 EzAnalysisNotificationStrings.SUNNY_COMPLETED);
 
-            ChartBatchResult batch = runSunnyMaintenance(beatmaps, notification, beatmap => ezSSRUnit.TryCompute(beatmap, CancellationToken.None));
+            ChartBatchResult batch = runSunnyMaintenance(beatmapIds, notification, beatmap => ezSSRUnit.TryCompute(beatmap, CancellationToken.None));
 
-            completeNotification(notification, batch.Attempted, beatmaps.Count, batch.Failed);
+            completeNotification(notification, batch.Attempted, beatmapIds.Count, batch.Failed);
 
             bool completed = !batch.Aborted && notification?.State != ProgressNotificationState.Cancelled;
-            return (completed, beatmaps.Count);
+            return (completed, beatmapIds.Count);
         }
 
         /// <summary>
@@ -2497,7 +2497,7 @@ namespace osu.Game.Database
         /// Notification cancellation drains already-computed charts. Shutdown disposes Realm and abandons uncommitted queue items.
         /// </remarks>
         private ChartBatchResult runSunnyMaintenance(
-            IReadOnlyList<BeatmapInfo> work,
+            IReadOnlyList<Guid> work,
             ProgressNotification? notification,
             Func<BeatmapInfo, EzSunnyMaintenanceResult?> compute)
         {
@@ -2517,7 +2517,7 @@ namespace osu.Game.Database
         }
 
         private ChartBatchResult runSunnyMaintenanceWithQueue(
-            IReadOnlyList<BeatmapInfo> work,
+            IReadOnlyList<Guid> work,
             ProgressNotification? notification,
             Func<BeatmapInfo, EzSunnyMaintenanceResult?> compute,
             BlockingCollection<(Guid Id, EzSunnyMaintenanceResult? Result)> pending,
@@ -2600,16 +2600,17 @@ namespace osu.Game.Database
                         return;
 
                     sleepIfRequired();
-                    BeatmapInfo beatmap = work[index];
+                    Guid id = work[index];
 
                     try
                     {
-                        EzSunnyMaintenanceResult? result = compute(beatmap);
+                        BeatmapInfo? beatmap = realmAccess.Run(r => r.Find<BeatmapInfo>(id)?.Detach());
+                        EzSunnyMaintenanceResult? result = beatmap == null ? null : compute(beatmap);
 
-                        if (result is { RequiresStore: true, Star: >= 0 })
+                        if (beatmap != null && result is { RequiresStore: true, Star: >= 0 })
                             ((IWorkingBeatmapCache)beatmapManager).Invalidate(beatmap);
 
-                        enqueue(beatmap.ID, result);
+                        enqueue(id, result);
                     }
                     catch (ObjectDisposedException)
                     {
@@ -2619,8 +2620,8 @@ namespace osu.Game.Database
                     }
                     catch (Exception e)
                     {
-                        Logger.Log($"Sunny compute failed on {beatmap.ID}: {e}");
-                        enqueue(beatmap.ID, null);
+                        Logger.Log($"Sunny compute failed on {id}: {e}");
+                        enqueue(id, null);
                     }
                 }
             }
@@ -2676,6 +2677,12 @@ namespace osu.Game.Database
                 catch (ObjectDisposedException)
                 {
                     Interlocked.Exchange(ref realmShutdown, 1);
+                    storeBatch.Clear();
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Sunny maintenance store batch failed: {e}");
+                    failed += storeBatch.Count;
                     storeBatch.Clear();
                 }
             }

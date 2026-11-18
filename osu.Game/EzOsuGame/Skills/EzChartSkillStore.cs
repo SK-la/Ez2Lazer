@@ -309,7 +309,7 @@ namespace osu.Game.EzOsuGame.Skills
             ApplySunnyMaintenanceBatch(new[] { (beatmapId, (EzSunnyMaintenanceResult?)result) });
         }
 
-        /// <summary>Writes many Sunny maintenance outcomes in one Realm transaction.</summary>
+        /// <summary>Writes each Sunny maintenance outcome in its own Realm transaction.</summary>
         public (int Processed, int Failed) ApplySunnyMaintenanceBatch(IReadOnlyList<(Guid BeatmapId, EzSunnyMaintenanceResult? Result)> items)
         {
             if (items.Count == 0)
@@ -319,11 +319,13 @@ namespace osu.Game.EzOsuGame.Skills
             int failed = 0;
             DateTimeOffset at = DateTimeOffset.UtcNow;
 
-            realmAccess.Write(r =>
+            foreach (var (beatmapId, result) in items)
             {
-                foreach (var (beatmapId, result) in items)
+                try
                 {
-                    switch (applySunnyMaintenanceInTransaction(r, beatmapId, result, at))
+                    SunnyMaintenanceApplyOutcome outcome = realmAccess.Write(r => applySunnyMaintenanceInTransaction(r, beatmapId, result, at));
+
+                    switch (outcome)
                     {
                         case SunnyMaintenanceApplyOutcome.Processed:
                             processed++;
@@ -334,7 +336,16 @@ namespace osu.Game.EzOsuGame.Skills
                             break;
                     }
                 }
-            });
+                catch (ObjectDisposedException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    Logger.Log($"Sunny maintenance store failed on {beatmapId}: {e}");
+                    failed++;
+                }
+            }
 
             return (processed, failed);
         }
@@ -410,17 +421,7 @@ namespace osu.Game.EzOsuGame.Skills
             {
                 Logger.Log($"Sunny maintenance store failed on {beatmapId}: {e}");
 
-                try
-                {
-                    if (r.Find<BeatmapInfo>(beatmapId) is BeatmapInfo live)
-                        EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
-                }
-                catch (Exception markFailed)
-                {
-                    Logger.Log($"Sunny maintenance could not mark failure on {beatmapId}: {markFailed}");
-                }
-
-                return SunnyMaintenanceApplyOutcome.Failed;
+                throw;
             }
         }
 
