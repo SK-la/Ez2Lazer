@@ -78,9 +78,9 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_ACTION_PPP_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "四个模式各自的谱面向量，不依赖图表链", "Per-mode chart vector; independent of the chart chain");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_NAME = new EzLocalizationManager.EzLocalisableString("Sunny 星级", "Sunny SR");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_NAME = new EzLocalizationManager.EzLocalisableString("Sunny SR / PP", "Sunny SR / PP");
         public static readonly LocalisableString DATA_REBUILD_ACTION_SSR_DETAIL = new EzLocalizationManager.EzLocalisableString(
-            "独立评级，不依赖其他系统", "Independent rating; depends on nothing else");
+            "Sunny 星、Max PP 与 SR4 技能轴；顺带刷新 Ez键型", "Sunny star, max PP, and SR4 skill axes; also refreshes Ez KeyPattern");
 
         public static readonly LocalisableString DATA_REBUILD_ACTION_PATTERN_NAME = new EzLocalizationManager.EzLocalisableString("Ez键型", "Ez KeyPattern");
         public static readonly LocalisableString DATA_REBUILD_ACTION_PATTERN_DETAIL = new EzLocalizationManager.EzLocalisableString(
@@ -88,7 +88,7 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_NAME = new EzLocalizationManager.EzLocalisableString("原版 Max PP", "Original Max PP");
         public static readonly LocalisableString DATA_REBUILD_ACTION_OFFICIAL_DETAIL = new EzLocalizationManager.EzLocalisableString(
-            "Perfect 成绩的 PP 列，读官方难度", "Perfect-play PP column; reads official difficulty");
+            "Perfect 成绩的 PP 列，读原版难度", "Perfect-play PP column; reads original difficulty");
 
         public static readonly LocalisableString DATA_REBUILD_ACTION_TAGS_NAME = new EzLocalizationManager.EzLocalisableString("谱面标签", "Chart tags");
         public static readonly LocalisableString DATA_REBUILD_ACTION_TAGS_DETAIL = new EzLocalizationManager.EzLocalisableString(
@@ -102,13 +102,17 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly LocalisableString DATA_REBUILD_ACTION_ALL_DETAIL = new EzLocalizationManager.EzLocalisableString(
             "以上 Realm 项目一次跑完", "Runs every Realm item above in one pass");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_MAIN_NAME = new EzLocalizationManager.EzLocalisableString("主库 kps / KPC", "Main kps / KPC");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_MAIN_NAME = new EzLocalizationManager.EzLocalisableString(
+            "选歌分析切片（KPS/KPC）", "Song-select slice (KPS/KPC)");
         public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_MAIN_DETAIL = new EzLocalizationManager.EzLocalisableString(
-            "NoMod 分析切片", "NoMod analysis slice");
+            "SQLite 主库 NoMod 切片，供选歌界面读取；与 Realm 谱面链（Sunny/MSD 等）分开",
+            "SQLite main NoMod slices for song select; separate from the Realm chart chain (Sunny/MSD, etc.)");
 
-        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_BRANCHES_NAME = new EzLocalizationManager.EzLocalisableString("分支曲库 ssr/ PP", "Songs branches ssr/ PP");
+        public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_BRANCHES_NAME = new EzLocalizationManager.EzLocalisableString(
+            "分支曲库快照", "Songs-branch snapshots");
         public static readonly LocalisableString DATA_REBUILD_ACTION_SQLITE_BRANCHES_DETAIL = new EzLocalizationManager.EzLocalisableString(
-            "按分支快照构建，读主库切片", "Built per branch snapshot; reads the main slice");
+            "按分支 Mod 快照重建，依赖主库切片",
+            "Rebuilds per-branch mod snapshots; reads the main slice");
 
         public static readonly LocalisableString LOGO_VIS_BARS = new EzLocalizationManager.EzLocalisableString("柱状", "Bars");
         public static readonly LocalisableString LOGO_VIS_POLYLINE = new EzLocalizationManager.EzLocalisableString("折线", "Polyline");

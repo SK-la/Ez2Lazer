@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Localisation;
 using osu.Framework.Development;
 using osu.Framework.Graphics;
 using osu.Framework.Logging;
@@ -471,15 +472,15 @@ namespace osu.Game.EzOsuGame.Analysis
                     {
                         notificationOverlay.Post(new SimpleNotification
                         {
-                            Text = $"Ez songs branch refresh queued for {branchCount} branch(es)."
+                            Text = EzAnalysisNotificationStrings.SQLITE_BRANCHES_SIMPLE_QUEUED,
                         });
                         return;
                     }
 
                     var notification = new ProgressNotification
                     {
-                        Text = $"Ez songs branch refresh queued for {branchCount} branch(es) (~{totalBeatmaps} beatmaps)",
-                        CompletionText = "Songs branch refresh complete",
+                        Text = EzAnalysisNotificationStrings.SqliteBranchesQueued(branchCount, totalBeatmaps),
+                        CompletionText = EzAnalysisNotificationStrings.SQLITE_BRANCHES_COMPLETED,
                         CancelRequested = () => true,
                         State = ProgressNotificationState.Active
                     };
@@ -521,13 +522,13 @@ namespace osu.Game.EzOsuGame.Analysis
                 {
                     if (processedBeatmaps > 0 && branchBeatmapTotal > 0)
                     {
-                        songsBranchRefreshProgressNotification.Text =
-                            $"Refreshing songs branch \"{branchDisplayName}\" ({processedBeatmaps} of {branchBeatmapTotal}) — branch {processedBranches} of {totalBranches}";
+                        songsBranchRefreshProgressNotification.Text = EzAnalysisNotificationStrings.SqliteBranchesRefreshing(
+                            branchDisplayName, processedBeatmaps, branchBeatmapTotal, processedBranches, totalBranches);
                         songsBranchRefreshProgressNotification.Progress = (float)processedBeatmaps / branchBeatmapTotal;
                     }
                     else if (processedBranches >= totalBranches)
                     {
-                        songsBranchRefreshProgressNotification.CompletionText = "Songs branch refresh complete";
+                        songsBranchRefreshProgressNotification.CompletionText = EzAnalysisNotificationStrings.SQLITE_BRANCHES_COMPLETED;
                         songsBranchRefreshProgressNotification.State = ProgressNotificationState.Completed;
                         songsBranchRefreshProgressNotification = null;
                     }
@@ -742,12 +743,13 @@ namespace osu.Game.EzOsuGame.Analysis
                     if (notification.State == ProgressNotificationState.Cancelled)
                         return;
 
-                    notification.Text = $"Ez analysis rebuild queued {total} beatmaps for recompute ({processed} of {total})";
+                    notification.Text = LocalisableString.Interpolate(
+                        $"{EzAnalysisNotificationStrings.SQLITE_MAIN_SLICE_RUNNING} ({EzAnalysisNotificationStrings.Progress(processed, total)})");
                     notification.Progress = total > 0 ? (float)processed / total : 1;
 
                     if (processed >= total)
                     {
-                        notification.CompletionText = $"{total} beatmaps' analysis recompute complete";
+                        notification.CompletionText = EzAnalysisNotificationStrings.SQLITE_MAIN_SLICE_COMPLETED;
                         notification.State = ProgressNotificationState.Completed;
                     }
                 }
@@ -798,7 +800,7 @@ namespace osu.Game.EzOsuGame.Analysis
                     {
                         notificationOverlay.Post(new SimpleNotification
                         {
-                            Text = $"Ez analysis rebuild queued {totalCount} beatmaps for recompute. Background sqlite processing is still working through {remainingCount} remaining result(s)."
+                            Text = EzAnalysisNotificationStrings.SqliteMainSliceQueuedWithBacklog(totalCount, remainingCount),
                         });
 
                         return;
@@ -806,8 +808,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
                     var notification = new ProgressNotification
                     {
-                        Text = $"Ez analysis rebuild queued {totalCount} beatmaps for recompute ({totalCount - remainingCount} of {totalCount})",
-                        CompletionText = "beatmaps' analysis recompute is complete",
+                        Text = LocalisableString.Interpolate(
+                            $"{EzAnalysisNotificationStrings.SQLITE_MAIN_SLICE_RUNNING} ({EzAnalysisNotificationStrings.Progress(0, totalCount)})"),
+                        CompletionText = EzAnalysisNotificationStrings.SQLITE_MAIN_SLICE_COMPLETED,
                         CancelRequested = () =>
                         {
                             cancelPendingBeatmapProcessing();

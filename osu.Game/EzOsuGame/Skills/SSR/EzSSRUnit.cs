@@ -59,7 +59,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
         /// <see cref="Scoring.EzScoreRacePlayableResolver.SESSION_READY_SCOPE"/> (1000) and the Osu simulation band
         /// (2000+); the Mania simulation band is JudgeMode + 1.
         /// </remarks>
-        private const int BINDING_SCOPE = 3000;
+        private const int binding_scope = 3000;
 
         /// <summary>
         /// Rates one chart and writes its star and pp. Returns false when the chart could not be loaded, so a later
@@ -67,67 +67,92 @@ namespace osu.Game.EzOsuGame.Skills.SSR
         /// </summary>
         public bool ComputeAndStore(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
         {
+            EzSunnyMaintenanceResult? result = TryCompute(beatmapInfo, cancellationToken);
+
+            if (result == null)
+                return false;
+
+            if (!result.RequiresStore)
+                return true;
+
+            ApplyStore(beatmapInfo.ID, result);
+            return true;
+        }
+
+        /// <summary>CPU-only half of Sunny maintenance for parallel passes.</summary>
+        public EzSunnyMaintenanceResult? TryCompute(BeatmapInfo beatmapInfo, CancellationToken cancellationToken = default)
+        {
             ArgumentNullException.ThrowIfNull(beatmapInfo);
 
             if (!SupportsRuleset(beatmapInfo.Ruleset.OnlineID))
-                return true;
+                return EzSunnyMaintenanceResult.NoStoreRequired;
 
             IBeatmap playable;
 
             try
             {
-                // A default token stays null (no bound of its own) so the conversion keeps WorkingBeatmap's own
-                // bounded wait, exactly as the shared lookup did.
                 playable = EzPlayableBeatmapCache.GetBound(beatmapManager.GetWorkingBeatmap(beatmapInfo), beatmapInfo.Ruleset, null,
-                    BINDING_SCOPE, static _ => { }, cancellationToken == CancellationToken.None ? null : cancellationToken);
+                    binding_scope, static _ => { }, cancellationToken == CancellationToken.None ? null : cancellationToken);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {
-                return false;
+                return null;
             }
 
             int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
 
             if (!EzSSREngine.IsPatternSupported(keyCount))
-                return true;
+                return EzSunnyMaintenanceResult.NoStoreRequired;
 
             var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
             double star;
+            IReadOnlyDictionary<string, double>? ssrSkillAxes = null;
 
             if (playable.HitObjects.Count == 0)
             {
                 star = 0;
-                storeEmptySunnySrSkillAxes(beatmapInfo);
+                ssrSkillAxes = buildEmptySsrSkillAxes();
             }
             else
             {
                 var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, playable.Difficulty.OverallDifficulty);
                 star = combined.Sr;
-                storeSunnySrSkillAxes(beatmapInfo, combined.PatternSnapshot);
+                ssrSkillAxes = EzSunnySrSkillValues.FromSnapshot(combined.PatternSnapshot);
             }
 
-            EzKeyPatternUnit.Write(skillStore, beatmapInfo, chart, star, cancellationToken);
-
             if (!double.IsFinite(star) || star < 0)
-                return false;
+                return null;
 
-            // Scored at the rating this call just measured, on the conversion it just used. Reading the stored SunnySR
-            // instead scored the previous pass's value - absent on a first rating - which is how the Sunny pp column
-            // ended up needing a second full-library pass that converted every chart again.
             var official = EzAnalysisComputation.ComputeOfficialBaseline(beatmapManager, beatmapInfo, star, playable, cancellationToken);
-            skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.SSR, star, official.SubstitutedPp >= 0 ? official.SubstitutedPp : null);
-
-            // The official pair came out of the same calculation, so it is written here too. Both halves are written
-            // together and only when both are missing: a chart holding a stale star with a fresh pp (or the reverse)
-            // is indistinguishable from a valid pair to a reader, and the two are what the official passes would
-            // otherwise each load, convert and recompute this chart to produce.
+            double? sunnyPp = official.SubstitutedPp >= 0 ? official.SubstitutedPp : null;
             double? officialStar = beatmapInfo.StarRating < 0 && official.Star >= 0 ? official.Star : null;
             double? officialPp = beatmapInfo.PerformancePoints < 0 && official.Pp >= 0 ? official.Pp : null;
 
-            if (officialStar != null || officialPp != null)
-                skillStore.WriteRating(beatmapInfo.ID, EzAnalysisSystem.Official, officialStar, officialPp);
+            IReadOnlyDictionary<string, double>? keyPatternSkills = string.IsNullOrEmpty(beatmapInfo.Hash)
+                ? null
+                : EzKeyPatternUnit.BuildSkillsForPersistence(chart, star, cancellationToken);
 
-            return true;
+            return new EzSunnyMaintenanceResult(
+                RequiresStore: true,
+                Star: star,
+                SunnyPp: sunnyPp,
+                OfficialStar: officialStar,
+                OfficialPp: officialPp,
+                BeatmapHash: beatmapInfo.Hash,
+                SsrSkillAxes: ssrSkillAxes,
+                KeyPatternSkillAxes: keyPatternSkills);
+        }
+
+        public void ApplyStore(Guid beatmapId, EzSunnyMaintenanceResult result) => skillStore.ApplySunnyMaintenanceResult(beatmapId, result);
+
+        private static IReadOnlyDictionary<string, double> buildEmptySsrSkillAxes()
+        {
+            var values = new Dictionary<string, double>(EzSunnySrSkillAxisExtensions.ChartAxisIds.Count, StringComparer.Ordinal);
+
+            foreach (string axisId in EzSunnySrSkillAxisExtensions.ChartAxisIds)
+                values[axisId] = 0;
+
+            return values;
         }
 
         /// <summary>
@@ -148,7 +173,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             try
             {
                 playable = EzPlayableBeatmapCache.GetBound(beatmapManager.GetWorkingBeatmap(beatmapInfo), beatmapInfo.Ruleset, null,
-                    BINDING_SCOPE, static _ => { }, cancellationToken == CancellationToken.None ? null : cancellationToken);
+                    binding_scope, static _ => { }, cancellationToken == CancellationToken.None ? null : cancellationToken);
             }
             catch (Exception e) when (e is not ObjectDisposedException)
             {

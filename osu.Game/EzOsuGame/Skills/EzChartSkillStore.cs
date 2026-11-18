@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Analysis;
@@ -296,32 +297,169 @@ namespace osu.Game.EzOsuGame.Skills
             int version = algorithmVersion ?? system.CurrentVersion();
             string systemId = system.ToStorageId();
 
+            realmAccess.Write(r => replaceBeatmapSystemSkills(r, beatmapHash, system, skills, beatmapId, at, version, skillVersions, rulesetOnlineId));
+        }
+
+        /// <summary>Writes one Sunny maintenance bundle in a single transaction.</summary>
+        public void ApplySunnyMaintenanceResult(Guid beatmapId, EzSunnyMaintenanceResult result)
+        {
+            if (!result.RequiresStore)
+                return;
+
+            ApplySunnyMaintenanceBatch(new[] { (beatmapId, (EzSunnyMaintenanceResult?)result) });
+        }
+
+        /// <summary>Writes many Sunny maintenance outcomes in one Realm transaction.</summary>
+        public (int Processed, int Failed) ApplySunnyMaintenanceBatch(IReadOnlyList<(Guid BeatmapId, EzSunnyMaintenanceResult? Result)> items)
+        {
+            if (items.Count == 0)
+                return (0, 0);
+
+            int processed = 0;
+            int failed = 0;
+            DateTimeOffset at = DateTimeOffset.UtcNow;
+
             realmAccess.Write(r =>
             {
-                var existing = r.All<EzBeatmapSkillValue>()
-                                .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId)
-                                .ToList();
-
-                foreach (var row in existing)
-                    r.Remove(row);
-
-                foreach (var (skillId, value) in skills)
+                foreach (var (beatmapId, result) in items)
                 {
-                    int rowVersion = rowVersionFor(system, skillId, version, skillVersions, rulesetOnlineId);
-
-                    r.Add(new EzBeatmapSkillValue
+                    switch (applySunnyMaintenanceInTransaction(r, beatmapId, result, at))
                     {
-                        BeatmapHash = beatmapHash,
-                        BeatmapId = beatmapId,
-                        SystemId = systemId,
-                        RulesetOnlineId = rulesetOnlineId,
-                        SkillId = skillId,
-                        Value = value,
-                        AlgorithmVersion = rowVersion,
-                        ComputedAt = at,
-                    });
+                        case SunnyMaintenanceApplyOutcome.Processed:
+                            processed++;
+                            break;
+
+                        case SunnyMaintenanceApplyOutcome.Failed:
+                            failed++;
+                            break;
+                    }
                 }
             });
+
+            return (processed, failed);
+        }
+
+        private enum SunnyMaintenanceApplyOutcome
+        {
+            Processed,
+            Failed,
+        }
+
+        private static SunnyMaintenanceApplyOutcome applySunnyMaintenanceInTransaction(Realm r, Guid beatmapId, EzSunnyMaintenanceResult? result, DateTimeOffset at)
+        {
+            try
+            {
+                if (result == null)
+                {
+                    if (r.Find<BeatmapInfo>(beatmapId) is BeatmapInfo live)
+                        EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+
+                    return SunnyMaintenanceApplyOutcome.Failed;
+                }
+
+                if (!result.RequiresStore)
+                {
+                    if (r.Find<BeatmapInfo>(beatmapId) is BeatmapInfo live && live.EzRatingData.SunnySR < 0)
+                        EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+
+                    return SunnyMaintenanceApplyOutcome.Processed;
+                }
+
+                if (r.Find<BeatmapInfo>(beatmapId) is not BeatmapInfo stored)
+                    return SunnyMaintenanceApplyOutcome.Failed;
+
+                EzRatingWriter.Write(stored, EzAnalysisSystem.SSR, result.Star, result.SunnyPp);
+
+                if (result.OfficialStar != null || result.OfficialPp != null)
+                    EzRatingWriter.Write(stored, EzAnalysisSystem.Official, result.OfficialStar, result.OfficialPp);
+
+                if (string.IsNullOrEmpty(result.BeatmapHash))
+                    return SunnyMaintenanceApplyOutcome.Processed;
+
+                if (result.SsrSkillAxes != null)
+                {
+                    replaceBeatmapSystemSkills(
+                        r,
+                        result.BeatmapHash,
+                        EzAnalysisSystem.SSR,
+                        result.SsrSkillAxes,
+                        beatmapId,
+                        at,
+                        EzSSRUnit.VERSION,
+                        null,
+                        EzLocalProfileConstants.MANIA_RULESET_ID);
+                }
+
+                if (result.KeyPatternSkillAxes != null)
+                {
+                    replaceBeatmapSystemSkills(
+                        r,
+                        result.BeatmapHash,
+                        EzAnalysisSystem.KeyPattern,
+                        result.KeyPatternSkillAxes,
+                        beatmapId,
+                        at,
+                        EzKeyPatternUnit.VERSION,
+                        null,
+                        EzLocalProfileConstants.MANIA_RULESET_ID);
+                }
+
+                return SunnyMaintenanceApplyOutcome.Processed;
+            }
+            catch (Exception e)
+            {
+                Logger.Log($"Sunny maintenance store failed on {beatmapId}: {e}");
+
+                try
+                {
+                    if (r.Find<BeatmapInfo>(beatmapId) is BeatmapInfo live)
+                        EzRatingWriter.MarkProcessingFailed(live, EzAnalysisSystem.SSR);
+                }
+                catch (Exception markFailed)
+                {
+                    Logger.Log($"Sunny maintenance could not mark failure on {beatmapId}: {markFailed}");
+                }
+
+                return SunnyMaintenanceApplyOutcome.Failed;
+            }
+        }
+
+        private static void replaceBeatmapSystemSkills(
+            Realm r,
+            string beatmapHash,
+            EzAnalysisSystem system,
+            IReadOnlyDictionary<string, double> skills,
+            Guid beatmapId,
+            DateTimeOffset computedAt,
+            int algorithmVersion,
+            IReadOnlyDictionary<string, int>? skillVersions,
+            int rulesetOnlineId)
+        {
+            string systemId = system.ToStorageId();
+
+            var existing = r.All<EzBeatmapSkillValue>()
+                            .Where(v => v.BeatmapHash == beatmapHash && v.SystemId == systemId)
+                            .ToList();
+
+            foreach (var row in existing)
+                r.Remove(row);
+
+            foreach (var (skillId, value) in skills)
+            {
+                int rowVersion = rowVersionFor(system, skillId, algorithmVersion, skillVersions, rulesetOnlineId);
+
+                r.Add(new EzBeatmapSkillValue
+                {
+                    BeatmapHash = beatmapHash,
+                    BeatmapId = beatmapId,
+                    SystemId = systemId,
+                    RulesetOnlineId = rulesetOnlineId,
+                    SkillId = skillId,
+                    Value = value,
+                    AlgorithmVersion = rowVersion,
+                    ComputedAt = computedAt,
+                });
+            }
         }
 
         /// <summary>
@@ -423,10 +561,37 @@ namespace osu.Game.EzOsuGame.Skills
         /// Retires every system that reads <paramref name="system"/>, after that system's own refill pass has finished.
         /// </summary>
         public IReadOnlyList<EzAnalysisSystem> InvalidateDownstream(EzAnalysisSystem system)
+            => InvalidateDownstream(system, Array.Empty<EzAnalysisSystem>());
+
+        /// <summary>
+        /// Retires downstream of <paramref name="system"/> except systems already written in the same pass.
+        /// Those keep their rows and receive the current revision stamp so they are not owed another reset.
+        /// </summary>
+        public IReadOnlyList<EzAnalysisSystem> InvalidateDownstream(EzAnalysisSystem system, IReadOnlyList<EzAnalysisSystem> alreadyFilled)
         {
             var downstream = DownstreamOf(system);
-            retireRows(downstream);
-            return downstream;
+            var filled = alreadyFilled.Count == 0 ? null : alreadyFilled.ToHashSet();
+            var toRetire = filled == null
+                ? downstream
+                : downstream.Where(s => !filled.Contains(s)).ToList();
+
+            retireRows(toRetire);
+
+            if (filled != null)
+            {
+                foreach (var kept in downstream)
+                {
+                    if (!filled.Contains(kept))
+                        continue;
+
+                    int version = kept.CurrentVersion();
+
+                    if (version > 0)
+                        SetAppliedVersion(kept, version);
+                }
+            }
+
+            return toRetire;
         }
 
         private void retireRows(IReadOnlyList<EzAnalysisSystem> systems)
@@ -485,16 +650,53 @@ namespace osu.Game.EzOsuGame.Skills
             if (system == EzAnalysisSystem.KeyPattern)
                 return;
 
-            realmAccess.Write(r =>
+            var beatmapIds = realmAccess.Run(r =>
             {
-                foreach (var beatmap in r.All<BeatmapInfo>())
-                {
-                    if (beatmap.EzRatingData.GetStar(system) < 0 && beatmap.EzRatingData.GetPerformance(system) < 0)
-                        continue;
+                var beatmaps = r.All<BeatmapInfo>().ToList().AsEnumerable();
 
-                    EzRatingWriter.Clear(beatmap, system);
+                switch (system)
+                {
+                    case EzAnalysisSystem.Official:
+                        beatmaps = beatmaps.Where(b => b.EzRatingData.OfficialSR >= 0 || b.EzRatingData.OfficialPP >= 0);
+                        break;
+
+                    case EzAnalysisSystem.SSR:
+                        beatmaps = beatmaps.Where(b => b.EzRatingData.SunnySR >= 0 || b.EzRatingData.SunnyPP >= 0);
+                        break;
+
+                    case EzAnalysisSystem.PPP:
+                        beatmaps = beatmaps.Where(b => b.EzRatingData.PppSR >= 0 || b.EzRatingData.PppPP >= 0);
+                        break;
+
+                    case EzAnalysisSystem.Mina:
+                        beatmaps = beatmaps.Where(b => b.EzRatingData.MinaSR >= 0 || b.EzRatingData.MinaPP >= 0);
+                        break;
+
+                    default:
+                        return new List<Guid>();
                 }
+
+                return beatmaps.ToList().Select(b => b.ID).ToList();
             });
+
+            if (beatmapIds.Count == 0)
+                return;
+
+            const int batch_size = 500;
+
+            for (int i = 0; i < beatmapIds.Count; i += batch_size)
+            {
+                var batch = beatmapIds.Skip(i).Take(batch_size).ToList();
+
+                realmAccess.Write(r =>
+                {
+                    foreach (Guid id in batch)
+                    {
+                        if (r.Find<BeatmapInfo>(id) is BeatmapInfo beatmap)
+                            EzRatingWriter.Clear(beatmap, system);
+                    }
+                });
+            }
         }
 
         /// <summary>
