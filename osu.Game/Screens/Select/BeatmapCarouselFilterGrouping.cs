@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
+using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Carousel;
@@ -64,8 +65,8 @@ namespace osu.Game.Screens.Select
                 var newGroupMap = new Dictionary<GroupDefinition, List<CarouselItem>>(groupMap.Count);
 
                 var criteria = GetCriteria();
-                var newItems = new List<CarouselItem>();
                 var itemList = (List<CarouselItem>)items;
+                List<CarouselItem> newItems = [with(capacity: itemList.Count)];
 
                 IReadOnlyDictionary<BeatmapInfo, double>? operationDifficulties = null;
                 IReadOnlyDictionary<BeatmapInfo, double>? operationPpValues = null;
@@ -149,7 +150,7 @@ namespace osu.Game.Screens.Select
 
                     if (group != null)
                     {
-                        newGroupMap[group] = currentGroupItems = new List<CarouselItem>();
+                        newGroupMap[group] = currentGroupItems = [with(capacity: itemsInGroup.Count + 1)];
 
                         addItem(groupItem = new CarouselItem(group)
                         {
@@ -169,8 +170,10 @@ namespace osu.Game.Screens.Select
 
                         if (newBeatmapSet)
                         {
-                            if (!newSetMap.TryGetValue(groupedBeatmapSet, out currentSetItems))
-                                newSetMap[groupedBeatmapSet] = currentSetItems = new List<CarouselItem>();
+                            ref var setItems = ref newSetMap.GetValueRefOrAddDefault(groupedBeatmapSet, out bool exists);
+                            if (!exists || setItems == null)
+                                setItems = [];
+                            currentSetItems = setItems;
                         }
 
                         if (BeatmapSetsGroupedTogether)
@@ -506,6 +509,57 @@ namespace osu.Game.Screens.Select
             return new GroupDefinition(-bucket, label).Yield();
         }
 
+        private static readonly string[] touhou_needles =
+        [
+            "touhou", "東方", "东方", "touhou project", "東方Project", "東方プロジェクト", "동방프로젝트", "동방Project", "tohou",
+            "瑶山百灵", "藤咲かりん", "小峠舞", "ZUN", "上海アリス幻樂団", "上海アリス", "Team Shanghai Alice", "IOSYS", "EastNewSound", "幽閉サテライト", "C-CLAYS", "Silver Forest", "Sound Holic", "Alstroemeria Records",
+            "豚乙女", "Demetori", "SOUND HOLIC",
+            "幽闭星光",
+            "博麗", "霊夢", "霊夢", "魔理沙", "アリス", "咲夜", "レミリア", "フランドール", "チルノ", "パチュリー", "妖夢", "鈴仙", "早苗", "映姫", "幽々子", "蓮子", "メディスン", "妖怪",
+            "地霊殿", "紅魔郷", "妖々夢", "永夜抄", "花映塚", "風神録", "神霊廟", "輝針城", "紺珠伝", "天空璋", "鬼形獣", "虹龍洞"
+        ];
+
+        private static readonly string[] vocaloid_needles =
+        [
+            "vocaloid", "ボーカロイド", "보컬로이드", "vocaloids", "vocaloid music", "diva",
+            "miku", "hatsune", "kagamine", "gumi", "luka", "meiko", "kaito", "鏡音", "初音", "巡音", "巡音ルカ", "鏡音リン", "鏡音レン", "MEIKO", "KAITO", "GUMI"
+        ];
+
+        private static readonly string[] ez2_needles = ["ez2", "ez2ac", "ez2dj", "ez2on"];
+
+        private static readonly string[] djmax_needles = ["djmax", "디제이맥스", "DJMAX"];
+
+        private static readonly string[] bms_needles = ["bms", "bof"];
+
+        private static readonly string[] bemani_needles =
+        [
+            "iidx", "beatmania iidx", "beatmania", "beatmaniaIIDX", "konami", "bemani", "sdvx", "sound voltex",
+            "pop'n music", "pop'n", "popn", "guitarFreaks", "drummania", "DDR", "dance dance revolution", "DanceDanceRevolution", "jubeat", "reflec beat", "REFLEC BEAT",
+            "あさき", "dj TAKA", "DJ YOSHITAKA", " 猫叉Master", "U1", "L.E.D.", "wac", "Qrispy Joybox", "PON", "DJ TOTTO", "PHQUASE", "村井圣夜"
+        ];
+
+        private static readonly string[] o2_needles = ["o2jam", "o2mania", "오투잼", "[荣誉]", "[木星灵魂]", "[木星]", "劲乐团"];
+
+        private static readonly string[] acg_needles =
+        [
+            "tv", "tv-size", "tv size", "anime", "op", "ed", "tv_ver", "アニメ", "动画", "acg", "galgame", "dmm", "Douga", "Nico",
+            "game"
+        ];
+
+        private static bool containsAny(string haystack, ReadOnlySpan<string> needles)
+        {
+            if (string.IsNullOrEmpty(haystack))
+                return false;
+
+            foreach (string n in needles)
+            {
+                if (!string.IsNullOrEmpty(n) && haystack.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)
+                    return true;
+            }
+
+            return false;
+        }
+
         private IEnumerable<GroupDefinition> defineGroupBySource(BeatmapInfo beatmap)
         {
             var meta = beatmap.BeatmapSet!.Metadata;
@@ -523,53 +577,28 @@ namespace osu.Game.Screens.Select
             if (string.IsNullOrWhiteSpace(combined))
                 return new GroupDefinition(200, "Unsourced").Yield();
 
-            // helper for case-insensitive contains
-            static bool containsAny(string haystack, params string[] needles)
-            {
-                if (string.IsNullOrEmpty(haystack)) return false;
-
-                foreach (string n in needles)
-                {
-                    if (!string.IsNullOrEmpty(n) && haystack.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)
-                        return true;
-                }
-
-                return false;
-            }
-
-            // priority-ordered matching
-            if (containsAny(combined, "touhou", "東方", "东方", "touhou project", "東方Project", "東方プロジェクト", "동방프로젝트", "동방Project", "tohou",
-                    "瑶山百灵", "藤咲かりん", "小峠舞", "ZUN", "上海アリス幻樂団", "上海アリス", "Team Shanghai Alice", "IOSYS", "EastNewSound", "幽閉サテライト", "C-CLAYS", "Silver Forest", "Sound Holic", "Alstroemeria Records",
-                    "豚乙女", "Demetori", "SOUND HOLIC",
-                    "幽闭星光",
-                    "博麗", "霊夢", "霊夢", "魔理沙", "アリス", "咲夜", "レミリア", "フランドール", "チルノ", "パチュリー", "妖夢", "鈴仙", "早苗", "映姫", "幽々子", "蓮子", "メディスン", "妖怪",
-                    "地霊殿", "紅魔郷", "妖々夢", "永夜抄", "花映塚", "風神録", "神霊廟", "輝針城", "紺珠伝", "天空璋", "鬼形獣", "虹龍洞"))
+            if (containsAny(combined, touhou_needles))
                 return new GroupDefinition(2, "东方Project").Yield();
 
-            if (containsAny(combined, "vocaloid", "ボーカロイド", "보컬로이드", "vocaloids", "vocaloid music", "diva",
-                    "miku", "hatsune", "kagamine", "gumi", "luka", "meiko", "kaito", "鏡音", "初音", "巡音", "巡音ルカ", "鏡音リン", "鏡音レン", "MEIKO", "KAITO", "GUMI"))
+            if (containsAny(combined, vocaloid_needles))
                 return new GroupDefinition(4, "VOCALOID").Yield();
 
-            if (containsAny(combined, "ez2", "ez2ac", "ez2dj", "ez2on"))
+            if (containsAny(combined, ez2_needles))
                 return new GroupDefinition(1, "EZ2AC").Yield();
 
-            if (containsAny(combined, "djmax", "디제이맥스", "DJMAX"))
+            if (containsAny(combined, djmax_needles))
                 return new GroupDefinition(0, "DJMAX").Yield();
 
-            if (containsAny(combined, "bms", "bof"))
+            if (containsAny(combined, bms_needles))
                 return new GroupDefinition(0, "BMS").Yield();
 
-            if (containsAny(combined, "iidx", "beatmania iidx", "beatmania", "beatmaniaIIDX", "konami", "bemani", "sdvx", "sound voltex",
-                    "pop'n music", "pop'n", "popn", "guitarFreaks", "drummania", "DDR", "dance dance revolution", "DanceDanceRevolution", "jubeat", "reflec beat", "REFLEC BEAT",
-                    "あさき", "dj TAKA", "DJ YOSHITAKA", " 猫叉Master", "U1", "L.E.D.", "wac", "Qrispy Joybox", "PON", "DJ TOTTO", "PHQUASE", "村井圣夜"
-                ))
+            if (containsAny(combined, bemani_needles))
                 return new GroupDefinition(0, "BEMANI SOUND").Yield();
 
-            if (containsAny(combined, "o2jam", "o2mania", "오투잼", "[荣誉]", "[木星灵魂]", "[木星]", "劲乐团"))
+            if (containsAny(combined, o2_needles))
                 return new GroupDefinition(0, "O2").Yield();
 
-            if (containsAny(combined, "tv", "tv-size", "tv size", "anime", "op", "ed", "tv_ver", "アニメ", "动画", "acg", "galgame", "dmm", "Douga", "Nico",
-                    "game"))
+            if (containsAny(combined, acg_needles))
                 return new GroupDefinition(3, "ACG").Yield();
 
             // Ez: group beatmaps with storyboard or video that didn't match any game-specific group above.
@@ -604,9 +633,9 @@ namespace osu.Game.Screens.Select
 
                 foreach (string md5 in collection.BeatmapMD5Hashes)
                 {
-                    if (!md5ToCollectionsMap.TryGetValue(md5, out var collections))
-                        md5ToCollectionsMap[md5] = collections = new List<GroupDefinition>();
-
+                    ref var collections = ref md5ToCollectionsMap.GetValueRefOrAddDefault(md5, out bool exists);
+                    if (!exists || collections == null)
+                        collections = [];
                     collections.Add(groupDefinition);
                 }
             }

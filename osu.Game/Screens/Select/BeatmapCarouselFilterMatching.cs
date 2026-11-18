@@ -39,7 +39,7 @@ namespace osu.Game.Screens.Select
             var criteria = getCriteria();
             var itemList = items.ToList();
             int countMatching = 0;
-            var matchedItems = new List<CarouselItem>();
+            List<CarouselItem> matchedItems = [with(capacity: itemList.Count)];
 
             bool requiresDifficultyForFiltering = criteria.StarDifficulty.HasFilter || criteria.UserStarDifficulty.HasFilter;
             bool requiresPpForFiltering = criteria.Pp.HasFilter;
