@@ -8,7 +8,6 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.LocalProfile;
-using osu.Game.EzOsuGame.Skills.SkillTag;
 using osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern;
 
 namespace osu.Game.EzOsuGame.Skills.SSR
@@ -17,8 +16,8 @@ namespace osu.Game.EzOsuGame.Skills.SSR
     /// Runs the SSR system for one chart: gate, one conversion, engine, store.
     /// </summary>
     /// <remarks>
-    /// The rating math lives in <see cref="EzSSREngine"/>, in this assembly alongside the other systems. This type
-    /// answers which charts it rates and performs the write, so a ruleset never has to announce its own capability.
+    /// The rating math lives in <see cref="EzSSREngine"/>. This type rates through
+    /// <see cref="EzAnalysisComputation.ComputeSsr"/>, the same entry the live pass uses, then writes.
     /// </remarks>
     public sealed class EzSSRUnit
     {
@@ -103,7 +102,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             if (!EzSSREngine.IsPatternSupported(keyCount))
                 return EzSunnyMaintenanceResult.NoStoreRequired;
 
-            var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
+            var ssr = EzAnalysisComputation.ComputeSsr(playable, beatmapInfo.Ruleset.OnlineID, 1, cancellationToken);
             double star;
             IReadOnlyDictionary<string, double>? ssrSkillAxes = null;
 
@@ -114,9 +113,11 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             }
             else
             {
-                var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, playable.Difficulty.OverallDifficulty);
-                star = combined.Sr;
-                ssrSkillAxes = EzSunnySrSkillValues.FromSnapshot(combined.PatternSnapshot);
+                if (ssr.SunnySR is not double resolvedSunny || !double.IsFinite(resolvedSunny) || resolvedSunny < 0)
+                    return null;
+
+                star = resolvedSunny;
+                ssrSkillAxes = ssr.PatternSnapshot != null ? EzSunnySrSkillValues.FromSnapshot(ssr.PatternSnapshot) : null;
             }
 
             if (!double.IsFinite(star) || star < 0)
@@ -127,7 +128,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             double? officialStar = beatmapInfo.StarRating < 0 && official.Star >= 0 ? official.Star : null;
             double? officialPp = beatmapInfo.PerformancePoints < 0 && official.Pp >= 0 ? official.Pp : null;
 
-            IReadOnlyDictionary<string, double>? keyPatternSkills = string.IsNullOrEmpty(beatmapInfo.Hash)
+            IReadOnlyDictionary<string, double>? keyPatternSkills = string.IsNullOrEmpty(beatmapInfo.Hash) || ssr.Chart is not { } chart
                 ? null
                 : EzKeyPatternUnit.BuildSkillsForPersistence(chart, star, cancellationToken);
 
@@ -199,9 +200,11 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             if (!EzSSREngine.IsPatternSupported(keyCount))
                 return EzSunnyAxesMaintenanceResult.NoStoreRequired;
 
-            var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
+            var ssr = EzAnalysisComputation.ComputeSsr(playable, beatmapInfo.Ruleset.OnlineID, 1, cancellationToken);
             IReadOnlyDictionary<string, double>? ssrAxes;
-            IReadOnlyDictionary<string, double>? keyPatternAxes = EzKeyPatternUnit.BuildSkillsForPersistence(chart, beatmapInfo.EzRatingData.SunnySR, cancellationToken);
+            IReadOnlyDictionary<string, double>? keyPatternAxes = ssr.Chart is { } chart
+                ? EzKeyPatternUnit.BuildSkillsForPersistence(chart, beatmapInfo.EzRatingData.SunnySR, cancellationToken)
+                : null;
 
             if (playable.HitObjects.Count == 0)
             {
@@ -209,8 +212,7 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             }
             else
             {
-                var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, playable.Difficulty.OverallDifficulty);
-                ssrAxes = EzSunnySrSkillValues.FromSnapshot(combined.PatternSnapshot);
+                ssrAxes = ssr.PatternSnapshot != null ? EzSunnySrSkillValues.FromSnapshot(ssr.PatternSnapshot) : null;
             }
 
             if (string.IsNullOrEmpty(beatmapInfo.Hash))

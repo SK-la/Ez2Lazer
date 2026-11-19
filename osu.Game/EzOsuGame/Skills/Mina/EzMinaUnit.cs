@@ -15,8 +15,8 @@ namespace osu.Game.EzOsuGame.Skills.Mina
     /// Runs the Mina system for one chart: gate, convert, call the Mina engine, hand the vector to the store.
     /// </summary>
     /// <remarks>
-    /// Write path only: live values come from the shared analysis pass
-    /// (<see cref="IEzChartAnalysisLookup"/>), never from here.
+    /// Write path: rates through <see cref="EzAnalysisComputation.ComputeMinaAxes"/>, the same entry the live pass
+    /// uses, then stores. Live reads still go through the analysis cache.
     /// </remarks>
     public sealed class EzMinaUnit
     {
@@ -92,40 +92,25 @@ namespace osu.Game.EzOsuGame.Skills.Mina
                 return new EzMinaMaintenanceSection.Unrateable();
             }
 
-            var computed = computeVector(playable, beatmapInfo, keyCount);
+            var mina = EzAnalysisComputation.ComputeMinaAxes(beatmapInfo.Ruleset.OnlineID, playable, 1);
 
-            if (computed == null)
+            if (mina is not { } result)
+            {
+                Logger.Log($"[EzSkills] Mina compute failed for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
                 return new EzMinaMaintenanceSection.TransientFailure();
+            }
 
-            if (computed.Value.Overall <= 0 && computed.Value.Stream <= 0)
+            if (!result.HasRating)
             {
                 Logger.Log($"[EzSkills] Mina zero vector for {beatmapInfo} (keys={keyCount})", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
                 return new EzMinaMaintenanceSection.Unrateable();
             }
 
-            double? star = computed.Value.Overall > 0
-                ? EzMinaStarRatingScale.ToStarRating(computed.Value.Overall)
+            double? star = result.Vector.Overall > 0
+                ? EzMinaStarRatingScale.ToStarRating(result.Vector.Overall)
                 : null;
 
-            return new EzMinaMaintenanceSection.Vector(computed.Value, star);
-        }
-
-        private static EzMinaSkillAxisData? computeVector(IBeatmap playable, BeatmapInfo beatmapInfo, int keyCount)
-        {
-            var calc = EzMinaEnginePool.Rent();
-            EzMinaSkillAxisData vector;
-
-            try
-            {
-                vector = calc.CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(playable), keyCount, rate: 1f);
-            }
-            catch (Exception e)
-            {
-                Logger.Log($"[EzSkills] Mina compute failed for {beatmapInfo} (keys={keyCount}): {e.Message}", Ez2ConfigManager.LOGGER_NAME, LogLevel.Error);
-                return null;
-            }
-
-            return vector;
+            return new EzMinaMaintenanceSection.Vector(result.Vector, star);
         }
 
         private static Dictionary<string, double> toDictionary(EzMinaSkillAxisData vector)

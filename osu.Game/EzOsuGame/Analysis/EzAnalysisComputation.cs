@@ -32,7 +32,10 @@ using osu.Game.Utils;
 namespace osu.Game.EzOsuGame.Analysis
 {
     /// <summary>
-    /// L3 pass: one <see cref="EzAnalysisResult"/> for a chart + mods.
+    /// Chart analysis engines used by both the L3 live pass and the NoMod write units (BDSP / updater).
+    /// The full product is <see cref="Compute(WorkingBeatmap, in EzAnalysisLookupCache, CancellationToken)"/>;
+    /// <see cref="ComputeMinaAxes"/> and <see cref="ComputeSsr"/> are the per-system entries so a NoMod live pass
+    /// and a Realm write cannot assemble the same engine twice.
     /// When mods allow, L1 Sunny star (Realm) is chosen before Dan and scalar ratings so those fields share the headline;
     /// <see cref="EzAnalysisResult.SsrPatternRadar"/> stays the live snapshot.
     /// KPS/KPC NoMod slices are <c>ComputePersistedSqliteSlice</c>, not this method.
@@ -92,7 +95,7 @@ namespace osu.Game.EzOsuGame.Analysis
             if (playable.HitObjects.Count == 0)
                 return true;
 
-            if (computeSunnySR(playable, getRateAdjustMultiplier(mods), cancellationToken) is not double sr)
+            if (ComputeSsr(playable, ruleset.OnlineID, getRateAdjustMultiplier(mods), cancellationToken).SunnySR is not double sr)
                 return false;
 
             sunnySR = sr;
@@ -300,9 +303,8 @@ namespace osu.Game.EzOsuGame.Analysis
 
                 if (lookup.Ruleset.OnlineID == EzLocalProfileConstants.MANIA_RULESET_ID)
                 {
-                    var measurements = EzChartMeasurements.FromPlayable(analysisBeatmap, cancellationToken);
-
-                    if (ComputeMinaAxes(lookup.Ruleset.OnlineID, analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), cancellationToken) is { } mina)
+                    if (ComputeMinaAxes(lookup.Ruleset.OnlineID, analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), cancellationToken) is { } mina
+                        && mina.HasRating)
                     {
                         minaAxes = mina.Axes;
 
@@ -443,7 +445,7 @@ namespace osu.Game.EzOsuGame.Analysis
             SsrAndRadar ssrAndRadar;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Radar))
-                ssrAndRadar = computeSsrAndRadar(lookup, analysisBeatmap, measurements, cancellationToken);
+                ssrAndRadar = ComputeSsr(analysisBeatmap, rulesetOnlineId, rate, cancellationToken, measurements);
 
             double? sunnySR = persistedSunnyStar(lookup) ?? ssrAndRadar.SunnySR;
 
@@ -451,6 +453,9 @@ namespace osu.Game.EzOsuGame.Analysis
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Mina))
                 mina = ComputeMinaAxes(rulesetOnlineId, analysisBeatmap, rate, cancellationToken);
+
+            if (mina is { } measuredMina && !measuredMina.HasRating)
+                mina = null;
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -758,10 +763,7 @@ namespace osu.Game.EzOsuGame.Analysis
         /// Rows come from the playable, the same conversion the L1 write uses. Deriving them from a CSI chart
         /// dropped columns outside the key count and made a NoMod live pass disagree with the stored headline.
         /// </remarks>
-        internal static MinaResult? ComputeMinaAxes(int rulesetOnlineId, IBeatmap playable, double rate)
-            => ComputeMinaAxes(rulesetOnlineId, playable, rate, CancellationToken.None);
-
-        internal static MinaResult? ComputeMinaAxes(int rulesetOnlineId, IBeatmap playable, double rate, CancellationToken cancellationToken)
+        internal static MinaResult? ComputeMinaAxes(int rulesetOnlineId, IBeatmap playable, double rate, CancellationToken cancellationToken = default)
         {
             ArgumentNullException.ThrowIfNull(playable);
 
@@ -779,9 +781,6 @@ namespace osu.Game.EzOsuGame.Analysis
                 var engine = EzMinaEnginePool.Rent();
                 var vector = engine.CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(playable), keyCount, (float)rate);
 
-                if (vector.Overall <= 0 && vector.Stream <= 0)
-                    return null;
-
                 var axes = new Dictionary<string, double>(StringComparer.Ordinal);
 
                 foreach (var (axis, value) in vector.Enumerate())
@@ -796,7 +795,10 @@ namespace osu.Game.EzOsuGame.Analysis
         }
 
         /// <summary>Bare-axis table plus the engine vector it came from.</summary>
-        internal readonly record struct MinaResult(IReadOnlyDictionary<string, double> Axes, EzMinaSkillAxisData Vector);
+        internal readonly record struct MinaResult(IReadOnlyDictionary<string, double> Axes, EzMinaSkillAxisData Vector)
+        {
+            public bool HasRating => Vector.Overall > 0 || Vector.Stream > 0;
+        }
 
         /// <summary>
         /// PP+ chart vector for the current mods. Independent of the ruleset analysis provider: PP+ covers
@@ -839,42 +841,59 @@ namespace osu.Game.EzOsuGame.Analysis
             return new StructureResult(axes, info);
         }
 
-        private readonly record struct SsrAndRadar(double? SunnySR, EzRadarChartData<string>? KeyPatternRadar, EzRadarChartData<string>? SsrPatternRadar);
+        internal readonly record struct SsrAndRadar(
+            double? SunnySR,
+            EzRadarChartData<string>? KeyPatternRadar,
+            EzRadarChartData<string>? SsrPatternRadar,
+            EzManiaChartInput? Chart = null,
+            EzManiaSR4PatternSnapshot? PatternSnapshot = null);
 
         /// <summary>
         /// The Sunny rating and the two chart views this pass can draw, from one derivation of the chart.
         /// </summary>
         /// <remarks>
         /// The rating and its pattern breakdown come from one engine call, so asking for both does not run the
-        /// difficulty core twice for the same chart and mods.
+        /// difficulty core twice for the same chart and mods. BDSP Sunny write goes through here with rate 1.
         /// </remarks>
-        private static SsrAndRadar computeSsrAndRadar(
-            in EzAnalysisLookupCache lookup,
-            IBeatmap analysisBeatmap,
-            EzChartMeasurements? measurements,
-            CancellationToken cancellationToken)
+        internal static SsrAndRadar ComputeSsr(
+            IBeatmap playable,
+            int rulesetOnlineId,
+            double rate,
+            CancellationToken cancellationToken = default,
+            EzChartMeasurements? measurements = null)
         {
-            if (!EzSSRUnit.SupportsRuleset(lookup.Ruleset.OnlineID) || measurements is not { } measured)
+            ArgumentNullException.ThrowIfNull(playable);
+
+            if (!EzSSRUnit.SupportsRuleset(rulesetOnlineId))
                 return default;
 
-            var chart = measured.Chart;
-            int keyCount = measured.KeyCount;
+            EzManiaChartInput chart;
+            int keyCount;
+
+            if (measurements is { } measured)
+            {
+                chart = measured.Chart;
+                keyCount = measured.KeyCount;
+            }
+            else
+            {
+                keyCount = EzHoldMetrics.ResolveKeyCount(playable);
+                chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
+            }
 
             EzRadarChartData<string>? keyPatternRadar = EzKeyPatternUnit.ComputeRadar(chart, cancellationToken);
 
             if (!EzSSREngine.IsPatternSupported(keyCount))
-                return new SsrAndRadar(null, keyPatternRadar, null);
+                return new SsrAndRadar(null, keyPatternRadar, null, chart);
 
             if (chart.Notes.Count == 0)
-                return new SsrAndRadar(0, keyPatternRadar, null);
+                return new SsrAndRadar(0, keyPatternRadar, null, chart);
 
-            // L3 SunnySRSkill spokes always from this live snapshot; L1 Sunny star is resolved later in Compute.
-            var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, analysisBeatmap.Difficulty.OverallDifficulty,
-                getRateAdjustMultiplier(lookup.OrderedMods));
-
+            var combined = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, playable.Difficulty.OverallDifficulty, rate);
             double? sunnySR = double.IsFinite(combined.Sr) && combined.Sr >= 0 ? combined.Sr : null;
 
-            return new SsrAndRadar(sunnySR, keyPatternRadar, EzManiaSR4PatternRadarBuilder.Create(combined.PatternSnapshot));
+            return new SsrAndRadar(sunnySR, keyPatternRadar, EzManiaSR4PatternRadarBuilder.Create(combined.PatternSnapshot), chart,
+                combined.PatternSnapshot);
         }
 
         /// <summary>
@@ -884,22 +903,6 @@ namespace osu.Game.EzOsuGame.Analysis
         {
             int realColumnCount = EzManiaColumnLayout.ResolveRealColumnCount(lookup.Ruleset, lookup.BeatmapInfo, lookup.OrderedMods);
             EzManiaColumnLayout.PadToRealColumnCount(columnCounts, holdNoteCounts, realColumnCount);
-        }
-
-        /// <summary>
-        /// The Sunny rating of an already-built playable, or null when the chart has no layout this engine rates.
-        /// </summary>
-        private static double? computeSunnySR(IBeatmap playable, double rate, CancellationToken cancellationToken)
-        {
-            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
-
-            if (!EzSSREngine.IsPatternSupported(keyCount))
-                return null;
-
-            var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
-            double sr = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, playable.Difficulty.OverallDifficulty, rate).Sr;
-
-            return double.IsFinite(sr) && sr >= 0 ? sr : null;
         }
 
         /// <summary>
@@ -967,7 +970,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 return true;
             }
 
-            sunnySR = computeSunnySR(analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), cancellationToken);
+            sunnySR = ComputeSsr(analysisBeatmap, lookup.Ruleset.OnlineID, getRateAdjustMultiplier(lookup.OrderedMods), cancellationToken).SunnySR;
             return sunnySR != null;
         }
 
