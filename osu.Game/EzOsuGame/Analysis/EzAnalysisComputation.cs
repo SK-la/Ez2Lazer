@@ -302,7 +302,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 {
                     var measurements = EzChartMeasurements.FromPlayable(analysisBeatmap, cancellationToken);
 
-                    if (ComputeMinaAxes(lookup.Ruleset.OnlineID, measurements, getRateAdjustMultiplier(lookup.OrderedMods), cancellationToken) is { } mina)
+                    if (ComputeMinaAxes(lookup.Ruleset.OnlineID, analysisBeatmap, getRateAdjustMultiplier(lookup.OrderedMods), cancellationToken) is { } mina)
                     {
                         minaAxes = mina.Axes;
 
@@ -450,7 +450,7 @@ namespace osu.Game.EzOsuGame.Analysis
             MinaResult? mina;
 
             using (EzAnalysisPassPerf.Measure(EzAnalysisPassPerf.Stage.Mina))
-                mina = ComputeMinaAxes(rulesetOnlineId, measurements, rate, cancellationToken);
+                mina = ComputeMinaAxes(rulesetOnlineId, analysisBeatmap, rate, cancellationToken);
 
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -754,15 +754,21 @@ namespace osu.Game.EzOsuGame.Analysis
         /// The one Mina measurement in the codebase. Every consumer (axes table, dan, radar, player aggregation)
         /// goes through here, so no second implementation of the engine call can drift from this one.
         /// </summary>
-        internal static MinaResult? ComputeMinaAxes(int rulesetOnlineId, EzChartMeasurements? measurements, double rate)
-            => ComputeMinaAxes(rulesetOnlineId, measurements, rate, CancellationToken.None);
+        /// <remarks>
+        /// Rows come from the playable, the same conversion the L1 write uses. Deriving them from a CSI chart
+        /// dropped columns outside the key count and made a NoMod live pass disagree with the stored headline.
+        /// </remarks>
+        internal static MinaResult? ComputeMinaAxes(int rulesetOnlineId, IBeatmap playable, double rate)
+            => ComputeMinaAxes(rulesetOnlineId, playable, rate, CancellationToken.None);
 
-        internal static MinaResult? ComputeMinaAxes(int rulesetOnlineId, EzChartMeasurements? measurements, double rate, CancellationToken cancellationToken)
+        internal static MinaResult? ComputeMinaAxes(int rulesetOnlineId, IBeatmap playable, double rate, CancellationToken cancellationToken)
         {
-            if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID || measurements is not { } measured)
+            ArgumentNullException.ThrowIfNull(playable);
+
+            if (rulesetOnlineId != EzLocalProfileConstants.MANIA_RULESET_ID)
                 return null;
 
-            int keyCount = measured.KeyCount;
+            int keyCount = EzHoldMetrics.ResolveKeyCount(playable);
             if (!EzMinaEngine.IsSupportedKeyCount(keyCount))
                 return null;
 
@@ -771,7 +777,7 @@ namespace osu.Game.EzOsuGame.Analysis
             try
             {
                 var engine = EzMinaEnginePool.Rent();
-                var vector = engine.CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(measured.Chart.Notes), keyCount, (float)rate);
+                var vector = engine.CalculateChartMinaSkillAxis(EzMinaNoteConverter.Convert(playable), keyCount, (float)rate);
 
                 if (vector.Overall <= 0 && vector.Stream <= 0)
                     return null;
@@ -891,7 +897,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 return null;
 
             var chart = EzCSIEngine.FromPlayable(playable, cancellationToken);
-            double sr = EzSSREngine.CalculateSR(chart, keyCount, playable.Difficulty.OverallDifficulty, rate);
+            double sr = EzSSREngine.CalculateSRWithPatternSnapshot(chart, keyCount, playable.Difficulty.OverallDifficulty, rate).Sr;
 
             return double.IsFinite(sr) && sr >= 0 ? sr : null;
         }

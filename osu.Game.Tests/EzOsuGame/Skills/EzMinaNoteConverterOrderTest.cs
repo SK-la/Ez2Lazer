@@ -4,8 +4,11 @@
 using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Skills.Mina;
 using osu.Game.EzOsuGame.Skills.SkillTag;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mania.Objects;
 
 namespace osu.Game.Tests.EzOsuGame.Skills
 {
@@ -59,6 +62,30 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(rows[0].RowTime, Is.EqualTo(0f));
             Assert.That(rows[1].RowTime, Is.EqualTo(0.1f));
             Assert.That(rows[2].RowTime, Is.EqualTo(0.75f));
+        }
+
+        [Test]
+        public void Playable_keeps_columns_that_a_csi_chart_drops()
+        {
+            var beatmap = new Beatmap
+            {
+                BeatmapInfo =
+                {
+                    Ruleset = new ManiaRuleset().RulesetInfo,
+                    Difficulty = { CircleSize = 4 },
+                },
+                HitObjects =
+                {
+                    new Note { StartTime = 100, Column = 0 },
+                    new Note { StartTime = 200, Column = 4 },
+                },
+            };
+
+            var fromPlayable = EzMinaNoteConverter.Convert(beatmap);
+            var fromChart = EzMinaNoteConverter.Convert(EzCSIEngine.FromPlayable(beatmap).Notes);
+
+            Assert.That(fromPlayable.Length, Is.EqualTo(2));
+            Assert.That(fromChart.Length, Is.EqualTo(1));
         }
 
         [Test]
