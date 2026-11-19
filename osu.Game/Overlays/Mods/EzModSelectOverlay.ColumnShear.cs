@@ -20,46 +20,48 @@ namespace osu.Game.Overlays.Mods
 
         private void applyEzColumnFlowShear()
         {
-            columnFlow.Shear = new Vector2(ColumnFlowShearX, 0);
-            applyEzColumnFlowShearToColumns();
-            Scheduler.AddDelayed(applyEzColumnFlowShearToColumns, 50);
-            Scheduler.AddDelayed(applyEzColumnFlowShearToColumns, 250);
-        }
-
-        private void applyEzColumnFlowShearToColumns()
-        {
-            foreach (var dim in columnFlow)
-            {
-                if (dim.Column is ModColumn modColumn)
-                    modColumn.ApplyEzLayoutShearToContent(ColumnFlowShearX);
-                else
-                    dim.Column.ApplyEzLayoutShear(ColumnFlowShearX);
-            }
+            ContentView.ApplyShear(ColumnFlowShearX);
         }
     }
 
     public abstract partial class ModSelectColumn
     {
+        private float? ezLayoutShear;
+
         internal void ApplyEzLayoutShear(float shearX)
         {
+            ezLayoutShear = shearX;
             var counter = new Vector2(-shearX, 0);
-            triangles.Shear = counter;
-            headerText.Shear = counter;
+            headerBackground.Shear = WrapItems ? new Vector2(shearX, 0) : Vector2.Zero;
+            triangles.Shear = WrapItems ? Vector2.Zero : counter;
+            headerText.Shear = WrapItems ? Vector2.Zero : counter;
+
+            foreach (var panel in ItemsFlow.Children.OfType<ModSelectPanel>())
+            {
+                panel.Shear = WrapItems ? new Vector2(shearX, 0) : Vector2.Zero;
+                panel.ApplyEzLayoutShear(shearX);
+            }
+
+            foreach (var button in ItemsFlow.Children.OfType<AddPresetButton>())
+            {
+                button.Shear = WrapItems ? new Vector2(shearX, 0) : Vector2.Zero;
+                button.ApplyEzLayoutShear(shearX);
+            }
+
+            if (this is EzModGroupColumn groupColumn)
+                groupColumn.ApplyEzLayoutShearExtras(WrapItems ? 0 : shearX);
+        }
+
+        protected void RefreshEzLayoutShear()
+        {
+            if (ezLayoutShear is float shear)
+                ApplyEzLayoutShear(shear);
         }
     }
 
-    public partial class ModColumn
+    public partial class AddPresetButton
     {
-        internal void ApplyEzLayoutShearToContent(float shearX)
-        {
-            ApplyEzLayoutShear(shearX);
-
-            foreach (var panel in ItemsFlow.Children.OfType<ModSelectPanel>())
-                panel.ApplyEzLayoutShear(shearX);
-
-            if (this is EzModGroupColumn groupColumn)
-                groupColumn.ApplyEzLayoutShearExtras(shearX);
-        }
+        internal void ApplyEzLayoutShear(float shearX) => ButtonContent.Shear = new Vector2(-shearX, 0);
     }
 
     public abstract partial class ModSelectPanel

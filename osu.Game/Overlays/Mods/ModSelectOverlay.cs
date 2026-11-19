@@ -111,11 +111,11 @@ namespace osu.Game.Overlays.Mods
 
         private Bindable<bool> textSearchStartsActive = null!;
 
-        private ColumnScrollContainer columnScroll = null!;
-        private ColumnFlowContainer columnFlow = null!;
+        private protected ModSelectContent ContentView { get; private set; } = null!;
+        private Container contentArea = null!;
 
-        private Container aboveColumnsContent = null!;
-        private ModCustomisationPanel customisationPanel = null!;
+        protected Container AboveColumnsContent { get; private set; } = null!;
+        protected ModCustomisationPanel CustomisationPanel { get; private set; } = null!;
 
         protected virtual SelectAllModsButton? SelectAllModsButton => null;
 
@@ -154,7 +154,7 @@ namespace osu.Game.Overlays.Mods
                     RelativeSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {
-                        new Container
+                        contentArea = new Container
                         {
                             Padding = new MarginPadding
                             {
@@ -165,28 +165,10 @@ namespace osu.Game.Overlays.Mods
                             RelativePositionAxes = Axes.Both,
                             Children = new Drawable[]
                             {
-                                columnScroll = new ColumnScrollContainer
-                                {
-                                    RelativeSizeAxes = Axes.Both,
-                                    Masking = false,
-                                    ClampExtension = 100,
-                                    ScrollbarOverlapsContent = false,
-                                    Child = columnFlow = new ColumnFlowContainer
-                                    {
-                                        Anchor = Anchor.BottomLeft,
-                                        Origin = Anchor.BottomLeft,
-                                        Direction = FillDirection.Horizontal,
-                                        Shear = OsuGame.SHEAR,
-                                        RelativeSizeAxes = Axes.Y,
-                                        AutoSizeAxes = Axes.X,
-                                        Margin = new MarginPadding { Horizontal = 70 },
-                                        Padding = new MarginPadding { Bottom = 10 },
-                                        ChildrenEnumerable = CreateColumns()
-                                    }
-                                }
+                                ContentView = new HorizontalModSelectContent(CreateColumns())
                             }
                         },
-                        aboveColumnsContent = new Container
+                        AboveColumnsContent = new Container
                         {
                             RelativeSizeAxes = Axes.Both,
                             Padding = new MarginPadding { Horizontal = 100, Bottom = 15f },
@@ -197,7 +179,7 @@ namespace osu.Game.Overlays.Mods
                                     HoldFocus = false,
                                     Width = 300,
                                 },
-                                customisationPanel = new ModCustomisationPanel
+                                CustomisationPanel = new ModCustomisationPanel
                                 {
                                     Anchor = Anchor.TopRight,
                                     Origin = Anchor.TopRight,
@@ -235,7 +217,7 @@ namespace osu.Game.Overlays.Mods
             // This is an optimisation to prevent refreshing the available settings controls when it can be
             // reasonably assumed that the settings panel is never to be displayed (e.g. FreeModSelectOverlay).
             if (AllowCustomisation)
-                ((IBindable<IReadOnlyList<Mod>>)customisationPanel.SelectedMods).BindTo(SelectedMods);
+                ((IBindable<IReadOnlyList<Mod>>)CustomisationPanel.SelectedMods).BindTo(SelectedMods);
 
             SelectedMods.BindValueChanged(_ =>
             {
@@ -245,11 +227,11 @@ namespace osu.Game.Overlays.Mods
                 ActiveMods.Value = ComputeActiveMods();
             }, true);
 
-            customisationPanel.ExpandedState.BindValueChanged(_ => updateCustomisationVisualState(), true);
+            CustomisationPanel.ExpandedState.BindValueChanged(_ => updateCustomisationVisualState(), true);
 
             SearchTextBox.Current.BindValueChanged(query =>
             {
-                foreach (var column in columnFlow.Columns)
+                foreach (var column in ContentView.Columns)
                     column.SearchTerm = query.NewValue;
 
                 if (SearchTextBox.HasFocus)
@@ -258,16 +240,12 @@ namespace osu.Game.Overlays.Mods
 
             // Start scrolling from the end, to give the user a sense that
             // there is more horizontal content available.
-            ScheduleAfterChildren(() =>
-            {
-                columnScroll.ScrollToEnd(false);
-                columnScroll.ScrollTo(0);
-            });
+            ScheduleAfterChildren(() => ContentView.InitialiseScroll());
         }
 
         private void preselectMod()
         {
-            var visibleMods = columnFlow.Columns.OfType<ModColumn>().Where(c => c.IsPresent).SelectMany(c => c.AvailableMods.Where(m => m.Visible));
+            var visibleMods = ContentView.Columns.OfType<ModColumn>().Where(c => c.IsPresent).SelectMany(c => c.AvailableMods.Where(m => m.Visible));
 
             // Search for an exact acronym or name match, or otherwise default to the first visible mod.
             ModState? matchingMod =
@@ -277,6 +255,13 @@ namespace osu.Game.Overlays.Mods
 
             foreach (var mod in AllAvailableMods)
                 mod.Preselected.Value = mod == preselectedMod && SearchTextBox.Current.Value.Length > 0;
+
+            if (matchingMod != null && SearchTerm.Length > 0)
+            {
+                var column = ContentView.Columns.OfType<ModColumn>().FirstOrDefault(candidate => candidate.AvailableMods.Contains(matchingMod));
+                if (column != null)
+                    ContentView.RevealColumn(column);
+            }
         }
 
         private void clearPreselection()
@@ -302,7 +287,7 @@ namespace osu.Game.Overlays.Mods
             base.Update();
 
             SearchTextBox.PlaceholderText = SearchTextBox.HasFocus ? input_search_placeholder : tab_to_search_placeholder;
-            aboveColumnsContent.Padding = aboveColumnsContent.Padding with { Bottom = DisplayedFooterContent?.DisplaysStackedVertically == true ? 75f : 15f };
+            AboveColumnsContent.Padding = AboveColumnsContent.Padding with { Bottom = DisplayedFooterContent?.DisplaysStackedVertically == true ? 75f : 15f };
         }
 
         /// <summary>
@@ -310,7 +295,7 @@ namespace osu.Game.Overlays.Mods
         /// </summary>
         public void SelectAll()
         {
-            foreach (var column in columnFlow.Columns.OfType<ModColumn>())
+            foreach (var column in ContentView.Columns.OfType<ModColumn>())
                 column.SelectAll();
         }
 
@@ -319,7 +304,7 @@ namespace osu.Game.Overlays.Mods
         /// </summary>
         public virtual void DeselectAll()
         {
-            foreach (var column in columnFlow.Columns.OfType<ModColumn>())
+            foreach (var column in ContentView.Columns.OfType<ModColumn>())
                 column.DeselectAll();
         }
 
@@ -379,27 +364,33 @@ namespace osu.Game.Overlays.Mods
 
         protected virtual void AssignModsToColumns()
         {
-            foreach (var column in columnFlow.Columns.OfType<ModColumn>())
+            foreach (var column in ContentView.Columns.OfType<ModColumn>())
                 column.AvailableMods = AvailableMods.Value.GetValueOrDefault(column.ModType, Array.Empty<ModState>());
         }
 
-        private protected void ReplaceModColumns(IEnumerable<ColumnDimContainer> columns)
-        {
-            var existing = columnFlow.Children.Where(child => child.Column is ModColumn).ToArray();
-
-            foreach (var child in existing)
-                columnFlow.Remove(child, true);
-
-            foreach (var column in columns)
-                columnFlow.Add(column);
-        }
+        private protected void ReplaceModColumns(IEnumerable<ModColumn> columns) => ContentView.ReplaceModColumns(columns);
 
         protected void SetColumnFlowBottomPadding(float bottom)
         {
-            columnFlow.Padding = columnFlow.Padding with { Bottom = bottom };
+            ContentView.SetBottomPadding(bottom);
         }
 
-        protected void AddAboveColumns(Drawable drawable) => aboveColumnsContent.Add(drawable);
+        private protected void ReplaceContentView(ModSelectContent view)
+        {
+            ContentView.FlushPendingSelections();
+            contentArea.Remove(ContentView, true);
+            contentArea.Add(ContentView = view);
+        }
+
+        protected void SetContentAreaPadding(MarginPadding padding) => contentArea.Padding = padding;
+
+        protected void RefreshSearchPreselection()
+        {
+            if (SearchTextBox.HasFocus)
+                preselectMod();
+        }
+
+        protected void AddAboveColumns(Drawable drawable) => AboveColumnsContent.Add(drawable);
 
         private void filterMods()
         {
@@ -424,29 +415,29 @@ namespace osu.Game.Overlays.Mods
 
             if (anyCustomisableModActive)
             {
-                customisationPanel.Enabled.Value = true;
+                CustomisationPanel.Enabled.Value = true;
 
                 if (anyModPendingConfiguration)
-                    customisationPanel.ExpandedState.Value = ModCustomisationPanel.ModCustomisationPanelState.ExpandedByMod;
+                    CustomisationPanel.ExpandedState.Value = ModCustomisationPanel.ModCustomisationPanelState.ExpandedByMod;
             }
             else
             {
-                customisationPanel.ExpandedState.Value = ModCustomisationPanel.ModCustomisationPanelState.Collapsed;
-                customisationPanel.Enabled.Value = false;
+                CustomisationPanel.ExpandedState.Value = ModCustomisationPanel.ModCustomisationPanelState.Collapsed;
+                CustomisationPanel.Enabled.Value = false;
             }
         }
 
         private void updateCustomisationVisualState()
         {
-            if (customisationPanel.ExpandedState.Value != ModCustomisationPanel.ModCustomisationPanelState.Collapsed)
+            if (CustomisationPanel.ExpandedState.Value != ModCustomisationPanel.ModCustomisationPanelState.Collapsed)
             {
-                columnScroll.FadeColour(OsuColour.Gray(0.5f), 400, Easing.OutQuint);
+                ContentView.FadeColour(OsuColour.Gray(0.5f), 400, Easing.OutQuint);
                 SearchTextBox.FadeColour(OsuColour.Gray(0.5f), 400, Easing.OutQuint);
                 setTextBoxFocus(false);
             }
             else
             {
-                columnScroll.FadeColour(Color4.White, 400, Easing.OutQuint);
+                ContentView.FadeColour(Color4.White, 400, Easing.OutQuint);
                 SearchTextBox.FadeColour(Color4.White, 400, Easing.OutQuint);
                 setTextBoxFocus(textSearchStartsActive.Value);
             }
@@ -512,23 +503,21 @@ namespace osu.Game.Overlays.Mods
 
             base.PopIn();
 
-            aboveColumnsContent
+            AboveColumnsContent
                 .FadeIn(fade_in_duration, Easing.OutQuint)
                 .MoveToY(0, fade_in_duration, Easing.OutQuint);
 
             int nonFilteredColumnCount = 0;
 
-            for (int i = 0; i < columnFlow.Count; i++)
+            foreach (var column in ContentView.Columns)
             {
-                var column = columnFlow[i].Column;
-
                 bool allFiltered = column is ModColumn modColumn && modColumn.AvailableMods.All(modState => !modState.Visible);
 
                 double delay = allFiltered ? 0 : nonFilteredColumnCount * 30;
                 double duration = allFiltered ? 0 : fade_in_duration;
                 float startingYPosition = 0;
                 if (!allFiltered)
-                    startingYPosition = nonFilteredColumnCount % 2 == 0 ? -distance : distance;
+                    startingYPosition = nonFilteredColumnCount % 2 == 0 ? -ContentView.TransitionDistance : ContentView.TransitionDistance;
 
                 column.TopLevelContent
                       .MoveToY(startingYPosition)
@@ -572,16 +561,14 @@ namespace osu.Game.Overlays.Mods
 
             base.PopOut();
 
-            aboveColumnsContent
+            AboveColumnsContent
                 .FadeOut(fade_out_duration / 2, Easing.OutQuint)
                 .MoveToY(-distance, fade_out_duration / 2, Easing.OutQuint);
 
             int nonFilteredColumnCount = 0;
 
-            for (int i = 0; i < columnFlow.Count; i++)
+            foreach (var column in ContentView.Columns)
             {
-                var column = columnFlow[i].Column;
-
                 bool allFiltered = false;
 
                 if (column is ModColumn modColumn)
@@ -593,7 +580,7 @@ namespace osu.Game.Overlays.Mods
                 double duration = allFiltered ? 0 : fade_out_duration;
                 float newYPosition = 0;
                 if (!allFiltered)
-                    newYPosition = nonFilteredColumnCount % 2 == 0 ? -distance : distance;
+                    newYPosition = nonFilteredColumnCount % 2 == 0 ? -ContentView.TransitionDistance : ContentView.TransitionDistance;
 
                 column.TopLevelContent
                       .MoveToY(newYPosition, duration, Easing.OutQuint)
@@ -603,7 +590,7 @@ namespace osu.Game.Overlays.Mods
                     nonFilteredColumnCount += 1;
             }
 
-            customisationPanel.ExpandedState.Value = ModCustomisationPanel.ModCustomisationPanelState.Collapsed;
+            CustomisationPanel.ExpandedState.Value = ModCustomisationPanel.ModCustomisationPanelState.Collapsed;
         }
 
         #endregion
@@ -630,7 +617,7 @@ namespace osu.Game.Overlays.Mods
                 // wherein activating the binding will both change the contents of the search text box and deselect all mods.
                 case GlobalAction.DeselectAllMods:
                 {
-                    if (!SearchTextBox.HasFocus && customisationPanel.ExpandedState.Value == ModCustomisationPanel.ModCustomisationPanelState.Collapsed)
+                    if (!SearchTextBox.HasFocus && CustomisationPanel.ExpandedState.Value == ModCustomisationPanel.ModCustomisationPanelState.Collapsed)
                     {
                         DisplayedFooterContent?.DeselectAllModsButton?.TriggerClick();
                         return true;
@@ -696,7 +683,7 @@ namespace osu.Game.Overlays.Mods
             if (e.Repeat || e.Key != Key.Tab)
                 return false;
 
-            if (customisationPanel.ExpandedState.Value != ModCustomisationPanel.ModCustomisationPanelState.Collapsed)
+            if (CustomisationPanel.ExpandedState.Value != ModCustomisationPanel.ModCustomisationPanelState.Collapsed)
                 return true;
 
             // TODO: should probably eventually support typical platform search shortcuts (`Ctrl-F`, `/`)

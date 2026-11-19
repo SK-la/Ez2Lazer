@@ -5,15 +5,24 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Mods
 {
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum EzModSelectLayoutMode
+    {
+        Horizontal,
+        Vertical,
+    }
+
     /// <summary>
     /// Client mod-select layout at <c>EzResources/Config/ModLayout.json</c>. Not part of a theme layout set.
-    /// <see cref="ColumnShear"/> is global; <see cref="Rulesets"/> holds per-ruleset group/hidden lists keyed by <see cref="RulesetInfo.ShortName"/>.
+    /// <see cref="ColumnShear"/> and <see cref="LayoutMode"/> are global; <see cref="Rulesets"/> holds per-ruleset group/hidden lists keyed by <see cref="RulesetInfo.ShortName"/>.
     /// </summary>
     public sealed class EzModLayoutDocument
     {
@@ -21,6 +30,8 @@ namespace osu.Game.EzOsuGame.Mods
 
         /// <summary>Horizontal column shear. <c>null</c> means <see cref="EzModLayoutResolver.DEFAULT_COLUMN_SHEAR"/>.</summary>
         public float? ColumnShear { get; set; }
+
+        public EzModSelectLayoutMode LayoutMode { get; set; }
 
         public Dictionary<string, EzModRulesetListLayout>? Rulesets { get; set; }
 

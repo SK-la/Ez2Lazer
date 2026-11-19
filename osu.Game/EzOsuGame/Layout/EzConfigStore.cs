@@ -85,6 +85,17 @@ namespace osu.Game.EzOsuGame.Layout
         public EzRulesetModLayout? GetModLayout(string rulesetKey) =>
             GetModLayoutDocument().ToLayout(rulesetKey);
 
+        public EzModSelectLayoutMode ModSelectLayoutMode => GetModLayoutDocument().LayoutMode;
+
+        public void SaveModSelectLayoutMode(EzModSelectLayoutMode mode)
+        {
+            lock (saveLock)
+            {
+                modLayout.LayoutMode = mode;
+                writeText(EzModLayoutDocument.FILENAME, JsonConvert.SerializeObject(modLayout, json_settings));
+            }
+        }
+
         public void SaveModLayout(string rulesetKey, EzRulesetModLayout layout)
         {
             lock (saveLock)
@@ -144,6 +155,7 @@ namespace osu.Game.EzOsuGame.Layout
                         return;
 
                     modLayout.ColumnShear = loaded.ColumnShear;
+                    modLayout.LayoutMode = loaded.LayoutMode == EzModSelectLayoutMode.Vertical ? EzModSelectLayoutMode.Vertical : EzModSelectLayoutMode.Horizontal;
                     modLayout.Rulesets = loaded.Rulesets;
                 }
                 catch (Exception ex)
