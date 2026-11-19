@@ -3,11 +3,10 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
+using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets.Objects;
 using osu.Game.Rulesets.Objects.Types;
 
 namespace osu.Game.EzOsuGame.Analysis
@@ -28,7 +27,12 @@ namespace osu.Game.EzOsuGame.Analysis
                 return new List<double>();
 
             if (source.Count <= targetCount)
-                return source as List<double> ?? source.ToList();
+            {
+                if (source is List<double> list)
+                    return list;
+
+                return [with(capacity: source.Count), .. source];
+            }
 
             // Uniform re-sampling by index. Keeps endpoints stable.
             var result = new List<double>(targetCount);
@@ -84,9 +88,7 @@ namespace osu.Game.EzOsuGame.Analysis
                 estimatedIntervals = max_estimated_intervals;
 
             var kpsList = new List<double>(estimatedIntervals);
-
-            // 缓存hitObjects数组以提高访问性能
-            var hitObjectsArray = hitObjects as HitObject[] ?? hitObjects.ToArray();
+            int hitCount = hitObjects.Count;
 
             double currentTime = 0;
             int currentIndex = 0;
@@ -95,13 +97,12 @@ namespace osu.Game.EzOsuGame.Analysis
             {
                 double endTime = currentTime + interval;
 
-                // 优化的区间计算：从上一个位置开始搜索
                 int startIdx = currentIndex;
-                while (startIdx < hitObjectsArray.Length && hitObjectsArray[startIdx].StartTime < currentTime)
+                while (startIdx < hitCount && hitObjects[startIdx].StartTime < currentTime)
                     startIdx++;
 
                 int endIdx = startIdx;
-                while (endIdx < hitObjectsArray.Length && hitObjectsArray[endIdx].StartTime < endTime)
+                while (endIdx < hitCount && hitObjects[endIdx].StartTime < endTime)
                     endIdx++;
 
                 int hits = endIdx - startIdx;
@@ -118,80 +119,34 @@ namespace osu.Game.EzOsuGame.Analysis
             if (kpsList.Count == 0)
                 return (0, 0, kpsList);
 
-            // 使用LINQ的高性能版本
-            double average = kpsList.Sum() / kpsList.Count;
-            double max = kpsList.Max();
+            double sum = 0;
+            double max = kpsList[0];
 
-            return (average, max, kpsList);
+            foreach (double kps in kpsList.AsSpan())
+            {
+                sum += kps;
+                if (kps > max)
+                    max = kps;
+            }
+
+            return (sum / kpsList.Count, max, kpsList);
         }
 
         /// <summary>
-        /// 高性能列音符计数，使用数组代替Dictionary以提高性能
+        /// Counts notes per column, including holds.
         /// </summary>
         public static Dictionary<int, int> GetColumnNoteCountsOptimized(IBeatmap beatmap)
         {
-            // 收集所有带列信息的对象（包含普通 note 与长按 LN），以生成每列的总 note 数。
-            // 统一口径：ColumnCounts 表示每列的总 note 数（包括 LNs）。
-            var columnObjects = new List<IHasColumn>(beatmap.HitObjects.Count);
+            var counts = new Dictionary<int, int>();
+            var hitObjects = beatmap.HitObjects;
 
-            foreach (var obj in beatmap.HitObjects)
+            for (int i = 0; i < hitObjects.Count; i++)
             {
-                if (obj is IHasColumn columnObj)
-                {
-                    columnObjects.Add(columnObj);
-                }
+                if (hitObjects[i] is IHasColumn columnObj)
+                    counts.Increment(columnObj.Column);
             }
 
-            if (columnObjects.Count == 0)
-                return new Dictionary<int, int>();
-
-            // 找出列的范围以使用数组优化
-            int minColumn = columnObjects[0].Column;
-            int maxColumn = minColumn;
-
-            for (int i = 1; i < columnObjects.Count; i++)
-            {
-                int column = columnObjects[i].Column;
-                if (column < minColumn) minColumn = column;
-                if (column > maxColumn) maxColumn = column;
-            }
-
-            int columnRange = maxColumn - minColumn + 1;
-
-            // 如果列范围较小，使用数组；否则使用Dictionary
-            if (columnRange <= 32) // 合理的阈值
-            {
-                int[] countsArray = new int[columnRange];
-
-                foreach (var obj in columnObjects)
-                {
-                    countsArray[obj.Column - minColumn]++;
-                }
-
-                var result = new Dictionary<int, int>();
-
-                for (int i = 0; i < columnRange; i++)
-                {
-                    if (countsArray[i] > 0)
-                    {
-                        result[i + minColumn] = countsArray[i];
-                    }
-                }
-
-                return result;
-            }
-            else
-            {
-                // 列范围太大，使用Dictionary
-                var counts = new Dictionary<int, int>();
-
-                foreach (var obj in columnObjects)
-                {
-                    counts[obj.Column] = counts.GetValueOrDefault(obj.Column) + 1;
-                }
-
-                return counts;
-            }
+            return counts;
         }
 
         /// <summary>
@@ -272,24 +227,18 @@ namespace osu.Game.EzOsuGame.Analysis
                     sampledIndices[i] = (int)((long)i * lastIndex / (DEFAULT_KPS_GRAPH_POINTS - 1));
             }
 
-            // 同时处理KPS和列统计
-            var hitObjectsArray = hitObjects as HitObject[] ?? hitObjects.ToArray();
+            int hitCount = hitObjects.Count;
 
-            // 非 KPS-only 路径才需要列统计。
             if (!onlyKps)
             {
-                foreach (var obj in hitObjectsArray)
+                for (int i = 0; i < hitCount; i++)
                 {
-                    if (obj is IHasColumn columnObj)
+                    if (hitObjects[i] is IHasColumn columnObj)
                     {
-                        // 统计所有note（包括普通note和长按note）
-                        columnCounts[columnObj.Column] = columnCounts.GetValueOrDefault(columnObj.Column) + 1;
+                        columnCounts.Increment(columnObj.Column);
 
-                        // 单独统计长按note
-                        if (obj is IHasDuration)
-                        {
-                            holdNoteCounts[columnObj.Column] = holdNoteCounts.GetValueOrDefault(columnObj.Column) + 1;
-                        }
+                        if (hitObjects[i] is IHasDuration)
+                            holdNoteCounts.Increment(columnObj.Column);
                     }
                 }
             }
@@ -307,11 +256,11 @@ namespace osu.Game.EzOsuGame.Analysis
                 double endTime = currentTime + interval;
 
                 int startIdx = currentIndex;
-                while (startIdx < hitObjectsArray.Length && hitObjectsArray[startIdx].StartTime < currentTime)
+                while (startIdx < hitCount && hitObjects[startIdx].StartTime < currentTime)
                     startIdx++;
 
                 int endIdx = startIdx;
-                while (endIdx < hitObjectsArray.Length && hitObjectsArray[endIdx].StartTime < endTime)
+                while (endIdx < hitCount && hitObjects[endIdx].StartTime < endTime)
                     endIdx++;
 
                 int hits = endIdx - startIdx;

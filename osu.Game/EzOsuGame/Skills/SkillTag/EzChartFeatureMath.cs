@@ -3,7 +3,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
+using osu.Game.Extensions;
 
 namespace osu.Game.EzOsuGame.Skills.SkillTag
 {
@@ -15,7 +15,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
         public static double Clamp01(double value) => Clamp(value, 0, 1);
 
-        public static double MinGate(params double[] values)
+        public static double MinGate(params ReadOnlySpan<double> values)
         {
             if (values.Length == 0)
                 return 0;
@@ -32,18 +32,25 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
             if (values.Count == 0)
                 return 0;
 
-            double[] copy = values.ToArray();
+            double[] copy = copyValues(values);
             int index = quantileIndex(copy.Length, q);
             return quickselect(copy, index);
         }
 
-        public static double[] Quantiles(IReadOnlyList<double> values, params double[] qs)
+        public static double[] Quantiles(IReadOnlyList<double> values, params ReadOnlySpan<double> qs)
         {
             if (values.Count == 0)
-                return qs.Select(_ => 0.0).ToArray();
+                return new double[qs.Length];
 
-            double[] sorted = values.OrderBy(v => v).ToArray();
-            return qs.Select(q => sorted[quantileIndex(sorted.Length, q)]).ToArray();
+            double[] sorted = copyValues(values);
+            Array.Sort(sorted);
+
+            double[] result = new double[qs.Length];
+
+            for (int i = 0; i < qs.Length; i++)
+                result[i] = sorted[quantileIndex(sorted.Length, qs[i])];
+
+            return result;
         }
 
         public static int CountInWindow(IReadOnlyList<double> times, double windowMs)
@@ -93,11 +100,10 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
             var buckets = new Dictionary<double, int>();
 
-            foreach (double value in values)
+            for (int i = 0; i < values.Count; i++)
             {
-                double bucket = Math.Round(value / bucketSize) * bucketSize;
-                buckets.TryGetValue(bucket, out int count);
-                buckets[bucket] = count + 1;
+                double bucket = Math.Round(values[i] / bucketSize) * bucketSize;
+                buckets.Increment(bucket);
             }
 
             double entropy = 0;
@@ -114,7 +120,7 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
         public static double[] BucketValues(IReadOnlyList<double> values, double bucketSize)
         {
             if (bucketSize <= 0)
-                return values.ToArray();
+                return copyValues(values);
 
             double[] result = new double[values.Count];
 
@@ -131,23 +137,19 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
 
             var counts = new Dictionary<double, int>();
 
-            foreach (double value in values)
-            {
-                counts.TryGetValue(value, out int count);
-                counts[value] = count + 1;
-            }
+            for (int i = 0; i < values.Count; i++)
+                counts.Increment(values[i]);
 
-            var entries = counts.ToArray();
             double total = values.Count;
             double entropy = 0;
 
-            foreach (var left in entries)
+            foreach (var left in counts)
             {
-                foreach (var right in entries)
+                foreach (var right in counts)
                 {
                     double distance = Math.Abs(left.Key - right.Key);
 
-                    for (int i = 0; i < logIterations; i++)
+                    for (int j = 0; j < logIterations; j++)
                         distance = Math.Log(1 + distance);
 
                     entropy += (left.Value / total) * (right.Value / total) * distance;
@@ -203,6 +205,29 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag
                 return 0;
 
             return Math.Pow(sum / weightSum, 1.0 / exponent);
+        }
+
+        private static double[] copyValues(IReadOnlyList<double> values)
+        {
+            double[] copy = new double[values.Count];
+
+            switch (values)
+            {
+                case double[] array:
+                    array.AsSpan().CopyTo(copy);
+                    break;
+
+                case List<double> list:
+                    list.AsSpan().CopyTo(copy);
+                    break;
+
+                default:
+                    for (int i = 0; i < values.Count; i++)
+                        copy[i] = values[i];
+                    break;
+            }
+
+            return copy;
         }
 
         private static int quantileIndex(int length, double q)

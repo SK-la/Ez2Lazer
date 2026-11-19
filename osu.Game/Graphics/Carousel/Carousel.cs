@@ -24,6 +24,7 @@ using osu.Framework.Input.Events;
 using osu.Framework.Layout;
 using osu.Framework.Logging;
 using osu.Framework.Utils;
+using osu.Game.Extensions;
 using osu.Game.Input.Bindings;
 using osu.Game.Online.Multiplayer;
 using osuTK;
@@ -1092,11 +1093,22 @@ namespace osu.Game.Graphics.Carousel
         {
             Debug.Assert(carouselItems != null);
 
-            List<CarouselItem> toDisplay = range == DisplayRange.EMPTY
-                ? new List<CarouselItem>()
-                : carouselItems.GetRange(range.First, range.Last - range.First + 1);
+            List<CarouselItem> toDisplay;
 
-            toDisplay.RemoveAll(i => !i.IsVisible);
+            if (range == DisplayRange.EMPTY)
+                toDisplay = [];
+            else
+            {
+                int length = range.Last - range.First + 1;
+                var visible = carouselItems[range.First, length];
+                toDisplay = [with(capacity: visible.Length)];
+
+                foreach (var item in visible)
+                {
+                    if (item.IsVisible)
+                        toDisplay.Add(item);
+                }
+            }
 
             // Iterate over all panels which are already displayed and figure which need to be displayed / removed.
             foreach (var panel in Scroll.Panels)
