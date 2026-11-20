@@ -79,6 +79,7 @@ namespace osu.Game.Screens.Select
 
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
         private CancellationTokenSource? ezAnalysisCancellationSource;
+        private Bindable<string>? analysisSystemSelection;
 
         private string? scratchText;
 
@@ -336,7 +337,8 @@ namespace osu.Game.Screens.Select
             mods.BindValueChanged(_ => updateKeyCount(), true);
 
             // Mania's pill follows the selection between Sunny and Mina; the other rulesets ignore it.
-            ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection).BindValueChanged(_ =>
+            analysisSystemSelection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
+            analysisSystemSelection.BindValueChanged(_ =>
             {
                 if (Item?.IsVisible == true)
                     updateEzDisplay();
@@ -435,6 +437,12 @@ namespace osu.Game.Screens.Select
             starDifficultyCancellationSource = null;
 
             clearEzAnalysisBinding();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            analysisSystemSelection?.UnbindAll();
+            base.Dispose(isDisposing);
         }
 
         private void clearEzAnalysisBinding(bool resetDisplay = true)
