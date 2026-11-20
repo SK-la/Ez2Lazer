@@ -2,16 +2,20 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Input.Events;
+using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Mods.Input;
@@ -21,8 +25,9 @@ using osuTK.Input;
 
 namespace osu.Game.EzOsuGame.Overlays
 {
-    public partial class EzModGroupColumn : ModColumn
+    public partial class EzModGroupColumn : ModColumn, IHasTooltip
     {
+        public LocalisableString TooltipText => GroupName;
         public string GroupId { get; }
 
         public string GroupName { get; private set; }
@@ -49,9 +54,10 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private OsuTextBox renameBox = null!;
         private OsuClickableContainer deleteButton = null!;
+        private readonly TruncatingSpriteText groupTitle;
 
-        public EzModGroupColumn(EzModGroupLayout group, Bindable<bool> editing, Key[]? hotkeys)
-            : base(parseSeed(group.SeedType) ?? ModType.Fun, false)
+        public EzModGroupColumn(EzModGroupLayout group, Bindable<bool> editing, Key[]? hotkeys, bool wrapItems = false)
+            : base(parseSeed(group.SeedType) ?? ModType.Fun, false, wrapItems)
         {
             GroupId = group.Id;
             GroupName = group.Name;
@@ -59,10 +65,45 @@ namespace osu.Game.EzOsuGame.Overlays
             this.hotkeys = hotkeys;
             seedType = parseSeed(group.SeedType);
             HeaderText = group.Name;
+            HeaderLabel.Alpha = 0;
+            TopLevelContent.Add(groupTitle = new TruncatingSpriteText
+            {
+                Text = group.Name,
+                Font = OsuFont.TorusAlternate.With(size: 17, weight: FontWeight.SemiBold),
+                Colour = Colour4.Black,
+                Width = WIDTH - 70,
+                Position = new Vector2(17, 21),
+                Origin = Anchor.CentreLeft,
+            });
         }
 
         public int InsertionIndex(Vector2 screenPosition, string? skipAcronym)
         {
+            if (WrapItems)
+            {
+                var cards = new List<(float X, float Y, float Width, float Height)>();
+                var indices = new List<int>();
+                int originalIndex = 0;
+
+                foreach (var item in ItemsFlow)
+                {
+                    if (item is not EzModLayoutPanel panel || string.Equals(panel.Mod.Acronym, skipAcronym, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (panel.IsPresent)
+                    {
+                        var topLeft = panel.ToSpaceOfOtherDrawable(Vector2.Zero, ItemsFlow);
+                        cards.Add((topLeft.X, topLeft.Y, panel.DrawWidth, panel.DrawHeight));
+                        indices.Add(originalIndex);
+                    }
+
+                    originalIndex++;
+                }
+
+                int wrappedIndex = EzModLayoutGeometry.InsertionIndex(cards, ItemsFlow.ToLocalSpace(screenPosition));
+                return wrappedIndex < indices.Count ? indices[wrappedIndex] : originalIndex;
+            }
+
             int index = 0;
 
             foreach (var child in ItemsFlow)
@@ -86,6 +127,16 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             GroupName = name;
             HeaderText = name;
+            groupTitle.Text = name;
+        }
+
+        public void CommitRename()
+        {
+            if (renameBox.Alpha == 0)
+                return;
+
+            RenameRequested?.Invoke(this, renameBox.Text);
+            renameBox.Alpha = 0;
         }
 
         internal void ApplyEzLayoutShearExtras(float shearX)
@@ -96,6 +147,41 @@ namespace osu.Game.EzOsuGame.Overlays
             var counter = new Vector2(-shearX, 0);
             renameBox.Shear = counter;
             deleteButton.Shear = counter;
+            groupTitle.Shear = counter;
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+            groupTitle.Width = Math.Max(1, DrawWidth - 70);
+        }
+
+        internal (Vector2 Position, Vector2 Size) InsertionMarker(Vector2 screenPosition, string? skipAcronym)
+        {
+            int insertion = InsertionIndex(screenPosition, skipAcronym);
+            int index = 0;
+            EzModLayoutPanel? last = null;
+
+            foreach (var child in ItemsFlow)
+            {
+                if (child is not EzModLayoutPanel panel || string.Equals(panel.Mod.Acronym, skipAcronym, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (index >= insertion && panel.IsPresent)
+                    return (panel.ToScreenSpace(Vector2.Zero), WrapItems ? new Vector2(3, panel.DrawHeight) : new Vector2(panel.DrawWidth, 3));
+
+                if (panel.IsPresent)
+                    last = panel;
+
+                index++;
+            }
+
+            if (last == null)
+                return (ToScreenSpace(new Vector2(12, 48)), new Vector2(Math.Max(1, DrawWidth - 24), 3));
+
+            return WrapItems
+                ? (last.ToScreenSpace(new Vector2(last.DrawWidth, 0)), new Vector2(3, last.DrawHeight))
+                : (last.ToScreenSpace(new Vector2(0, last.DrawHeight)), new Vector2(last.DrawWidth, 3));
         }
 
         protected override bool HidesWhenEmpty => !editing.Value;

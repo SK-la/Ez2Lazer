@@ -7,6 +7,15 @@ namespace osu.Game.EzOsuGame.Localization
 {
     public static class EzModLayoutStrings
     {
+        public static readonly EzLocalizationManager.EzLocalisableString NO_RESULTS =
+            new EzLocalizationManager.EzLocalisableString("没有匹配的 Mod", "No matching mods");
+
+        public static readonly EzLocalizationManager.EzLocalisableString HORIZONTAL =
+            new EzLocalizationManager.EzLocalisableString("横向", "Horizontal");
+
+        public static readonly EzLocalizationManager.EzLocalisableString VERTICAL =
+            new EzLocalizationManager.EzLocalisableString("纵向", "Vertical");
+
         public static readonly EzLocalizationManager.EzLocalisableString EDIT =
             new EzLocalizationManager.EzLocalisableString("编辑", "Edit");
 

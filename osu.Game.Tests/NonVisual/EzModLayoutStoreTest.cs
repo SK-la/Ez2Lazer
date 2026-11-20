@@ -3,12 +3,14 @@
 
 using System.Collections.Generic;
 using System.IO;
-using NUnit.Framework;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using NUnit.Framework;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Mods;
+using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Tests.NonVisual
 {
@@ -22,6 +24,7 @@ namespace osu.Game.Tests.NonVisual
             var store = new EzConfigStore(storage);
 
             Assert.That(store.GetModLayout("osu"), Is.Null);
+            Assert.That(store.ModSelectLayoutMode, Is.EqualTo(EzModSelectLayoutMode.Horizontal));
             Assert.That(File.Exists(path(storage, EzModifyPath.CONFIG_ROOT_PATH, EzModLayoutDocument.FILENAME)), Is.False);
             Assert.That(Directory.Exists(full(storage, EzModifyPath.CONFIG_LAYOUT_PATH)), Is.False);
         }
@@ -99,6 +102,56 @@ namespace osu.Game.Tests.NonVisual
             Assert.That(mania!.Groups![0].Acronyms!, Is.EqualTo(new[] { "MR" }));
             Assert.That(osu.ColumnShear, Is.EqualTo(0.12f));
             Assert.That(mania.ColumnShear, Is.EqualTo(0.12f));
+        }
+
+        [Test]
+        public void TestModeIsGlobalAndDoesNotSaveDraft()
+        {
+            using var storage = new TemporaryNativeStorage("ez-mod-layout-mode");
+            var store = new EzConfigStore(storage);
+            store.SaveModLayout("osu", new EzRulesetModLayout
+            {
+                ColumnShear = 0.12f,
+                Groups = new List<EzModGroupLayout>
+                {
+                    new EzModGroupLayout { Id = "a", Name = "Saved", Acronyms = new List<string> { "HD" } },
+                },
+                Hidden = new List<string> { "FL" },
+            });
+
+            var draft = EzModLayoutResolver.Resolve(store.GetModLayout("osu"), new[]
+            {
+                new EzModLayoutMod("HD", ModType.DifficultyIncrease),
+                new EzModLayoutMod("FL", ModType.DifficultyIncrease),
+            }, preserveUnavailable: true);
+            draft.Groups![0].Name = "Draft";
+            store.SaveModSelectLayoutMode(EzModSelectLayoutMode.Vertical);
+
+            var reloaded = new EzConfigStore(storage);
+            Assert.That(reloaded.ModSelectLayoutMode, Is.EqualTo(EzModSelectLayoutMode.Vertical));
+            Assert.That(reloaded.GetModLayout("osu")!.Groups![0].Name, Is.EqualTo("Saved"));
+            Assert.That(reloaded.GetModLayout("osu")!.Hidden, Is.EqualTo(new[] { "FL" }));
+            Assert.That(reloaded.GetModLayout("osu")!.ColumnShear, Is.EqualTo(0.12f));
+
+            reloaded.SaveModLayout("mania", new EzRulesetModLayout { ColumnShear = 0.12f });
+            Assert.That(new EzConfigStore(storage).ModSelectLayoutMode, Is.EqualTo(EzModSelectLayoutMode.Vertical));
+
+            string json = File.ReadAllText(path(storage, EzModifyPath.CONFIG_ROOT_PATH, EzModLayoutDocument.FILENAME));
+            Assert.That(JObject.Parse(json)["LayoutMode"]!.ToString(), Is.EqualTo("Vertical"));
+        }
+
+        [Test]
+        public void TestLegacyReadDoesNotRewriteFile()
+        {
+            using var storage = new TemporaryNativeStorage("ez-mod-layout-legacy");
+            var store = new EzConfigStore(storage);
+            store.SaveModLayout("osu", new EzRulesetModLayout { ColumnShear = 0.1f });
+            string configFile = path(storage, EzModifyPath.CONFIG_ROOT_PATH, EzModLayoutDocument.FILENAME);
+            const string legacy = "{\"ColumnShear\":0.1,\"Rulesets\":{}}";
+            File.WriteAllText(configFile, legacy);
+
+            Assert.That(new EzConfigStore(storage).ModSelectLayoutMode, Is.EqualTo(EzModSelectLayoutMode.Horizontal));
+            Assert.That(File.ReadAllText(configFile), Is.EqualTo(legacy));
         }
 
         private static string path(TemporaryNativeStorage storage, string directory, string filename) =>

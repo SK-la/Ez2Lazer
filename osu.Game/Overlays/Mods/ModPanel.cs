@@ -18,7 +18,11 @@ namespace osu.Game.Overlays.Mods
     public partial class ModPanel : ModSelectPanel, IFilterable
     {
         public Mod Mod => modState.Mod;
-        public override BindableBool Active => modState.Active;
+        public override BindableBool Active => active;
+        private readonly BindableBool active = new BindableBool();
+        private readonly Bindable<bool> validForSelection;
+        private readonly Bindable<bool> matchingTextFilter;
+        private readonly Bindable<bool> preselected;
 
         protected override float IdleSwitchWidth => 54;
         protected override float ExpandedSwitchWidth => 70;
@@ -28,6 +32,10 @@ namespace osu.Game.Overlays.Mods
         public ModPanel(ModState modState)
         {
             this.modState = modState;
+            active.BindTo(modState.Active);
+            validForSelection = modState.ValidForSelection.GetBoundCopy();
+            matchingTextFilter = modState.MatchingTextFilter.GetBoundCopy();
+            preselected = modState.Preselected.GetBoundCopy();
 
             Title = Mod.Name;
             Description = Mod.Description;
@@ -57,9 +65,9 @@ namespace osu.Game.Overlays.Mods
         {
             base.LoadComplete();
 
-            modState.ValidForSelection.BindValueChanged(_ => updateFilterState());
-            modState.MatchingTextFilter.BindValueChanged(_ => updateFilterState(), true);
-            modState.Preselected.BindValueChanged(b =>
+            validForSelection.BindValueChanged(_ => updateFilterState());
+            matchingTextFilter.BindValueChanged(_ => updateFilterState(), true);
+            preselected.BindValueChanged(b =>
             {
                 if (b.NewValue)
                 {
@@ -74,6 +82,15 @@ namespace osu.Game.Overlays.Mods
                 else
                     Content.EdgeEffect = default;
             }, true);
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            active.UnbindAll();
+            validForSelection.UnbindAll();
+            matchingTextFilter.UnbindAll();
+            preselected.UnbindAll();
+            base.Dispose(isDisposing);
         }
 
         protected override void Select()

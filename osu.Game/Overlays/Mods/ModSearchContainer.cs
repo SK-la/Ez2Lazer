@@ -7,6 +7,8 @@ namespace osu.Game.Overlays.Mods
 {
     public partial class ModSearchContainer : SearchContainer
     {
+        internal void FilterImmediately() => Filter();
+
         public new string SearchTerm
         {
             get => base.SearchTerm;

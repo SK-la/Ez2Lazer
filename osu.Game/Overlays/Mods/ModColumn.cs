@@ -39,13 +39,14 @@ namespace osu.Game.Overlays.Mods
             get => availableMods;
             set
             {
+                unbindModStates();
                 availableMods = value;
 
                 foreach (var mod in availableMods)
                 {
-                    mod.Active.BindValueChanged(_ => updateState());
-                    mod.MatchingTextFilter.BindValueChanged(_ => updateState());
-                    mod.ValidForSelection.BindValueChanged(_ => updateState());
+                    mod.Active.BindValueChanged(onModStateChanged);
+                    mod.MatchingTextFilter.BindValueChanged(onModStateChanged);
+                    mod.ValidForSelection.BindValueChanged(onModStateChanged);
                 }
 
                 updateState();
@@ -61,7 +62,7 @@ namespace osu.Game.Overlays.Mods
 
         private readonly ToggleAllCheckbox? toggleAllCheckbox;
 
-        private Bindable<ModSelectHotkeyStyle> hotkeyStyle = null!;
+        private Bindable<ModSelectHotkeyStyle>? hotkeyStyle;
         private IModHotkeyHandler hotkeyHandler = null!;
 
         private Task? latestLoadTask;
@@ -88,7 +89,8 @@ namespace osu.Game.Overlays.Mods
 
         public override bool IsPresent => base.IsPresent || Scheduler.HasPendingTasks;
 
-        public ModColumn(ModType modType, bool allowIncompatibleSelection)
+        public ModColumn(ModType modType, bool allowIncompatibleSelection, bool wrapItems = false)
+            : base(wrapItems)
         {
             ModType = modType;
             this.allowIncompatibleSelection = allowIncompatibleSelection;
@@ -134,7 +136,7 @@ namespace osu.Game.Overlays.Mods
             base.LoadComplete();
 
             toggleAllCheckbox?.Current.BindValueChanged(_ => updateToggleAllText(), true);
-            hotkeyStyle.BindValueChanged(val => hotkeyHandler = CreateHotkeyHandler(val.NewValue), true);
+            hotkeyStyle?.BindValueChanged(val => hotkeyHandler = CreateHotkeyHandler(val.NewValue), true);
             asyncLoadPanels();
         }
 
@@ -156,6 +158,8 @@ namespace osu.Game.Overlays.Mods
             latestLoadTask = LoadComponentsAsync(panels, loaded =>
             {
                 ItemsFlow.ChildrenEnumerable = loaded;
+                ItemsFlow.FilterImmediately();
+                RefreshEzLayoutShear();
                 updateState();
             }, (cancellationTokenSource = new CancellationTokenSource()).Token);
         }
@@ -163,6 +167,26 @@ namespace osu.Game.Overlays.Mods
         protected virtual bool HidesWhenEmpty => true;
 
         protected void RefreshColumnState() => updateState();
+
+        private void onModStateChanged(ValueChangedEvent<bool> _) => updateState();
+
+        private void unbindModStates()
+        {
+            foreach (var mod in availableMods)
+            {
+                mod.Active.ValueChanged -= onModStateChanged;
+                mod.MatchingTextFilter.ValueChanged -= onModStateChanged;
+                mod.ValidForSelection.ValueChanged -= onModStateChanged;
+            }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            cancellationTokenSource?.Cancel();
+            unbindModStates();
+            hotkeyStyle?.UnbindAll();
+            base.Dispose(isDisposing);
+        }
 
         private void updateState()
         {

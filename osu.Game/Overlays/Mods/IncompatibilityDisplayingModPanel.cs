@@ -22,6 +22,8 @@ namespace osu.Game.Overlays.Mods
         [Resolved]
         private Bindable<IReadOnlyList<Mod>> selectedMods { get; set; } = null!;
 
+        private Bindable<IReadOnlyList<Mod>>? selectedModsBinding;
+
         public IncompatibilityDisplayingModPanel(ModState modState)
             : base(modState)
         {
@@ -34,10 +36,17 @@ namespace osu.Game.Overlays.Mods
 
         protected override void LoadComplete()
         {
-            selectedMods.BindValueChanged(_ => updateIncompatibility(), true);
+            selectedModsBinding = selectedMods.GetBoundCopy();
+            selectedModsBinding.BindValueChanged(_ => updateIncompatibility(), true);
             incompatible.BindValueChanged(_ => Scheduler.AddOnce(UpdateState));
             // base call will run `UpdateState()` first time and finish transforms.
             base.LoadComplete();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            selectedModsBinding?.UnbindAll();
+            base.Dispose(isDisposing);
         }
 
         private void updateIncompatibility()

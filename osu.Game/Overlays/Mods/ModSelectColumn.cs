@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System.Collections.Generic;
+using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
@@ -9,7 +10,7 @@ using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
-using System.Linq;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.Graphics.Containers;
@@ -55,6 +56,7 @@ namespace osu.Game.Overlays.Mods
 
         protected readonly Container ControlContainer;
         protected readonly ModSearchContainer ItemsFlow;
+        protected Drawable HeaderLabel => headerText;
 
         private readonly TextFlowContainer headerText;
         private readonly Box headerBackground;
@@ -66,17 +68,31 @@ namespace osu.Game.Overlays.Mods
 
         protected const float WIDTH = 320;
 
-        protected ModSelectColumn()
+        internal bool WrapItems { get; }
+
+        protected ModSelectColumn(bool wrapItems = false)
         {
-            Width = WIDTH;
-            RelativeSizeAxes = Axes.Y;
-            Shear = OsuGame.SHEAR;
+            WrapItems = wrapItems;
+            Width = wrapItems ? 1 : WIDTH;
+            RelativeSizeAxes = wrapItems ? Axes.X : Axes.Y;
+            AutoSizeAxes = wrapItems ? Axes.Y : Axes.None;
+            Shear = wrapItems ? Vector2.Zero : OsuGame.SHEAR;
+
+            ItemsFlow = new ModSearchContainer
+            {
+                RelativeSizeAxes = Axes.X,
+                AutoSizeAxes = Axes.Y,
+                Direction = wrapItems ? FillDirection.Full : FillDirection.Vertical,
+                Spacing = wrapItems ? new Vector2(12) : new Vector2(0, 7),
+                Padding = new MarginPadding(wrapItems ? 12 : 7),
+            };
 
             InternalChildren = new Drawable[]
             {
                 TopLevelContent = new Container
                 {
-                    RelativeSizeAxes = Axes.Both,
+                    RelativeSizeAxes = wrapItems ? Axes.X : Axes.Both,
+                    AutoSizeAxes = wrapItems ? Axes.Y : Axes.None,
                     CornerRadius = ModSelectPanel.CORNER_RADIUS,
                     Masking = true,
                     Children = new Drawable[]
@@ -122,11 +138,13 @@ namespace osu.Game.Overlays.Mods
                         },
                         new Container
                         {
-                            RelativeSizeAxes = Axes.Both,
+                            RelativeSizeAxes = wrapItems ? Axes.X : Axes.Both,
+                            AutoSizeAxes = wrapItems ? Axes.Y : Axes.None,
                             Padding = new MarginPadding { Top = header_height },
                             Child = contentContainer = new Container
                             {
-                                RelativeSizeAxes = Axes.Both,
+                                RelativeSizeAxes = wrapItems ? Axes.X : Axes.Both,
+                                AutoSizeAxes = wrapItems ? Axes.Y : Axes.None,
                                 Masking = true,
                                 CornerRadius = ModSelectPanel.CORNER_RADIUS,
                                 BorderThickness = 3,
@@ -139,11 +157,12 @@ namespace osu.Game.Overlays.Mods
                                     new GridContainer
                                     {
                                         Padding = new MarginPadding { Top = 1, Bottom = 3 },
-                                        RelativeSizeAxes = Axes.Both,
+                                        RelativeSizeAxes = wrapItems ? Axes.X : Axes.Both,
+                                        AutoSizeAxes = wrapItems ? Axes.Y : Axes.None,
                                         RowDimensions = new[]
                                         {
                                             new Dimension(GridSizeMode.AutoSize),
-                                            new Dimension()
+                                            wrapItems ? new Dimension(GridSizeMode.AutoSize) : new Dimension()
                                         },
                                         Content = new[]
                                         {
@@ -157,19 +176,15 @@ namespace osu.Game.Overlays.Mods
                                             },
                                             new Drawable[]
                                             {
-                                                new OsuScrollContainer(Direction.Vertical)
-                                                {
-                                                    RelativeSizeAxes = Axes.Both,
-                                                    ClampExtension = 100,
-                                                    ScrollbarOverlapsContent = false,
-                                                    Child = ItemsFlow = new ModSearchContainer
+                                                wrapItems
+                                                    ? ItemsFlow
+                                                    : new OsuScrollContainer(Direction.Vertical)
                                                     {
-                                                        RelativeSizeAxes = Axes.X,
-                                                        AutoSizeAxes = Axes.Y,
-                                                        Spacing = new Vector2(0, 7),
-                                                        Padding = new MarginPadding(7)
+                                                        RelativeSizeAxes = Axes.Both,
+                                                        ClampExtension = 100,
+                                                        ScrollbarOverlapsContent = false,
+                                                        Child = ItemsFlow,
                                                     }
-                                                }
                                             }
                                         }
                                     }
@@ -179,6 +194,23 @@ namespace osu.Game.Overlays.Mods
                     }
                 }
             };
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (!WrapItems)
+                return;
+
+            float width = ItemsFlow.DrawWidth - ItemsFlow.Padding.TotalHorizontal;
+            float cardWidth = EzModLayoutGeometry.CardWidth(width, (ezLayoutShear ?? 0) * ModSelectPanel.HEIGHT);
+
+            foreach (var item in ItemsFlow)
+            {
+                item.RelativeSizeAxes &= ~Axes.X;
+                item.Width = cardWidth;
+            }
         }
 
         private void createHeaderText(LocalisableString text)
