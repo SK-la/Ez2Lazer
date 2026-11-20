@@ -44,7 +44,7 @@ namespace osu.Game.Overlays.Settings.Sections.Skin
                     Current = enableScriptedSkinsBindable,
                 })
                 {
-                    Note = { Value = new SettingsNote.Data(EzEditorStrings.SETTINGS_ENABLE_SCRIPTED_SKINS_NOTE, SettingsNote.Type.Informational) },
+                    Note = { Value = new SettingsNote.Data(EzEditorStrings.SETTINGS_ENABLE_SCRIPTED_SKINS_NOTE, SettingsNote.Type.Warning) },
                 },
                 new SettingsButtonV2
                 {

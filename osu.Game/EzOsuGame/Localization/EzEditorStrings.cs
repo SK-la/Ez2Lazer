@@ -55,10 +55,10 @@ namespace osu.Game.EzOsuGame.Localization
             "Enable scripted skins");
 
         public static readonly LocalisableString SETTINGS_ENABLE_SCRIPTED_SKINS_NOTE = new EzLocalizationManager.EzLocalisableString(
-            "关闭时不扫描 ScriptedSkin 目录、不监视脚本文件、不做脚本编译，可省下启动期开销；修改后需重启生效。"
-            + "\n开启后列表显示目录名（脚本声明的名称需选中该皮肤时才编译读取）。",
-            "When disabled the ScriptedSkin directory is not scanned, watched, or compiled, saving startup cost. Requires a restart to take effect."
-            + "\nWhen enabled the list shows folder names; a script's declared name is only read once that skin is selected.");
+            "脚本与游戏同进程、以当前用户权限执行，可读写文件、启动进程并访问网络，没有沙箱。只启用你信任的脚本；修改后需重启生效。"
+            + "\n关闭时不扫描 ScriptedSkin 目录。开启后列表显示目录名，选中该皮肤时才编译执行。",
+            "Scripted skins run in the game process with your user privileges: they can read and write files, start processes, and use the network. There is no sandbox. Enable only scripts you trust. A restart is required."
+            + "\nWhen disabled, the ScriptedSkin directory is not scanned. When enabled, the list shows folder names; a script is compiled and run only after that skin is selected.");
 
         #endregion
 

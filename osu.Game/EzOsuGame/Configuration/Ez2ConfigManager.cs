@@ -1360,6 +1360,7 @@ namespace osu.Game.EzOsuGame.Configuration
 
         /// <summary>
         /// 脚本皮肤总开关。关闭时不扫描 <c>EzResources/ScriptedSkin</c>、不监视脚本文件、不做任何脚本编译。
+        /// 开启后脚本以当前用户权限在游戏进程内执行，没有沙箱。
         /// 属启动期一次性读取的开关（不参与响应式绑定），改动后需重启生效。
         /// </summary>
         EnableScriptedSkins,

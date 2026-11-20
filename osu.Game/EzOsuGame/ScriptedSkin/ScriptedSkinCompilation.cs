@@ -96,8 +96,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
 
             var options = csharpCompilation.Options;
 
-            // SafeMetadataResolver is available for optional #r directive restrictions; wiring it as the sole
-            // MetadataReferenceResolver can break transitive type resolution during Emit.
+            // 引用解析保持 Roslyn 默认行为。脚本是本机可信代码，编译选项不构成沙箱。
             return csharpCompilation.WithOptions(options.WithNullableContextOptions(NullableContextOptions.Enable));
         }
 
