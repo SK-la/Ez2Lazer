@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering;
@@ -24,7 +25,6 @@ using osu.Game.Overlays.Settings;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Skinning;
 using osuTK;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.EzOsuGame.HUD
 {

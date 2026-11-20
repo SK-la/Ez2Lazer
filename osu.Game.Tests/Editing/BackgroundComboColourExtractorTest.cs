@@ -5,9 +5,8 @@ using System;
 using System.IO;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Graphics.Imaging;
 using osu.Game.Utils;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.Tests.Editing
 {
@@ -35,7 +34,7 @@ namespace osu.Game.Tests.Editing
 
         private static MemoryStream createImage(Func<int, int, Rgba32> getPixel)
         {
-            var image = new Image<Rgba32>(100, 100);
+            using var image = new RgbaImage(100, 100);
 
             for (int y = 0; y < image.Height; y++)
             {

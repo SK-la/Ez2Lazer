@@ -19,7 +19,7 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.IO;
 using osu.Game.Resources;
 using osu.Game.Skinning;
-using SixLabors.ImageSharp.Processing;
+using osu.Game.Utils;
 
 namespace osu.Game.EzOsuGame
 {

@@ -5,13 +5,12 @@ using System.IO;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Tests.Visual;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.Tests.EzOsuGame.Textures
 {
@@ -340,14 +339,14 @@ namespace osu.Game.Tests.EzOsuGame.Textures
 
         private void writePng(string path, int size)
         {
-            using var image = new Image<Rgba32>(size, size);
+            using var image = new RgbaImage(size, size);
             using var stream = LocalStorage.GetStream(path, FileAccess.Write);
             image.SaveAsPng(stream);
         }
 
         private void writeGif(string path, int size)
         {
-            using var image = new Image<Rgba32>(size, size);
+            using var image = new RgbaImage(size, size);
             using var stream = LocalStorage.GetStream(path, FileAccess.Write);
             image.SaveAsGif(stream);
         }

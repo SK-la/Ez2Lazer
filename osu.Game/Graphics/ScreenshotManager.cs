@@ -12,6 +12,7 @@ using osu.Framework.Audio.Sample;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.Input;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
@@ -27,10 +28,6 @@ using osu.Game.Online.API.Requests;
 using osu.Game.Online.Multiplayer;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
 
 namespace osu.Game.Graphics
 {
@@ -129,13 +126,16 @@ namespace osu.Game.Graphics
                     break;
 
                 case ScreenshotFormat.Png:
+                {
                     // Convert the taken screenshot to JPEG (to save storage) before uploading if user set their screenshots to
                     // save in a different format.
-                    var image = await Image.LoadAsync(storage.GetFullPath(filename)).ConfigureAwait(false);
+                    using var imageStream = storage.GetStream(filename, FileAccess.Read, FileMode.Open);
+                    using var image = (ImageCodec.Decoder ?? throw new InvalidOperationException("No image decoder has been registered.")).Decode(imageStream);
 
                     stream = new MemoryStream();
-                    await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = jpeg_quality }).ConfigureAwait(false);
+                    (ImageCodec.Encoder ?? throw new InvalidOperationException("No image encoder has been registered.")).Encode(image, stream, ImageFileFormat.Jpeg, jpeg_quality);
                     break;
+                }
 
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -188,6 +188,8 @@ namespace osu.Game.Graphics
             // so it must always save, regardless of the user's copy-only preference.
             bool shouldSave = !copyToClipboard || screenshotAction != EzScreenshotAction.CopyOnly;
             bool shouldCopy = copyToClipboard && screenshotAction != EzScreenshotAction.SaveOnly;
+            RgbaImage? screenshotImage = null;
+            RgbaImage? croppedImage = null;
 
             try
             {
@@ -216,8 +218,10 @@ namespace osu.Game.Graphics
                     }
                 }
 
-                using (Image<Rgba32>? image = await host.TakeScreenshotAsync().ConfigureAwait(false))
+                screenshotImage = await host.TakeScreenshotAsync().ConfigureAwait(false);
+                RgbaImage image = screenshotImage;
                 {
+                    // Keep image ownership in the outer finally so the optional crop can replace it safely.
                     if (config.Get<ScalingMode>(OsuSetting.Scaling) == ScalingMode.Everything)
                     {
                         float posX = config.Get<float>(OsuSetting.ScalingPositionX);
@@ -225,21 +229,17 @@ namespace osu.Game.Graphics
                         float sizeX = config.Get<float>(OsuSetting.ScalingSizeX);
                         float sizeY = config.Get<float>(OsuSetting.ScalingSizeY);
 
-                        image.Mutate(m =>
-                        {
-                            Rectangle rect = new Rectangle(Point.Empty, m.GetCurrentSize());
+                        int cropX = (image.Width - (int)(image.Width * sizeX)) / 2;
+                        int cropY = (image.Height - (int)(image.Height * sizeY)) / 2;
+                        int cropWidth = image.Width - cropX * 2;
+                        int cropHeight = image.Height - cropY * 2;
 
-                            // Reduce size by user scale settings...
-                            int sx = (rect.Width - (int)(rect.Width * sizeX)) / 2;
-                            int sy = (rect.Height - (int)(rect.Height * sizeY)) / 2;
-                            rect.Inflate(-sx, -sy);
+                        // Reduce size by user scale settings, then adjust the crop origin.
+                        cropX = (int)(cropX * posX) * 2;
+                        cropY = (int)(cropY * posY) * 2;
 
-                            // ...then adjust the region based on their positional offset.
-                            rect.X = (int)(rect.X * posX) * 2;
-                            rect.Y = (int)(rect.Y * posY) * 2;
-
-                            m.Crop(rect);
-                        });
+                        croppedImage = image.Crop(cropX, cropY, cropWidth, cropHeight);
+                        image = croppedImage;
                     }
 
                     if (shouldCopy)
@@ -258,20 +258,20 @@ namespace osu.Game.Graphics
                         return null;
                     }
 
-                    (string? filename, Stream? stream) = getWritableStream(screenshotFormat.Value);
+                    (string? filename, Stream? outputStream) = getWritableStream(screenshotFormat.Value);
 
-                    if (filename == null) return null;
+                    if (filename == null || outputStream == null) return null;
 
-                    using (stream)
+                    using (Stream stream = outputStream)
                     {
                         switch (screenshotFormat.Value)
                         {
                             case ScreenshotFormat.Png:
-                                await image.SaveAsPngAsync(stream).ConfigureAwait(false);
+                                image.SaveAsPng(stream);
                                 break;
 
                             case ScreenshotFormat.Jpg:
-                                await image.SaveAsJpegAsync(stream, new JpegEncoder { Quality = jpeg_quality }).ConfigureAwait(false);
+                                image.SaveAsJpeg(stream, jpeg_quality);
                                 break;
 
                             default:
@@ -297,6 +297,9 @@ namespace osu.Game.Graphics
             }
             finally
             {
+                croppedImage?.Dispose();
+                screenshotImage?.Dispose();
+
                 if (Interlocked.Decrement(ref screenShotTasks) == 0)
                     cursorVisibility.Value = true;
             }
