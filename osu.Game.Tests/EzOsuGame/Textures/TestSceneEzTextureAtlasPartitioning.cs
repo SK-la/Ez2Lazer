@@ -8,14 +8,13 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Tests.Visual;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.Tests.EzOsuGame.Textures
 {
@@ -283,7 +282,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
 
         private void writePng(string path, int width, int height)
         {
-            using var image = new Image<Rgba32>(width, height);
+            using var image = new RgbaImage(width, height);
             using var stream = LocalStorage.GetStream(path, FileAccess.Write);
             image.SaveAsPng(stream);
         }

@@ -7,9 +7,9 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.IO.Stores;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
+using osu.Game.Utils;
 
 namespace osu.Game.Skinning
 {
@@ -94,20 +94,15 @@ namespace osu.Game.Skinning
             int width = textureUpload.Width;
             int height = textureUpload.Height;
 
-            var image = Image.LoadPixelData(textureUpload.Data, width, height);
+            using var image = new RgbaImage(width, height, textureUpload.Data);
 
             // 原始 texture upload 不再返回也不再使用。
             textureUpload.Dispose();
 
             // 目标框逐轴裁到上限：Stretch 下即逐轴裁剪（历史兜底语义），
             // Max 下为在该框内按最长边等比缩小（见构造函数 resizeMode 说明）。
-            image.Mutate(i => i.Resize(new ResizeOptions
-            {
-                Mode = resizeMode,
-                Size = new Size(Math.Min(width, maxDimension), Math.Min(height, maxDimension)),
-            }));
-
-            return new TextureUpload(image);
+            RgbaImage resized = ImageProcessing.Resize(image, Math.Min(width, maxDimension), Math.Min(height, maxDimension), resizeMode);
+            return new TextureUpload(resized);
         }
 
         public Stream? GetStream(string name) => textureStore?.GetStream(name);
