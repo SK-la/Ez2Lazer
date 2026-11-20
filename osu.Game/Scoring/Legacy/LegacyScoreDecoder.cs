@@ -143,6 +143,9 @@ namespace osu.Game.Scoring.Legacy
                             PopulateTotalScoreWithoutMods(score.ScoreInfo);
 
                         score.ScoreInfo.Pauses.AddRange(readScore.Pauses);
+                        score.ScoreInfo.JudgeMode = readScore.JudgeMode;
+                        score.ScoreInfo.HealthMode = readScore.HealthMode;
+                        score.ScoreInfo.GameplayEnvironmentSnapshot = readScore.GameplayEnvironment;
                     });
                 }
             }

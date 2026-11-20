@@ -10,6 +10,7 @@ using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Models;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -261,6 +262,7 @@ namespace osu.Game.Scoring
             clone.SessionAccuracyCutoffA = SessionAccuracyCutoffA;
             clone.SessionAccuracyCutoffS = SessionAccuracyCutoffS;
             clone.SessionSettingsCaptured = SessionSettingsCaptured;
+            clone.GameplayEnvironmentSnapshot = GameplayEnvironmentSnapshot;
             clone.EzBonus = EzBonus;
 
             return clone;
@@ -325,19 +327,26 @@ namespace osu.Game.Scoring
         /// Ez2Lazer: Accuracy cutoff A at gameplay start (submission eligibility snapshot).
         /// </summary>
         [Ignored]
-        public double SessionAccuracyCutoffA { get; set; } = EzOsuGame.Scoring.EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_A;
+        public double SessionAccuracyCutoffA { get; set; } = EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_A;
 
         /// <summary>
         /// Ez2Lazer: Accuracy cutoff S at gameplay start (submission eligibility snapshot).
         /// </summary>
         [Ignored]
-        public double SessionAccuracyCutoffS { get; set; } = EzOsuGame.Scoring.EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_S;
+        public double SessionAccuracyCutoffS { get; set; } = EzOnlineScoreSubmissionPolicy.DEFAULT_ACCURACY_CUTOFF_S;
 
         /// <summary>
         /// Whether session offset/cutoff snapshots were captured at gameplay start.
         /// </summary>
         [Ignored]
         public bool SessionSettingsCaptured { get; set; }
+
+        /// <summary>
+        /// Ez2Lazer: environment used for this play session. This is kept out of Realm and is serialized into
+        /// extended replay exports so stored replays can be evaluated independently of current user settings.
+        /// </summary>
+        [Ignored]
+        public GameplayEnvironment? GameplayEnvironmentSnapshot { get; set; }
 
         private Dictionary<HitResult, int>? statistics;
 

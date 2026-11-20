@@ -4,6 +4,7 @@
 using System.IO;
 using NUnit.Framework;
 using osu.Game.Beatmaps.Formats;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.IO.Archives;
 using osu.Game.Replays;
@@ -123,6 +124,18 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                     }
                 }
             };
+            score.ScoreInfo.JudgeMode = (int)EzEnumJudgeMode.O2Jam;
+            score.ScoreInfo.HealthMode = (int)EzEnumHealthMode.O2JamNormal;
+            score.ScoreInfo.GameplayEnvironmentSnapshot = new GameplayEnvironment
+            {
+                JudgeMode = EzEnumJudgeMode.O2Jam,
+                HealthMode = EzEnumHealthMode.O2JamNormal,
+                JudgePrecedence = EzEnumJudgePrecedence.Earliest,
+                OffsetPlusMania = 12.5,
+                OffsetPlusNonMania = -4.25,
+                BmsPoorHitResultEnable = true,
+                ApplyInputOffsetViaReplayFrameShift = true,
+            };
 
             using var sourceHighPrecisionReplay = new MemoryStream();
             EzHighPrecisionReplayFrames.Write(sourceHighPrecisionReplay, score, beatmap);
@@ -156,6 +169,16 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                 Assert.That(decoded.Replay.Frames[0].Time, Is.EqualTo(1000));
                 Assert.That(decoded.Replay.Frames[1].Time, Is.EqualTo(1000));
                 Assert.That(decoded.Replay.Frames[2].Time, Is.EqualTo(1100));
+                Assert.That(decoded.ScoreInfo.JudgeMode, Is.EqualTo((int)EzEnumJudgeMode.O2Jam));
+                Assert.That(decoded.ScoreInfo.HealthMode, Is.EqualTo((int)EzEnumHealthMode.O2JamNormal));
+                Assert.That(decoded.ScoreInfo.GameplayEnvironmentSnapshot, Is.Not.Null);
+                Assert.That(decoded.ScoreInfo.GameplayEnvironmentSnapshot!.JudgeMode, Is.EqualTo(EzEnumJudgeMode.O2Jam));
+                Assert.That(decoded.ScoreInfo.GameplayEnvironmentSnapshot.HealthMode, Is.EqualTo(EzEnumHealthMode.O2JamNormal));
+                Assert.That(decoded.ScoreInfo.GameplayEnvironmentSnapshot.JudgePrecedence, Is.EqualTo(EzEnumJudgePrecedence.Earliest));
+                Assert.That(decoded.ScoreInfo.GameplayEnvironmentSnapshot.OffsetPlusMania, Is.EqualTo(12.5));
+                Assert.That(decoded.ScoreInfo.GameplayEnvironmentSnapshot.OffsetPlusNonMania, Is.EqualTo(-4.25));
+                Assert.That(decoded.ScoreInfo.GameplayEnvironmentSnapshot.BmsPoorHitResultEnable, Is.True);
+                Assert.That(decoded.ScoreInfo.GameplayEnvironmentSnapshot.ApplyInputOffsetViaReplayFrameShift, Is.True);
             }
         }
     }

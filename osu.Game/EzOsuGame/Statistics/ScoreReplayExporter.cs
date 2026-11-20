@@ -43,6 +43,14 @@ namespace osu.Game.EzOsuGame.Statistics
                 return;
             }
 
+            // The replay is reloaded from Realm for its file attachments, while the environment snapshot is transient.
+            if (scoreInfo.GameplayEnvironmentSnapshot is { } environment)
+            {
+                score.ScoreInfo.JudgeMode = scoreInfo.JudgeMode;
+                score.ScoreInfo.HealthMode = scoreInfo.HealthMode;
+                score.ScoreInfo.GameplayEnvironmentSnapshot = environment;
+            }
+
             const string extension = EzReplayExportEncoder.EXTENSION;
             string itemFilename = $"{score.ScoreInfo.GetDisplayString()} ({score.ScoreInfo.Date.LocalDateTime:yyyy-MM-dd_HH-mm})".GetValidFilename();
 

@@ -125,9 +125,9 @@ namespace osu.Game.Tests.Scores.IO
 
                 var importedFrames = scoreManager.GetScore(imported)?.Replay?.Frames;
                 Assert.That(importedFrames, Has.Count.EqualTo(score.Replay.Frames.Count));
-                Assert.That(importedFrames.Select(f => f.Time), Is.EqualTo(score.Replay.Frames.Select(f => f.Time)));
+                Assert.That(importedFrames?.Select(f => f.Time), Is.EqualTo(score.Replay.Frames.Select(f => f.Time)));
 
-                for (int i = 0; i < importedFrames.Count; i++)
+                for (int i = 0; i < importedFrames?.Count; i++)
                     Assert.That(importedFrames[i].IsEquivalentTo(score.Replay.Frames[i]), Is.True, $"Frame {i} differs from the original input.");
             }
             finally

@@ -127,6 +127,7 @@ namespace osu.Game.EzOsuGame.Scoring
             double offset = beatmap?.BeatmapVersion < 5 ? -LegacyBeatmapDecoder.EARLY_VERSION_TIMING_OFFSET : 0;
 
             using var ms = new MemoryStream();
+
             using (var bw = new BinaryWriter(ms, Encoding.UTF8, leaveOpen: true))
             {
                 var scoreFrames = score.Replay?.Frames;
