@@ -141,6 +141,51 @@ namespace osu.Game.Rulesets.Mania.Tests
                 });
         }
 
+        [TestCase(EzEnumJudgeMode.Lazer)]
+        [TestCase(EzEnumJudgeMode.Malody_E)]
+        public void TestLateHoldHeadMissDoesNotPreventCompletion(EzEnumJudgeMode judgeMode)
+        {
+            parityEnvironment = ReplayJudgeTestConfig.Create(judgeMode, EzEnumHealthMode.Lazer);
+
+            const double head = 1000;
+            const double tail = 1600;
+
+            runFullScoreParityTest(
+                new List<ManiaHitObject>
+                {
+                    new HoldNote { StartTime = head, Duration = tail - head, Column = 0 },
+                    new Note { StartTime = 1100, Column = 0 },
+                },
+                new List<ReplayFrame>
+                {
+                    new ManiaReplayFrame(1130, ManiaAction.Key1),
+                    new ManiaReplayFrame(1150),
+                    new ManiaReplayFrame(2000),
+                },
+                assertJudgedHitsComplete: true,
+                assertSessionParity: false,
+                overallDifficulty: 8);
+
+            AddAssert("hold head misses while follow-up tap and tail settle", () =>
+            {
+                var hitEvents = currentPlayer.ScoreProcessor.HitEvents;
+                bool headMissed = hitEvents.Any(e => e.HitObject is HeadNote && Math.Abs(e.HitObject.StartTime - head) < 0.01 && e.Result == HitResult.Miss);
+                bool tailJudged = hitEvents.Any(e => e.HitObject is TailNote && Math.Abs(e.HitObject.StartTime - tail) < 0.01);
+                bool followUpHit = hitEvents.Any(e => e.HitObject is Note
+                                                      && e.HitObject is not HeadNote
+                                                      && e.HitObject is not TailNote
+                                                      && Math.Abs(e.HitObject.StartTime - 1100) < 0.01
+                                                      && e.Result.IsHit());
+
+                if (headMissed && tailJudged && followUpHit)
+                    return true;
+
+                throw new AssertionException(
+                    $"headMissed={headMissed} tailJudged={tailJudged} followUpHit={followUpHit}: "
+                    + $"[{ManiaReplayParityHelper.DescribeHitEvents(hitEvents)}]");
+            });
+        }
+
         /// <summary>
         /// LN 尾之后明显迟松手（松手落在 release lenience 之外）：Drawable 与 Session 必须一致。
         /// </summary>
