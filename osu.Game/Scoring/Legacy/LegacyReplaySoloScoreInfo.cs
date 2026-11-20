@@ -40,6 +40,9 @@ namespace osu.Game.Scoring.Legacy
         [JsonProperty("client_version")]
         public string ClientVersion = string.Empty;
 
+        [JsonProperty("accuracy", NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.Include)]
+        public double? Accuracy { get; set; }
+
         [JsonProperty("rank")]
         [JsonConverter(typeof(StringEnumConverter))]
         public ScoreRank? Rank;
@@ -69,6 +72,7 @@ namespace osu.Game.Scoring.Legacy
             Statistics = score.Statistics.Where(kvp => kvp.Value != 0).ToDictionary(),
             MaximumStatistics = score.MaximumStatistics.Where(kvp => kvp.Value != 0).ToDictionary(),
             ClientVersion = score.ClientVersion,
+            Accuracy = score.Accuracy,
             Rank = score.Rank,
             UserID = score.User.OnlineID,
             TotalScoreWithoutMods = score.TotalScoreWithoutMods > 0 ? score.TotalScoreWithoutMods : null,

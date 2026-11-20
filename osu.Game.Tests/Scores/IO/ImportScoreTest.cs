@@ -99,7 +99,8 @@ namespace osu.Game.Tests.Scores.IO
                         Ruleset = beatmapInfo.Ruleset,
                         User = new APIUser { Username = "Test user" },
                         TotalScore = 987654,
-                        Date = DateTimeOffset.Now,
+                        Accuracy = 0.87654321,
+                        Date = DateTimeOffset.UtcNow.AddHours(-3),
                     },
                     Replay = new Replay
                     {
@@ -134,6 +135,8 @@ namespace osu.Game.Tests.Scores.IO
                 Assert.That(imported, Is.Not.Null);
                 Assert.That(imported.TotalScore, Is.EqualTo(score.ScoreInfo.TotalScore));
                 Assert.That(imported.User.Username, Is.EqualTo(score.ScoreInfo.User.Username));
+                Assert.That(imported.Date.ToUniversalTime(), Is.EqualTo(score.ScoreInfo.Date.ToUniversalTime()));
+                Assert.That(imported.Accuracy, Is.EqualTo(score.ScoreInfo.Accuracy));
 
                 var importedScore = scoreManager.GetScore(imported);
                 var importedFrames = importedScore?.Replay?.Frames;
