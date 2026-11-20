@@ -153,6 +153,9 @@ namespace osu.Game.Skinning
 
             scriptRunner = new SandboxedScriptRunner();
 
+            if (ScriptedSkinsEnabled)
+                Logger.Log($"{SandboxedScriptRunner.LOGGER_PREFIX} scripted skins execute as full-trust code in this process.", LoggingTarget.Information);
+
             // 初始化热重载管理器
             hotReloadManager = new HotReloadManager(scriptRunner);
             hotReloadManager.SkinReloaded += onScriptReloaded;

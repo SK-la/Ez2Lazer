@@ -40,7 +40,6 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         public SandboxedScriptRunner()
         {
             cache = new ScriptCompilationCache();
-            Logger.Log($"{LOGGER_PREFIX} scripted skins execute as full-trust code in this process.", LoggingTarget.Information, LogLevel.Important);
         }
 
         /// <summary>
