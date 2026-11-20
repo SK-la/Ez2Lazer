@@ -17,7 +17,7 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
     /// </summary>
     /// <remarks>
     /// 此接口定义了脚本皮肤需要实现的核心方法，允许用户通过 C# 脚本自定义皮肤行为。
-    /// 脚本将在沙箱环境中执行，以确保安全性。
+    /// 脚本与游戏同进程执行，权限与游戏进程相同。
     /// </remarks>
     public interface IScriptedSkin : IDisposable
     {

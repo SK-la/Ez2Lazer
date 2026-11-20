@@ -59,19 +59,4 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         {
         }
     }
-
-    /// <summary>
-    /// 脚本安全验证失败时抛出的异常。
-    /// </summary>
-    public class ScriptSecurityException : Exception
-    {
-        /// <summary>
-        /// 创建安全异常。
-        /// </summary>
-        /// <param name="message">错误消息。</param>
-        public ScriptSecurityException(string message)
-            : base(message)
-        {
-        }
-    }
 }

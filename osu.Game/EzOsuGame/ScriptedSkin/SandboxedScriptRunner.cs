@@ -3,7 +3,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -23,11 +22,11 @@ using osu.Game.Skinning;
 namespace osu.Game.EzOsuGame.ScriptedSkin
 {
     /// <summary>
-    /// 沙箱化的脚本执行器，负责加载、编译和执行用户编写的皮肤脚本。
+    /// 加载、编译并执行用户编写的皮肤脚本。
     /// </summary>
     /// <remarks>
-    /// 此执行器通过限制可访问的 API 和文件系统操作来确保安全性，
-    /// 防止恶意脚本对系统造成损害或在游戏中作弊。
+    /// 脚本与游戏同进程执行，权限与游戏进程相同，可使用已引用的 .NET 与游戏 API。
+    /// 这里没有沙箱：调用方只能把脚本当成与可执行文件同等的本机可信代码。
     /// </remarks>
     public class SandboxedScriptRunner
     {
@@ -36,12 +35,11 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         private readonly ScriptCompilationCache cache;
 
         /// <summary>
-        /// 创建沙箱脚本执行器实例。
+        /// 创建脚本执行器实例。
         /// </summary>
         public SandboxedScriptRunner()
         {
             cache = new ScriptCompilationCache();
-            Logger.Log("SandboxedScriptRunner initialized with security restrictions.", LoggingTarget.Information);
         }
 
         /// <summary>
@@ -50,7 +48,6 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         /// <param name="scriptPath">脚本文件的完整路径。</param>
         /// <returns>编译后的 IScriptedSkin 实例。</returns>
         /// <exception cref="ScriptCompilationException">编译失败时抛出。</exception>
-        /// <exception cref="ScriptSecurityException">安全验证失败时抛出。</exception>
         /// <exception cref="ScriptExecutionException">执行失败时抛出。</exception>
         public async Task<IScriptedSkin> LoadScriptAsync(string scriptPath)
             => await LoadScriptAsync<IScriptedSkin>(scriptPath).ConfigureAwait(false);
@@ -63,7 +60,6 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         /// <param name="ctorArgs">构造函数参数。</param>
         /// <returns>编译后的实例。</returns>
         /// <exception cref="ScriptCompilationException">编译失败时抛出。</exception>
-        /// <exception cref="ScriptSecurityException">安全验证失败时抛出。</exception>
         /// <exception cref="ScriptExecutionException">执行失败时抛出。</exception>
         public async Task<T> LoadScriptAsync<T>(string scriptPath, params object?[] ctorArgs)
             where T : class
@@ -84,9 +80,6 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
 
             // 读取脚本内容
             string scriptCode = await File.ReadAllTextAsync(scriptPath).ConfigureAwait(false);
-
-            // 验证脚本安全性
-            validateScriptSafety(scriptCode, scriptPath);
 
             try
             {
@@ -315,7 +308,6 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
                 throw new FileNotFoundException($"Script file not found: {scriptPath}");
 
             string scriptCode = await File.ReadAllTextAsync(scriptPath).ConfigureAwait(false);
-            validateScriptSafety(scriptCode, scriptPath);
 
             try
             {
@@ -382,83 +374,6 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
             cache.Clear();
             Logger.Log($"{LOGGER_PREFIX} All script caches cleared.", LoggingTarget.Information);
         }
-
-        /// <summary>
-        /// 验证脚本的安全性，阻止危险操作。
-        /// </summary>
-        /// <param name="scriptCode">脚本源代码。</param>
-        /// <param name="scriptPath">脚本文件路径（用于错误报告）。</param>
-        /// <exception cref="ScriptSecurityException">发现不安全代码时抛出。</exception>
-        private void validateScriptSafety(string scriptCode, string scriptPath)
-        {
-            // 定义禁止的 API 模式
-            var forbiddenPatterns = new Dictionary<string, string>
-            {
-                { "System.IO.File", "File system access is forbidden" },
-                { "System.IO.Directory", "Directory operations are forbidden" },
-                { "System.Net", "Network access is forbidden" },
-                { "System.Diagnostics", "Process operations are forbidden" },
-                { "System.Reflection", "Reflection is forbidden for security reasons" },
-                { "unsafe", "Unsafe code is not allowed" },
-                { "DllImport", "P/Invoke is forbidden" },
-                { "Marshal", "Memory manipulation is forbidden" },
-            };
-
-            foreach (var kvp in forbiddenPatterns)
-            {
-                if (scriptCode.Contains(kvp.Key))
-                {
-                    string message = $"Security violation in {Path.GetFileName(scriptPath)}: {kvp.Value}. " +
-                                     $"Forbidden API: '{kvp.Key}'";
-                    Logger.Log(message, LoggingTarget.Runtime);
-                    throw new ScriptSecurityException(message);
-                }
-            }
-
-            // 检查是否使用了命名空间声明（应该使用全局命名空间）
-            if (scriptCode.Contains("namespace "))
-            {
-                Logger.Log($"{LOGGER_PREFIX} Warning: Script {Path.GetFileName(scriptPath)} contains namespace declaration. " +
-                           "Scripts should use global namespace for simplicity.", LoggingTarget.Information);
-            }
-        }
-    }
-
-    /// <summary>
-    /// 安全的元数据解析器，限制脚本可引用的程序集。
-    /// </summary>
-    internal class SafeMetadataResolver : MetadataReferenceResolver
-    {
-        private readonly HashSet<string> allowedAssemblies;
-
-        public SafeMetadataResolver(IEnumerable<string> allowedAssemblyNames)
-        {
-            allowedAssemblies = new HashSet<string>(allowedAssemblyNames, StringComparer.OrdinalIgnoreCase);
-        }
-
-        public override bool ResolveMissingAssemblies => false;
-
-        public override ImmutableArray<PortableExecutableReference> ResolveReference(
-            string reference,
-            string? baseFilePath,
-            MetadataReferenceProperties properties)
-        {
-            string assemblyName = Path.GetFileNameWithoutExtension(reference);
-
-            if (!allowedAssemblies.Contains(assemblyName))
-            {
-                string message = $"Assembly '{assemblyName}' is not allowed in scripted skins. " +
-                                 $"Allowed assemblies: {string.Join(", ", allowedAssemblies)}";
-                Logger.Log(message, LoggingTarget.Runtime, LogLevel.Important);
-                throw new ScriptSecurityException(message);
-            }
-
-            return ImmutableArray.Create(MetadataReference.CreateFromFile(reference));
-        }
-
-        public override bool Equals(object? other) => other is SafeMetadataResolver;
-
-        public override int GetHashCode() => nameof(SafeMetadataResolver).GetHashCode();
     }
 
     /// <summary>
@@ -495,20 +410,5 @@ namespace osu.Game.EzOsuGame.ScriptedSkin
         public Version Version => skin.GetType().GetProperty("Version", BindingFlags.Public | BindingFlags.Instance)?.GetValue(skin) as Version ?? new Version(1, 0, 0);
 
         public void Dispose() => skin.Dispose();
-    }
-
-    /// <summary>
-    /// 受限的文件解析器，禁止访问脚本目录外的文件。
-    /// </summary>
-    /// <remarks>
-    /// 由于 Roslyn 的 SourceFileResolver API 限制，此类的实际文件访问限制
-    /// 主要通过 SafeMetadataResolver 和静态代码分析来实现。
-    /// </remarks>
-    internal class RestrictedFileResolver : SourceFileResolver
-    {
-        public RestrictedFileResolver()
-            : base(Array.Empty<string>(), Directory.GetCurrentDirectory())
-        {
-        }
     }
 }
