@@ -236,6 +236,7 @@ namespace osu.Game.EzOsuGame.Overlays
                 restoreScrollView = null;
                 Array.Clear(scrollPositions);
                 ContentView.RestoreScroll(0);
+                RefreshSearchPreselection();
             }, true);
 
             Ruleset.BindValueChanged(change =>
