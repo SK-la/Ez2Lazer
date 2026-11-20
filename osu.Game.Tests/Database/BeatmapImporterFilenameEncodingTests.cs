@@ -1,15 +1,19 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
+using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.IO.Archives;
 using osu.Game.Rulesets;
+using osu.Game.Utils;
 using SharpCompress.Common;
 using SharpCompress.Writers;
 using SharpCompress.Writers.Zip;
@@ -75,6 +79,65 @@ namespace osu.Game.Tests.Database
                     ClassicAssert.AreEqual(audio_reference, set.Beatmaps.Single().Metadata.AudioFile);
                 });
             });
+        }
+
+        [Test]
+        public void TestTraversalReferenceIsNotStoredOrExported()
+        {
+            RunTestWithRealmAsync(async (realm, storage) =>
+            {
+                const string audio_reference = "../../../../../../tmp/pwned.mp3";
+                const string background_reference = "../../../../../../tmp/pwned.jpg";
+                const string zip_audio_name = "audio.mp3";
+                const string zip_background_name = "bg.jpg";
+
+                var importer = new BeatmapImporter(storage, realm);
+                using var store = new RealmRulesetStore(realm, storage);
+
+                using var osz = createMinimalOszWithZipWriter(audio_reference, background_reference, zip_audio_name, zip_background_name);
+                var imported = await importer.Import(new ImportTask(osz, "traversal.osz"));
+
+                ClassicAssert.NotNull(imported);
+                imported!.PerformRead(set =>
+                {
+                    ClassicAssert.IsNull(set.GetFile(audio_reference));
+                    ClassicAssert.IsNull(set.GetFile(background_reference));
+                    ClassicAssert.NotNull(set.GetFile(zip_audio_name));
+                    ClassicAssert.NotNull(set.GetFile(zip_background_name));
+
+                    foreach (var file in set.Files)
+                        ClassicAssert.IsFalse(FilesystemSanityCheckHelpers.IncursPathTraversalRisk(file.Filename), file.Filename);
+                });
+
+                // Already-imported rows can still hold the traversal name. Export must not emit it.
+                realm.Write(r =>
+                {
+                    var set = r.All<BeatmapSetInfo>().Single();
+                    set.Files.Single(f => f.Filename == zip_audio_name).Filename = audio_reference;
+                });
+
+                using var exportStream = new MemoryStream();
+                await new RawArchiveExporter(storage).ExportToStreamAsync(imported, exportStream);
+
+                using var reader = new ZipArchiveReader(new MemoryStream(exportStream.GetBuffer(), 0, (int)exportStream.Length));
+                ClassicAssert.IsTrue(reader.Filenames.Any(name => name.EndsWith("pwned.mp3", StringComparison.Ordinal)));
+
+                foreach (string name in reader.Filenames)
+                {
+                    ClassicAssert.IsFalse(FilesystemSanityCheckHelpers.IncursPathTraversalRisk(name), name);
+                    ClassicAssert.IsFalse(name.Split('/', '\\').Contains(".."), name);
+                }
+            });
+        }
+
+        private sealed class RawArchiveExporter : LegacyArchiveExporter<BeatmapSetInfo>
+        {
+            public RawArchiveExporter(Storage storage)
+                : base(storage)
+            {
+            }
+
+            protected override string FileExtension => ".osz";
         }
 
         private static MemoryStream createMinimalOszWithoutEfs(string audioFilename, string backgroundFilename)

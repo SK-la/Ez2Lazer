@@ -22,6 +22,7 @@ using osu.Game.Models;
 using osu.Game.Overlays.Notifications;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Objects.Types;
+using osu.Game.Utils;
 using Realms;
 
 namespace osu.Game.Beatmaps
@@ -484,6 +485,12 @@ namespace osu.Game.Beatmaps
 
             foreach (string reference in references)
             {
+                if (!string.Equals(FilesystemSanityCheckHelpers.GetSafeArchiveEntryName(reference), reference, StringComparison.Ordinal))
+                {
+                    LogForModel(beatmapSet, $"Skipped .osu reference \"{reference}\" because it leaves the beatmap directory.");
+                    continue;
+                }
+
                 if (beatmapSet.GetFile(reference) != null)
                     continue;
 

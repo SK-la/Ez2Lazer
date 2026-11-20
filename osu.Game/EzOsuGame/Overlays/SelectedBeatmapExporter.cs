@@ -148,7 +148,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     using var stream = getConvertedFileContents(beatmapSet, file, ruleset, mods);
 
                     if (stream != null)
-                        writer.Write(file.Filename, stream);
+                        writer.Write(FilesystemSanityCheckHelpers.GetSafeArchiveEntryName(file.Filename), stream);
 
                     exported++;
                     notification.Progress = (float)exported / files.Count;

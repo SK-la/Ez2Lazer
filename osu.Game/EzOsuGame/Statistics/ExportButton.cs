@@ -210,7 +210,7 @@ namespace osu.Game.EzOsuGame.Statistics
                         using var stream = getConvertedFileContents(beatmapSet, file);
 
                         if (stream != null)
-                            writer.Write(file.Filename, stream);
+                            writer.Write(FilesystemSanityCheckHelpers.GetSafeArchiveEntryName(file.Filename), stream);
 
                         exported++;
                         notification.Progress = (float)exported / files.Count;
