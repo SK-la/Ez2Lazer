@@ -165,9 +165,15 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
             {
                 ensureCacheDirectory();
 
-                string downloadUrl = PixivApiProxy.RewriteImageUrl(
-                    illust.ImageUrl,
-                    ezConfig.Get<string>(Ez2Setting.PixivApiProxyBaseUrl));
+                string proxyBase = ezConfig.Get<string>(Ez2Setting.PixivApiProxyBaseUrl);
+                string downloadUrl = PixivApiProxy.RewriteImageUrl(illust.ImageUrl, proxyBase);
+
+                if (!PixivApiProxy.IsAllowedImageUrl(downloadUrl, proxyBase))
+                {
+                    error = EzSettingsPixivString.PIXIV_ERROR_IMAGE_DOWNLOAD_FAILED;
+                    Logger.Log("[Pixiv] refused image URL outside the image host allowlist", LoggingTarget.Network, LogLevel.Important);
+                    return false;
+                }
 
                 using var request = new WebRequest(downloadUrl)
                 {

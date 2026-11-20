@@ -119,8 +119,13 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
                 }
 
                 var json = JObject.Parse(request.GetResponseString() ?? string.Empty);
-                nextUrl = PixivJsonHelper.ResolveNextUrl(json);
-                nextUrl = resolveApiUrl(nextUrl);
+                nextUrl = resolveApiUrl(PixivJsonHelper.ResolveNextUrl(json));
+
+                if (!string.IsNullOrWhiteSpace(nextUrl) && !isAllowedApiUrl(nextUrl))
+                {
+                    Logger.Log("[Pixiv] ignored follow feed next_url outside the API allowlist", LoggingTarget.Network, LogLevel.Important);
+                    nextUrl = null;
+                }
 
                 var illusts = PixivJsonHelper.ExtractIllustTokens(json);
                 stats.SeenIllustCount += illusts.Count;
@@ -268,9 +273,17 @@ namespace osu.Game.EzOsuGame.Background.Pixiv
         private string resolveApiUrl(string? url)
             => PixivApiProxy.RewriteApiUrl(url ?? string.Empty, ezConfig.Get<string>(Ez2Setting.PixivApiProxyBaseUrl));
 
+        private bool isAllowedApiUrl(string url)
+            => PixivApiProxy.IsAllowedApiUrl(url, ezConfig.Get<string>(Ez2Setting.PixivApiProxyBaseUrl));
+
         private WebRequest createApiRequest(string url, string token)
         {
-            var request = new WebRequest(resolveApiUrl(url))
+            string resolved = resolveApiUrl(url);
+
+            if (!isAllowedApiUrl(resolved))
+                throw new InvalidOperationException("Refusing authenticated Pixiv request to a host outside the API allowlist.");
+
+            var request = new WebRequest(resolved)
             {
                 Method = HttpMethod.Get,
             };
