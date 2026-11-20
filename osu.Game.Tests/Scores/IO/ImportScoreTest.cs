@@ -14,6 +14,7 @@ using osu.Framework.Extensions;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.IO.Archives;
 using osu.Game.Online.API;
@@ -110,6 +111,17 @@ namespace osu.Game.Tests.Scores.IO
                         }
                     }
                 };
+                score.ScoreInfo.JudgeMode = (int)EzEnumJudgeMode.StableClassic;
+                score.ScoreInfo.GameplayEnvironmentSnapshot = new GameplayEnvironment
+                {
+                    JudgeMode = EzEnumJudgeMode.StableClassic,
+                    HealthMode = EzEnumHealthMode.Lazer,
+                    JudgePrecedence = EzEnumJudgePrecedence.Earliest,
+                    OffsetPlusMania = 12.5,
+                    OffsetPlusNonMania = -4.25,
+                    BmsPoorHitResultEnable = true,
+                    ApplyInputOffsetViaReplayFrameShift = true,
+                };
 
                 using var archive = new MemoryStream();
                 EzReplayExportEncoder.EncodeEzOsr(score, workingBeatmap.Beatmap, archive);
@@ -123,12 +135,20 @@ namespace osu.Game.Tests.Scores.IO
                 Assert.That(imported.TotalScore, Is.EqualTo(score.ScoreInfo.TotalScore));
                 Assert.That(imported.User.Username, Is.EqualTo(score.ScoreInfo.User.Username));
 
-                var importedFrames = scoreManager.GetScore(imported)?.Replay?.Frames;
+                var importedScore = scoreManager.GetScore(imported);
+                var importedFrames = importedScore?.Replay?.Frames;
                 Assert.That(importedFrames, Has.Count.EqualTo(score.Replay.Frames.Count));
                 Assert.That(importedFrames?.Select(f => f.Time), Is.EqualTo(score.Replay.Frames.Select(f => f.Time)));
 
                 for (int i = 0; i < importedFrames?.Count; i++)
                     Assert.That(importedFrames[i].IsEquivalentTo(score.Replay.Frames[i]), Is.True, $"Frame {i} differs from the original input.");
+
+                Assert.That(importedScore?.ScoreInfo.GameplayEnvironmentSnapshot, Is.Not.Null);
+                Assert.That(importedScore!.ScoreInfo.GameplayEnvironmentSnapshot!.JudgeMode, Is.EqualTo(EzEnumJudgeMode.StableClassic));
+                Assert.That(importedScore.ScoreInfo.GameplayEnvironmentSnapshot.JudgePrecedence, Is.EqualTo(EzEnumJudgePrecedence.Earliest));
+                Assert.That(importedScore.ScoreInfo.GameplayEnvironmentSnapshot.OffsetPlusMania, Is.EqualTo(12.5));
+                Assert.That(importedScore.ScoreInfo.GameplayEnvironmentSnapshot.OffsetPlusNonMania, Is.EqualTo(-4.25));
+                Assert.That(importedScore.ScoreInfo.GameplayEnvironmentSnapshot.BmsPoorHitResultEnable, Is.True);
             }
             finally
             {
