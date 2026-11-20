@@ -598,7 +598,7 @@ namespace osu.Game.Rulesets.Mania.UI
                 if (OrderedHitPolicyHelper.IsUserTriggerJudgeableNow(entry.RoutedObject, judgementTime))
                     continue;
 
-                ((DrawableManiaHitObject)entry.RoutedObject).MissForcefully();
+                ((DrawableManiaHitObject)entry.JudgementObject).MissForcefully();
             }
 
             LaneController.NotifyJudged(hitObject);
