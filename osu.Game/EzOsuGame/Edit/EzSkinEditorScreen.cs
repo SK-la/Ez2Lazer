@@ -11,6 +11,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Cursor;
 using osu.Framework.Input;
@@ -44,8 +45,6 @@ using osu.Game.Screens.Edit;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
 using osuTK;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.EzOsuGame.Edit
 {
@@ -1662,7 +1661,8 @@ namespace osu.Game.EzOsuGame.Edit
                     }
 
                     string filePath = Path.Combine(directory, $"{exportName}.png");
-                    await image.SaveAsPngAsync(filePath).ConfigureAwait(false);
+                    using (var stream = File.Create(filePath))
+                        image.SaveAsPng(stream);
 
                     if (edit != null)
                         await edit.Finish().ConfigureAwait(false);
@@ -1703,7 +1703,7 @@ namespace osu.Game.EzOsuGame.Edit
                 {
                     try
                     {
-                        using Image<Rgba32> image = task.GetResultSafely();
+                        using RgbaImage image = task.GetResultSafely();
                         string filename = $"ez-skin-editor-preview-{DateTimeOffset.Now:yyyyMMdd-HHmmss}.png";
                         var exportStorage = (storage as OsuStorage)?.GetExportStorage() ?? storage.GetStorageForDirectory(@"exports");
 

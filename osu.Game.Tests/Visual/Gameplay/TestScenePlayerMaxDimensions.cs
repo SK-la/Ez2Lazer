@@ -10,14 +10,14 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.IO.Stores;
 using osu.Framework.Testing;
 using osu.Game.IO;
 using osu.Game.Rulesets;
 using osu.Game.Screens.Play;
 using osu.Game.Skinning;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
+using osu.Game.Utils;
 
 namespace osu.Game.Tests.Visual.Gameplay
 {
@@ -121,13 +121,14 @@ namespace osu.Game.Tests.Visual.Gameplay
 
                 private TextureUpload upscale(TextureUpload textureUpload)
                 {
-                    var image = Image.LoadPixelData(textureUpload.Data, textureUpload.Width, textureUpload.Height);
+                    var image = new RgbaImage(textureUpload.Width, textureUpload.Height, textureUpload.Data);
 
                     // The original texture upload will no longer be returned or used.
                     textureUpload.Dispose();
 
-                    image.Mutate(i => i.Resize(new Size(textureUpload.Width, textureUpload.Height) * scale_factor));
-                    return new TextureUpload(image);
+                    var upscaled = ImageProcessing.Resize(image, textureUpload.Width * scale_factor, textureUpload.Height * scale_factor, ResizeMode.Stretch);
+                    image.Dispose();
+                    return new TextureUpload(upscaled);
                 }
 
                 public Stream? GetStream(string name) => textureStore?.GetStream(name);

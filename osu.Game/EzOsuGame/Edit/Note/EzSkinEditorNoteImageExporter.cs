@@ -4,17 +4,16 @@
 using System;
 using System.IO;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Imaging;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Skinning;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using osu.Game.Utils;
 
 namespace osu.Game.EzOsuGame.Edit.Note
 {
     public static class EzSkinEditorNoteImageExporter
     {
-        public static Image<Rgba32>? Export(
+        public static RgbaImage? Export(
             IEzSkinEditorNoteRulesetProfile profile,
             EzSkinEditorNotePreviewRequest request,
             string mountedSkinPath)
@@ -25,7 +24,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
             return exportTap(profile, request, mountedSkinPath);
         }
 
-        private static Image<Rgba32>? exportTap(IEzSkinEditorNoteRulesetProfile profile, EzSkinEditorNotePreviewRequest request, string mountedSkinPath)
+        private static RgbaImage? exportTap(IEzSkinEditorNoteRulesetProfile profile, EzSkinEditorNotePreviewRequest request, string mountedSkinPath)
         {
             string? textureName = profile.ResolveTextureName(request.UseEzNoteVariants, EzManiaNotePart.Note, request.VariantId);
 
@@ -39,14 +38,14 @@ namespace osu.Game.EzOsuGame.Edit.Note
 
             int width = Math.Max(1, (int)Math.Round(request.Width));
             int height = Math.Max(1, (int)Math.Round(request.Height));
-            var result = new Image<Rgba32>(width, height);
+            var result = new RgbaImage(width, height);
 
             drawLayer(result, source, y: 0, width, height, request);
 
             return result;
         }
 
-        private static Image<Rgba32>? exportHold(IEzSkinEditorNoteRulesetProfile profile, EzSkinEditorNotePreviewRequest request, string mountedSkinPath)
+        private static RgbaImage? exportHold(IEzSkinEditorNoteRulesetProfile profile, EzSkinEditorNotePreviewRequest request, string mountedSkinPath)
         {
             using var head = loadTextureImage(mountedSkinPath, profile.ResolveTextureName(request.UseEzNoteVariants, EzManiaNotePart.HoldHead, request.VariantId));
             using var body = loadTextureImage(mountedSkinPath, profile.ResolveTextureName(request.UseEzNoteVariants, EzManiaNotePart.HoldBody, request.VariantId));
@@ -61,7 +60,7 @@ namespace osu.Game.EzOsuGame.Edit.Note
             int tailHeight = tail?.Height ?? 24;
             int bodyHeight = Math.Max(1, height - headHeight - tailHeight);
 
-            var result = new Image<Rgba32>(width, height);
+            var result = new RgbaImage(width, height);
             int y = 0;
 
             if (head != null)
@@ -82,18 +81,14 @@ namespace osu.Game.EzOsuGame.Edit.Note
             return result;
         }
 
-        private static void drawLayer(Image<Rgba32> result, Image<Rgba32> source, int y, int width, int height, EzSkinEditorNotePreviewRequest request)
+        private static void drawLayer(RgbaImage result, RgbaImage source, int y, int width, int height, EzSkinEditorNotePreviewRequest request)
         {
-            result.Mutate(ctx =>
-            {
-                using var layer = source.Clone();
-                layer.Mutate(c => c.Resize(width, height));
-                applyTint(layer, request.NoteColour, request.ColouringMode, request.ColouringRange, request.ColouringStrength);
-                ctx.DrawImage(layer, new Point(0, y), 1f);
-            });
+            using var layer = ImageProcessing.Resize(source, width, height, ResizeMode.Stretch);
+            applyTint(layer, request.NoteColour, request.ColouringMode, request.ColouringRange, request.ColouringStrength);
+            ImageProcessing.DrawImage(result, layer, 0, y);
         }
 
-        private static Image<Rgba32>? loadTextureImage(string mountedSkinPath, string? textureName)
+        private static RgbaImage? loadTextureImage(string mountedSkinPath, string? textureName)
         {
             if (textureName == null)
                 return null;
@@ -103,32 +98,24 @@ namespace osu.Game.EzOsuGame.Edit.Note
             if (!File.Exists(filePath))
                 return null;
 
-            return Image.Load<Rgba32>(filePath);
+            using var stream = File.OpenRead(filePath);
+            return ImageCodec.Decode(stream);
         }
 
-        private static void applyTint(Image<Rgba32> image, Colour4 tint, EzColouringMode mode, EzColouringRange range, double strength)
+        private static void applyTint(RgbaImage image, Colour4 tint, EzColouringMode mode, EzColouringRange range, double strength)
         {
             var algorithm = EzNoteRecolour.ToAlgorithm(mode);
             float whiteTolerance = (float)strength / 255f;
 
-            image.ProcessPixelRows(accessor =>
+            foreach (ref Rgba32 pixel in image.PixelSpan)
             {
-                for (int y = 0; y < accessor.Height; y++)
-                {
-                    Span<Rgba32> row = accessor.GetRowSpan(y);
-
-                    for (int x = 0; x < row.Length; x++)
-                    {
-                        ref Rgba32 pixel = ref row[x];
-                        var source = new Colour4(pixel.R / 255f, pixel.G / 255f, pixel.B / 255f, pixel.A / 255f);
-                        var result = EzNoteRecolour.ApplyStraight(source, tint, algorithm, range, whiteTolerance: whiteTolerance);
-                        pixel.R = toByte(result.R);
-                        pixel.G = toByte(result.G);
-                        pixel.B = toByte(result.B);
-                        pixel.A = toByte(result.A);
-                    }
-                }
-            });
+                var source = new Colour4(pixel.R / 255f, pixel.G / 255f, pixel.B / 255f, pixel.A / 255f);
+                var result = EzNoteRecolour.ApplyStraight(source, tint, algorithm, range, whiteTolerance: whiteTolerance);
+                pixel.R = toByte(result.R);
+                pixel.G = toByte(result.G);
+                pixel.B = toByte(result.B);
+                pixel.A = toByte(result.A);
+            }
         }
 
         private static byte toByte(float channel) => (byte)Math.Clamp((int)Math.Round(channel * 255f), 0, 255);

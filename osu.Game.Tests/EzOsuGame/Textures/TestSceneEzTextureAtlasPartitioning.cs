@@ -8,14 +8,13 @@ using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Logging;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Tests.Visual;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.Tests.EzOsuGame.Textures
 {
@@ -85,7 +84,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
             // 反推字形落在多大的图集页上：TextureRegion 的 UV 以整页为分母，故 页尺寸 = 区域像素宽 / UV 宽。
             AddAssert("整套字形落在同一张字形专用页", () =>
             {
-                var pageSizes = glyphTextures.Select(pageSizeOf).Distinct().ToArray();
+                float[] pageSizes = glyphTextures.Select(pageSizeOf).Distinct().ToArray();
 
                 Assert.That(pageSizes, Has.Length.EqualTo(1), "字形被拆到了多张图集页");
                 Assert.That(pageSizes[0], Is.EqualTo(glyph_atlas_size).Within(0.5f), $"字形没有落在字形专用页（实际页尺寸 {pageSizes[0]}）");
@@ -178,7 +177,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
 
             AddAssert("段位图确实落在图集页上（而非绕过图集）", () =>
             {
-                var pageSizes = badgeTextures.Select(t => pageSizeOf(t.texture)).Distinct().ToArray();
+                float[] pageSizes = badgeTextures.Select(t => pageSizeOf(t.texture)).Distinct().ToArray();
 
                 Assert.That(pageSizes, Has.Length.EqualTo(1), "段位图被拆到了多张图集页");
                 Assert.That(pageSizes[0], Is.EqualTo(1024).Within(0.5f), $"段位图没有落在图集页（实际页尺寸 {pageSizes[0]}）");
@@ -283,7 +282,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
 
         private void writePng(string path, int width, int height)
         {
-            using var image = new Image<Rgba32>(width, height);
+            using var image = new RgbaImage(width, height);
             using var stream = LocalStorage.GetStream(path, FileAccess.Write);
             image.SaveAsPng(stream);
         }
