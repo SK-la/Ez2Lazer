@@ -16,11 +16,11 @@ using osu.Game.Database;
 using osu.Game.EzOsuGame.Database;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.IO.Archives;
-using osu.Game.Rulesets;
-using osu.Game.Scoring.Legacy;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Rulesets;
+using osu.Game.Scoring.Legacy;
 using osu.Game.Utils;
 using Realms;
 
@@ -28,7 +28,7 @@ namespace osu.Game.Scoring
 {
     public class ScoreImporter : RealmArchiveModelImporter<ScoreInfo>
     {
-        public override IEnumerable<string> HandledExtensions => new[] { ".osr" };
+        public override IEnumerable<string> HandledExtensions => new[] { ".osr", EzReplayExportEncoder.EXTENSION };
 
         protected override string[] HashableFileTypes => new[] { ".osr", EzHighPrecisionReplayFrames.EXTENSION };
 
@@ -47,7 +47,24 @@ namespace osu.Game.Scoring
 
         protected override ScoreInfo? CreateModel(ArchiveReader archive, ImportParameters parameters)
         {
-            string name = archive.Filenames.First(f => f.EndsWith(".osr", StringComparison.OrdinalIgnoreCase));
+            bool isEzOsr = string.Equals(Path.GetExtension(archive.Name), EzReplayExportEncoder.EXTENSION, StringComparison.OrdinalIgnoreCase);
+            string name;
+
+            if (isEzOsr)
+            {
+                string[] filenames = archive.Filenames.ToArray();
+                name = EzReplayExportEncoder.LEGACY_REPLAY_FILENAME;
+
+                if (filenames.Length != 2 || !filenames.Contains(name) || !filenames.Contains(EzHighPrecisionReplayFrames.FILENAME))
+                    throw new InvalidDataException("The .ezosr archive must contain replay.osr and replay.ezframes.");
+
+                using var frameStream = archive.GetStream(EzHighPrecisionReplayFrames.FILENAME);
+
+                if (frameStream == null || !EzHighPrecisionReplayFrames.TryRead(frameStream, out _))
+                    throw new InvalidDataException("The .ezosr archive contains invalid replay frames.");
+            }
+            else
+                name = archive.Filenames.First(f => f.EndsWith(".osr", StringComparison.OrdinalIgnoreCase));
 
             using (var stream = archive.GetStream(name))
             {
@@ -61,11 +78,10 @@ namespace osu.Game.Scoring
 
                     if (!parameters.Batch)
                     {
-                        // Retain bytes now: download temp .osr files are not guaranteed to still exist when the beatmap later arrives.
-                        ArchiveReader? retainedArchive = retainScoreArchive(archive, name);
+                        ImportTask? pendingImport = retainScoreArchive(archive, name, isEzOsr);
 
                         var req = new GetBeatmapRequest(new BeatmapInfo { MD5Hash = notFound.Hash });
-                        req.Success += res => PostNotification?.Invoke(new MissingBeatmapNotification(res, notFound.Hash, retainedArchive));
+                        req.Success += res => PostNotification?.Invoke(new MissingBeatmapNotification(res, notFound.Hash, pendingImport));
                         api.Queue(req);
                     }
 
@@ -81,12 +97,21 @@ namespace osu.Game.Scoring
 
         public Score GetScore(ScoreInfo score) => new LegacyDatabasedScore(score, rulesets, beatmaps(), Files.Store);
 
-        private static ArchiveReader? retainScoreArchive(ArchiveReader archive, string name)
+        private static ImportTask? retainScoreArchive(ArchiveReader archive, string name, bool isEzOsr)
         {
             try
             {
-                using var copyStream = archive.GetStream(name);
-                return new MemoryStreamArchiveReader(new MemoryStream(copyStream.ReadAllBytesToArray()), name);
+                // The original file may be gone by the time the beatmap arrives.
+                using var replay = archive.GetStream(name);
+
+                if (!isEzOsr)
+                    return new ImportTask(new MemoryStream(replay.ReadAllBytesToArray()), name);
+
+                using var frames = archive.GetStream(EzHighPrecisionReplayFrames.FILENAME);
+                var copy = new MemoryStream();
+                EzReplayExportEncoder.WriteArchive(copy, replay, frames);
+                copy.Position = 0;
+                return new ImportTask(copy, archive.Name);
             }
             catch (Exception e)
             {

@@ -14,18 +14,22 @@ using osu.Framework.Extensions;
 using osu.Framework.Platform;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.IO.Archives;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Replays;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Osu.Mods;
+using osu.Game.Rulesets.Osu.Replays;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osu.Game.Tests.Beatmaps.IO;
 using osu.Game.Tests.Resources;
 using osu.Game.Users;
+using osuTK;
 
 namespace osu.Game.Tests.Scores.IO
 {
@@ -70,6 +74,65 @@ namespace osu.Game.Tests.Scores.IO
                 {
                     host.Exit();
                 }
+            }
+        }
+
+        [Test]
+        public void TestEzOsrImportPreservesInputFrames()
+        {
+            using var host = new CleanRunHeadlessGameHost();
+
+            try
+            {
+                var osu = LoadOsuIntoHost(host, true);
+                var beatmapSet = BeatmapImportHelper.LoadQuickOszIntoOsu(osu).GetResultSafely();
+                var beatmapInfo = beatmapSet.Beatmaps.First(b => b.Ruleset.OnlineID == 0);
+                var beatmapManager = osu.Dependencies.Get<BeatmapManager>();
+                var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+
+                var score = new Score
+                {
+                    ScoreInfo = new ScoreInfo
+                    {
+                        BeatmapInfo = beatmapInfo,
+                        Ruleset = beatmapInfo.Ruleset,
+                        User = new APIUser { Username = "Test user" },
+                        TotalScore = 987654,
+                        Date = DateTimeOffset.Now,
+                    },
+                    Replay = new Replay
+                    {
+                        Frames =
+                        {
+                            new OsuReplayFrame(1000.125, new Vector2(128.5f, 256), OsuAction.LeftButton),
+                            new OsuReplayFrame(1000.375, new Vector2(129, 257.5f)),
+                            new OsuReplayFrame(1100.25, new Vector2(150, 260), OsuAction.RightButton),
+                        }
+                    }
+                };
+
+                using var archive = new MemoryStream();
+                EzReplayExportEncoder.EncodeEzOsr(score, workingBeatmap.Beatmap, archive);
+                archive.Position = 0;
+
+                osu.Import(new[] { new ImportTask(archive, "replay.ezosr") }).WaitSafely();
+
+                var scoreManager = osu.Dependencies.Get<ScoreManager>();
+                var imported = scoreManager.Query(_ => true);
+                Assert.That(imported, Is.Not.Null);
+                Assert.That(imported.TotalScore, Is.EqualTo(score.ScoreInfo.TotalScore));
+                Assert.That(imported.User.Username, Is.EqualTo(score.ScoreInfo.User.Username));
+
+                var importedFrames = scoreManager.GetScore(imported)?.Replay?.Frames;
+                Assert.That(importedFrames, Has.Count.EqualTo(score.Replay.Frames.Count));
+                Assert.That(importedFrames.Select(f => f.Time), Is.EqualTo(score.Replay.Frames.Select(f => f.Time)));
+
+                for (int i = 0; i < importedFrames.Count; i++)
+                    Assert.That(importedFrames[i].IsEquivalentTo(score.Replay.Frames[i]), Is.True, $"Frame {i} differs from the original input.");
+            }
+            finally
+            {
+                host.Exit();
             }
         }
 

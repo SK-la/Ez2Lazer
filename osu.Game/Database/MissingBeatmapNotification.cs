@@ -9,7 +9,6 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Drawables.Cards;
 using osu.Game.Configuration;
-using osu.Game.IO.Archives;
 using osu.Game.Localisation;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays.Notifications;
@@ -29,7 +28,7 @@ namespace osu.Game.Database
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
-        private readonly ArchiveReader? scoreArchive;
+        private readonly ImportTask? pendingImport;
         private readonly APIBeatmapSet beatmapSetInfo;
         private readonly string beatmapHash;
 
@@ -44,13 +43,13 @@ namespace osu.Game.Database
         /// </summary>
         /// <param name="beatmap">The online-retrieved beatmap to download.</param>
         /// <param name="beatmapHash">The hash of the beatmap that is required to proceed.</param>
-        /// <param name="scoreArchive">Optional archive with a score. If not <see langword="null"/>, a re-import of this archive will be attempted after the missing beatmap is downloaded.</param>
-        public MissingBeatmapNotification(APIBeatmap beatmap, string beatmapHash, ArchiveReader? scoreArchive)
+        /// <param name="pendingImport">Optional score import to retry after the missing beatmap is downloaded.</param>
+        public MissingBeatmapNotification(APIBeatmap beatmap, string beatmapHash, ImportTask? pendingImport)
         {
             beatmapSetInfo = beatmap.BeatmapSet!;
 
             this.beatmapHash = beatmapHash;
-            this.scoreArchive = scoreArchive;
+            this.pendingImport = pendingImport;
         }
 
         [BackgroundDependencyLoader]
@@ -96,12 +95,8 @@ namespace osu.Game.Database
 
             try
             {
-                if (scoreArchive != null)
-                {
-                    string name = scoreArchive.Filenames.First(f => f.EndsWith(".osr", StringComparison.OrdinalIgnoreCase));
-                    var importTask = new ImportTask(scoreArchive.GetStream(name), name);
-                    scoreManager.Import(new[] { importTask });
-                }
+                if (pendingImport != null)
+                    scoreManager.Import(new[] { pendingImport });
             }
             catch (Exception e)
             {

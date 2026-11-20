@@ -48,6 +48,7 @@ namespace osu.Desktop.Windows
             new FileAssociation(@".osz", WindowsAssociationManagerStrings.OsuBeatmap, Icons.Beatmap),
             new FileAssociation(@".olz", WindowsAssociationManagerStrings.OsuBeatmap, Icons.Beatmap),
             new FileAssociation(@".osr", WindowsAssociationManagerStrings.OsuReplay, Icons.Beatmap),
+            new FileAssociation(@".ezosr", WindowsAssociationManagerStrings.OsuReplay, Icons.Beatmap),
             new FileAssociation(@".osk", WindowsAssociationManagerStrings.OsuSkin, Icons.Beatmap),
         };
 
