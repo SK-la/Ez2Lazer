@@ -67,6 +67,10 @@ jobs:
       - name: Build and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # 引用只作为环境变量进入脚本。写进 run 时，分支名里的 $() 会在展开后被 PowerShell 执行。
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         shell: powershell
         run: |
           $beginArgs = @(
@@ -74,9 +78,9 @@ jobs:
             "/k:SK-la_Ez2Lazer",
             "/o:sk-la",
             "/d:sonar.token=$env:SONAR_TOKEN",
-            "/d:sonar.pullrequest.key=${{ github.event.pull_request.number }}",
-            "/d:sonar.pullrequest.branch=${{ github.event.pull_request.head.ref }}",
-            "/d:sonar.pullrequest.base=${{ github.event.pull_request.base.ref }}"
+            "/d:sonar.pullrequest.key=$env:PR_NUMBER",
+            "/d:sonar.pullrequest.branch=$env:PR_HEAD_REF",
+            "/d:sonar.pullrequest.base=$env:PR_BASE_REF"
           )
           & "${{ runner.temp }}\scanner\dotnet-sonarscanner" @beginArgs
 
@@ -171,6 +175,10 @@ jobs:
       - name: Build and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # 引用只作为环境变量进入脚本。写进 run 时，分支名里的 $() 会在展开后被 PowerShell 执行。
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          PR_HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          PR_BASE_REF: ${{ steps.pr.outputs.base_ref }}
         shell: powershell
         run: |
           $beginArgs = @(
@@ -178,9 +186,9 @@ jobs:
             "/k:SK-la_Ez2Lazer",
             "/o:sk-la",
             "/d:sonar.token=$env:SONAR_TOKEN",
-            "/d:sonar.pullrequest.key=${{ steps.pr.outputs.number }}",
-            "/d:sonar.pullrequest.branch=${{ steps.pr.outputs.head_ref }}",
-            "/d:sonar.pullrequest.base=${{ steps.pr.outputs.base_ref }}"
+            "/d:sonar.pullrequest.key=$env:PR_NUMBER",
+            "/d:sonar.pullrequest.branch=$env:PR_HEAD_REF",
+            "/d:sonar.pullrequest.base=$env:PR_BASE_REF"
           )
           & "${{ runner.temp }}\scanner\dotnet-sonarscanner" @beginArgs
 
