@@ -12,6 +12,7 @@ using osu.Framework.Platform;
 using osu.Game.Extensions;
 using osu.Game.IO.Archives;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Utils;
 using Realms;
 using SharpCompress.Common;
 using SharpCompress.Writers;
@@ -55,8 +56,10 @@ namespace osu.Game.Database
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (filesWritten.Contains(filename))
-                        throw new InvalidOperationException($"Error when exporting {model.GetDisplayString()}: Multiple files specify filename of {filename}");
+                    string entryName = FilesystemSanityCheckHelpers.GetSafeArchiveEntryName(filename);
+
+                    if (filesWritten.Contains(entryName))
+                        throw new InvalidOperationException($"Error when exporting {model.GetDisplayString()}: Multiple files specify filename of {entryName}");
 
                     using (stream)
                     {
@@ -67,8 +70,8 @@ namespace osu.Game.Database
                             continue;
                         }
 
-                        writer.Write(filename, stream);
-                        filesWritten.Add(filename);
+                        writer.Write(entryName, stream);
+                        filesWritten.Add(entryName);
                     }
 
                     i++;

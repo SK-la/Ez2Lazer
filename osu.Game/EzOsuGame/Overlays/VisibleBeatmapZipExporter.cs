@@ -167,7 +167,8 @@ namespace osu.Game.EzOsuGame.Overlays
                     if (stream == null)
                         continue;
 
-                    writer.Write($"{rootDirectory}/{beatmapSet.DirectoryName}/{file.Filename}".Replace('\\', '/'), stream);
+                    string entryName = $"{rootDirectory}/{beatmapSet.DirectoryName}/{file.Filename}".Replace('\\', '/');
+                    writer.Write(FilesystemSanityCheckHelpers.GetSafeArchiveEntryName(entryName), stream);
 
                     exportedFiles++;
                 }
