@@ -128,9 +128,11 @@ namespace osu.Game.EzOsuGame.Skills.SSR
             double? officialStar = beatmapInfo.StarRating < 0 && official.Star >= 0 ? official.Star : null;
             double? officialPp = beatmapInfo.PerformancePoints < 0 && official.Pp >= 0 ? official.Pp : null;
 
-            IReadOnlyDictionary<string, double>? keyPatternSkills = string.IsNullOrEmpty(beatmapInfo.Hash) || ssr.Chart is not { } chart
-                ? null
-                : EzKeyPatternUnit.BuildSkillsForPersistence(chart, star, cancellationToken);
+            IReadOnlyDictionary<string, double>? keyPatternSkills = string.IsNullOrEmpty(beatmapInfo.Hash)
+                || ssr.Chart is not { } chart
+                || ssr.KeyPatternRadar is not { } relative
+                    ? null
+                    : EzKeyPatternUnit.BuildSkillsForPersistence(chart, relative, star);
 
             return new EzSunnyMaintenanceResult(
                 RequiresStore: true,
@@ -202,8 +204,8 @@ namespace osu.Game.EzOsuGame.Skills.SSR
 
             var ssr = EzAnalysisComputation.ComputeSsr(playable, beatmapInfo.Ruleset.OnlineID, 1, cancellationToken);
             IReadOnlyDictionary<string, double>? ssrAxes;
-            IReadOnlyDictionary<string, double>? keyPatternAxes = ssr.Chart is { } chart
-                ? EzKeyPatternUnit.BuildSkillsForPersistence(chart, beatmapInfo.EzRatingData.SunnySR, cancellationToken)
+            IReadOnlyDictionary<string, double>? keyPatternAxes = ssr.Chart is { } chart && ssr.KeyPatternRadar is { } relative
+                ? EzKeyPatternUnit.BuildSkillsForPersistence(chart, relative, beatmapInfo.EzRatingData.SunnySR)
                 : null;
 
             if (playable.HitObjects.Count == 0)
