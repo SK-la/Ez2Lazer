@@ -108,5 +108,78 @@ namespace osu.Game.Tests.EzOsuGame.Background.Pixiv
         {
             Assert.That(PixivApiProxy.NormalizeBase("https://pixiv.example.com/"), Is.EqualTo("https://pixiv.example.com"));
         }
+
+        [Test]
+        public void TestOfficialAndRewrittenApiUrlsAreAllowed()
+        {
+            const string proxy = "https://pixiv.example.com";
+            const string vercel = "https://pixiv-proxy-ivory.vercel.app/api";
+
+            Assert.That(PixivApiProxy.IsAllowedApiUrl(official_follow, null), Is.True);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl(official_follow, "   "), Is.True);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl(PixivApiProxy.RewriteApiUrl(official_follow, proxy), proxy), Is.True);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl(PixivApiProxy.RewriteApiUrl(official_follow, vercel), vercel), Is.True);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("https://pixiv.example.com/v2/illust/follow?restrict=public&max_id=123", proxy), Is.True);
+        }
+
+        [Test]
+        public void TestAttackerNextUrlIsNotRewrittenAndIsRejected()
+        {
+            const string proxy = "https://pixiv.example.com";
+            const string next = "https://attacker.example/collect";
+
+            Assert.That(PixivApiProxy.RewriteApiUrl(next, proxy), Is.EqualTo(next));
+            Assert.That(PixivApiProxy.IsAllowedApiUrl(next, proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl(next, null), Is.False);
+        }
+
+        [Test]
+        public void TestApiAllowlistRejectsUntrustedHosts()
+        {
+            const string proxy = "https://pixiv.example.com";
+
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("http://app-api.pixiv.net/v2/illust/follow", null), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("https://app-api.pixiv.net:4443/v2/illust/follow", null), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("https://app-api.pixiv.net.attacker.example/v2", null), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("https://oauth.secure.pixiv.net/auth/token", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("http://pixiv.example.com/v2/illust/follow", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("https://pixiv.example.com:8443/v2/illust/follow", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("https://evil.pixiv.example.com/v2/illust/follow", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("https://pixiv.example.com.attacker.example/v2", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("/v2/illust/follow", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl(string.Empty, proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("https://app-api.pixiv.net@attacker.example/collect", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("https://attacker.example@app-api.pixiv.net/v2/illust/follow", null), Is.False);
+        }
+
+        [Test]
+        public void TestImageAllowlist()
+        {
+            const string proxy = "https://pixiv.example.com";
+            const string image = "https://i.pximg.net/img-original/img/2024/01/01/12345_p0.png";
+
+            Assert.That(PixivApiProxy.IsAllowedImageUrl(image, null), Is.True);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl(PixivApiProxy.RewriteImageUrl(image, proxy), proxy), Is.True);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("https://pixiv.example.com/image/img-original/img/a.png", proxy), Is.True);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("https://example.com/foo.png", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("http://169.254.169.254/latest/meta-data/", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("http://127.0.0.1/", null), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("file:///etc/passwd", null), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("http://i.pximg.net/a.png", null), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("https://i.pximg.net.attacker.example/a.png", null), Is.False);
+            Assert.That(PixivApiProxy.RewriteImageUrl("https://example.com/foo.png", proxy), Is.EqualTo("https://example.com/foo.png"));
+        }
+
+        [Test]
+        public void TestLocalProxyDoesNotAllowOtherLoopbackTargets()
+        {
+            const string proxy = "http://127.0.0.1:8080";
+
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("http://127.0.0.1:8080/image/a.png", proxy), Is.True);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("http://127.0.0.1/a.png", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedImageUrl("http://127.0.0.1:8081/a.png", proxy), Is.False);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("http://127.0.0.1:8080/v2/illust/follow", proxy), Is.True);
+            Assert.That(PixivApiProxy.IsAllowedApiUrl("http://169.254.169.254/collect", proxy), Is.False);
+        }
     }
 }
