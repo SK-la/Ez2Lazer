@@ -16,7 +16,6 @@ using SharpCompress.Archives;
 using SharpCompress.Archives.Zip;
 using SharpCompress.Common;
 using SharpCompress.Readers;
-using SixLabors.ImageSharp.Memory;
 
 namespace osu.Game.IO.Archives
 {
@@ -131,9 +130,18 @@ namespace osu.Game.IO.Archives
 
                 if (entry.Size > 0)
                 {
-                    var owner = MemoryAllocator.Default.Allocate<byte>((int)entry.Size);
-                    s.ReadExactly(owner.Memory.Span);
-                    return new MemoryOwnerMemoryStream(owner);
+                    int entryLength = checked((int)entry.Size);
+                    var owner = MemoryPool<byte>.Shared.Rent(entryLength);
+                    try
+                    {
+                        s.ReadExactly(owner.Memory.Span[..entryLength]);
+                        return new MemoryOwnerMemoryStream(owner, entryLength);
+                    }
+                    catch
+                    {
+                        owner.Dispose();
+                        throw;
+                    }
                 }
 
                 // due to a sharpcompress bug (https://github.com/adamhathcock/sharpcompress/issues/88),
@@ -158,11 +166,11 @@ namespace osu.Game.IO.Archives
             private readonly IMemoryOwner<byte> owner;
             private readonly Stream stream;
 
-            public MemoryOwnerMemoryStream(IMemoryOwner<byte> owner)
+            public MemoryOwnerMemoryStream(IMemoryOwner<byte> owner, int length)
             {
                 this.owner = owner;
 
-                stream = owner.Memory.AsStream();
+                stream = owner.Memory[..length].AsStream();
             }
 
             protected override void Dispose(bool disposing)
