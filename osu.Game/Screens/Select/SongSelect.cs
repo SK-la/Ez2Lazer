@@ -758,8 +758,9 @@ namespace osu.Game.Screens.Select
                     if (!stillPresent)
                     {
                         Beatmap.SetDefault();
+                        bool picked = carousel.NextRandom();
                         performDebounceSelection();
-                        return false;
+                        return picked;
                     }
                 }
 
@@ -797,8 +798,9 @@ namespace osu.Game.Screens.Select
                     }
                 }
 
-                // If all else fails, use the default beatmap.
+                // If all else fails, use the default beatmap, then try a random selection.
                 Beatmap.SetDefault();
+                validSelection = carousel.NextRandom();
                 performDebounceSelection();
 
                 return validSelection;
