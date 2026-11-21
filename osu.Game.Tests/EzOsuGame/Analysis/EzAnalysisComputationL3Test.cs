@@ -36,6 +36,22 @@ namespace osu.Game.Tests.EzOsuGame.Analysis
         }
 
         [Test]
+        public void Mania_pass_mina_matches_the_playable_write_path()
+        {
+            var beatmap = new TestBeatmap(new ManiaRuleset().RulesetInfo);
+            var working = new TestWorkingBeatmap(beatmap);
+            var lookup = new EzAnalysisLookupCache(beatmap.BeatmapInfo, beatmap.BeatmapInfo.Ruleset, mods: null);
+
+            var result = EzAnalysisComputation.Compute(working, lookup);
+            var playable = working.GetPlayableBeatmap(lookup.Ruleset, lookup.OrderedMods);
+            var written = EzAnalysisComputation.ComputeMinaAxes(beatmap.BeatmapInfo.Ruleset.OnlineID, playable, 1);
+
+            Assert.That(written, Is.Not.Null);
+            Assert.That(result.AxesOf(EzAnalysisSystem.Mina)[EzMinaSkillAxis.Overall.ToMetaId()],
+                Is.EqualTo(written!.Value.Axes[EzMinaSkillAxis.Overall.ToMetaId()]));
+        }
+
+        [Test]
         public void Mania_pass_uses_persisted_sunny_star_for_headline()
         {
             var beatmap = new TestBeatmap(new ManiaRuleset().RulesetInfo);

@@ -139,13 +139,19 @@ namespace osu.Game.EzOsuGame.Skills.SkillTag.KeyPattern
             ArgumentNullException.ThrowIfNull(chart);
 
             var relative = ComputeRadar(chart, cancellationToken);
+            return BuildSkillsForPersistence(chart, relative, sunnySR);
+        }
+
+        public static IReadOnlyDictionary<string, double>? BuildSkillsForPersistence(EzManiaChartInput chart, EzRadarChartData<string> relative, double sunnySR)
+        {
+            ArgumentNullException.ThrowIfNull(chart);
+
             bool emptyChart = chart.Notes.Count == 0;
 
             if (!emptyChart && !IsQuantifiableSunny(sunnySR))
                 return null;
 
-            var stored = emptyChart ? relative : Quantify(relative, sunnySR);
-            return ToSkills(stored);
+            return ToSkills(emptyChart ? relative : Quantify(relative, sunnySR));
         }
 
         /// <summary>Relative 0–10 scores for the five persistable axes. No LN%.</summary>
