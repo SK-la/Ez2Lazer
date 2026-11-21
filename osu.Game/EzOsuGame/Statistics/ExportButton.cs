@@ -109,6 +109,7 @@ namespace osu.Game.EzOsuGame.Statistics
                         {
                             new OsuMenuItem(ExportStrings.EXPORT_OSU, MenuItemType.Standard, () => Task.Run(exportOsu)),
                             new OsuMenuItem(ExportStrings.EXPORT_OSZ, MenuItemType.Standard, () => Task.Run(exportOszLegacy)),
+                            new OsuMenuItem(ExportStrings.EXPORT_OLZ, MenuItemType.Standard, () => Task.Run(exportOlz)),
                         }.Concat(createReplayExportItems()).ToArray(),
                         MaxHeight = 375,
                     },
@@ -139,7 +140,15 @@ namespace osu.Game.EzOsuGame.Statistics
                 if (beatmapInfo.BeatmapSet == null)
                     return;
 
-                exportArchive(beatmapInfo.BeatmapSet);
+                exportArchive(beatmapInfo.BeatmapSet, @".osz", useFixedEncoding: true);
+            }
+
+            private void exportOlz()
+            {
+                if (beatmapInfo.BeatmapSet == null)
+                    return;
+
+                exportArchive(beatmapInfo.BeatmapSet, @".olz", useFixedEncoding: false);
             }
 
             private void exportOsu()
@@ -192,9 +201,8 @@ namespace osu.Game.EzOsuGame.Statistics
                 notification.State = ProgressNotificationState.Completed;
             }
 
-            private void exportArchive(BeatmapSetInfo beatmapSet)
+            private void exportArchive(BeatmapSetInfo beatmapSet, string extension, bool useFixedEncoding)
             {
-                const string extension = @".osz";
                 string itemFilename = beatmapSet.GetDisplayString().GetValidFilename();
 
                 if (itemFilename.Length > LegacyExporter<BeatmapSetInfo>.MAX_FILENAME_LENGTH - extension.Length)
@@ -220,7 +228,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
                     var zipWriterOptions = new ZipWriterOptions(CompressionType.Deflate)
                     {
-                        ArchiveEncoding = ZipArchiveReader.DEFAULT_ENCODING
+                        ArchiveEncoding = useFixedEncoding ? ZipArchiveReader.DEFAULT_ENCODING : new ArchiveEncoding { Default = Encoding.UTF8, Password = Encoding.UTF8 }
                     };
 
                     using var writer = new ZipWriter(outStream, zipWriterOptions);
@@ -286,6 +294,9 @@ namespace osu.Game.EzOsuGame.Statistics
 
             internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_OSZ = new EzLocalizationManager.EzLocalisableString(
                 "导出本次游玩谱包为 .osz", "Export played beatmap set as .osz");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_OLZ = new EzLocalizationManager.EzLocalisableString(
+                "导出本次游玩谱包为 .olz（lazer）", "Export played beatmap set as .olz (lazer)");
 
             internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_OSR = new EzLocalizationManager.EzLocalisableString(
                 "导出本次游玩回放为 .osr（普通精度）", "Export played replay as .osr (standard precision)");
