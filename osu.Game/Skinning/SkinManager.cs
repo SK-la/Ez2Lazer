@@ -686,7 +686,7 @@ namespace osu.Game.Skinning
                 CurrentSkin.Value = getOrLoadScriptedSkin(skinInfo);
             });
 
-            SourceChanged.Invoke();
+            SourceChanged?.Invoke();
         }
 
         public void ReloadCurrentLegacyFolderSkinIfActive()
@@ -703,7 +703,7 @@ namespace osu.Game.Skinning
                     previous?.Dispose();
             });
 
-            SourceChanged.Invoke();
+            SourceChanged?.Invoke();
         }
 
         public void RefreshLegacySkinCatalog()
@@ -944,7 +944,9 @@ namespace osu.Game.Skinning
             return null;
         }
 
-        public event Action SourceChanged;
+#nullable enable
+        public event Action? SourceChanged;
+#nullable disable
 
         public Drawable GetDrawableComponent(ISkinComponentLookup lookup) => lookupWithFallback(s => s.GetDrawableComponent(lookup));
 

@@ -26,12 +26,20 @@ namespace osu.Game.EzOsuGame.Scoring
         /// <summary>架构注册表 markdown 文件名（文档用）。</summary>
         public const string EZ_SR_TL_REGISTRY = "docs/scoring/session.md";
 
-        public static EzScoreTimeline? TryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap = null,
-                                                IEzScoreTimelineCache? cache = null, CancellationToken cancellationToken = default)
+        public static EzScoreTimeline? TryBuild(ScoreManager scoreManager,
+                                                BeatmapManager beatmaps,
+                                                ScoreInfo scoreInfo,
+                                                IBeatmap? sharedPlayableBeatmap = null,
+                                                IEzScoreTimelineCache? cache = null,
+                                                CancellationToken cancellationToken = default)
             => tryBuild(scoreManager, beatmaps, scoreInfo, sharedPlayableBeatmap, cache ?? NullEzScoreTimelineCache.INSTANCE, cancellationToken);
 
-        private static EzScoreTimeline? tryBuild(ScoreManager scoreManager, BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap,
-                                                 IEzScoreTimelineCache cache, CancellationToken cancellationToken)
+        private static EzScoreTimeline? tryBuild(ScoreManager scoreManager,
+                                                 BeatmapManager beatmaps,
+                                                 ScoreInfo scoreInfo,
+                                                 IBeatmap? sharedPlayableBeatmap,
+                                                 IEzScoreTimelineCache cache,
+                                                 CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(scoreManager);
             ArgumentNullException.ThrowIfNull(beatmaps);
@@ -45,7 +53,8 @@ namespace osu.Game.EzOsuGame.Scoring
             // Modes that attach a beatmap provider take their chart from the provider, which derives a per-JudgeMode
             // copy from the score's own beatmap. Converting one here as well would produce a second, discarded copy of
             // the same chart, so only the availability of the source is checked.
-            bool usesBeatmapProvider = timelineMode is EzScoreRaceGhostTimelineMode.ManiaSession or EzScoreRaceGhostTimelineMode.OsuSession;
+            bool usesBeatmapProvider = timelineMode == EzScoreRaceGhostTimelineMode.OsuSession
+                                       || (timelineMode == EzScoreRaceGhostTimelineMode.ManiaSession && sharedPlayableBeatmap == null);
 
             var workingBeatmap = beatmaps.GetWorkingBeatmap(scoreInfo.BeatmapInfo);
 
@@ -136,7 +145,9 @@ namespace osu.Game.EzOsuGame.Scoring
             return timeline;
         }
 
-        private static IBeatmap? resolvePlayableBeatmap(BeatmapManager beatmaps, ScoreInfo scoreInfo, IBeatmap? sharedPlayableBeatmap,
+        private static IBeatmap? resolvePlayableBeatmap(BeatmapManager beatmaps,
+                                                        ScoreInfo scoreInfo,
+                                                        IBeatmap? sharedPlayableBeatmap,
                                                         CancellationToken cancellationToken)
         {
             if (sharedPlayableBeatmap != null)

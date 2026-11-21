@@ -89,7 +89,14 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
 
                         using var replayStream = new MemoryStream();
                         new LegacyScoreEncoder(score, playableBeatmap).Encode(replayStream);
-                        var imported = ImportScoreTest.LoadScoreIntoOsu(osu, score.ScoreInfo, new ByteArrayArchiveReader(replayStream.ToArray(), "replay.osr"));
+                        byte[] encodedReplay = replayStream.ToArray();
+
+                        var imported = ImportScoreTest.LoadScoreIntoOsu(osu, score.ScoreInfo, new ByteArrayArchiveReader(encodedReplay, "replay.osr"));
+                        var databasedScore = scoreManager.GetScore(imported);
+
+                        Assert.That(EzScoreRaceRulesetSupport.GetGhostTimelineMode(imported.Ruleset), Is.Not.EqualTo(EzScoreRaceGhostTimelineMode.None));
+                        Assert.That(databasedScore?.ScoreInfo.Files.Select(file => file.Filename), Does.Contain("replay.osr"), "the imported score must retain its replay file");
+                        Assert.That(databasedScore?.Replay?.Frames, Is.Not.Empty, "the imported score must retain its replay frames");
 
                         // Modes with a beatmap provider take the chart from the provider, so production hands them no
                         // playable at all; the others reuse one session-ready conversion.
@@ -100,13 +107,12 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
 
                         builderTimeline = EzScoreTimelineBuilder.TryBuild(scoreManager, beatmapManager, imported, sharedPlayableBeatmap: sharedPlayable);
 
-                        var databasedScore = scoreManager.GetScore(imported)!;
                         var session = ruleset.CreateEzReplaySession()!;
 
                         if (usesProvider)
                             session.AttachBeatmaps(beatmapManager);
 
-                        sessionTotal = session.RunTimelineDirect(databasedScore, sharedPlayable ?? playableBeatmap, ReplayRunPurpose.ForLive).FinalTotalScore;
+                        sessionTotal = session.RunTimelineDirect(databasedScore!, sharedPlayable ?? playableBeatmap, ReplayRunPurpose.ForLive).FinalTotalScore;
                     }
                     catch (Exception ex)
                     {
@@ -135,7 +141,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
 
         private static bool usesBeatmapProvider(Ruleset ruleset)
             => EzScoreRaceRulesetSupport.GetGhostTimelineMode(ruleset.RulesetInfo)
-               is EzScoreRaceGhostTimelineMode.ManiaSession or EzScoreRaceGhostTimelineMode.OsuSession;
+                is EzScoreRaceGhostTimelineMode.ManiaSession or EzScoreRaceGhostTimelineMode.OsuSession;
 
         private static BeatmapInfo findBeatmap(BeatmapManager beatmapManager, RulesetInfo rulesetInfo)
         {

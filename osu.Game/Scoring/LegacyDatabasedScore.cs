@@ -20,6 +20,7 @@ namespace osu.Game.Scoring
         public LegacyDatabasedScore(ScoreInfo score, RulesetStore rulesets, BeatmapManager beatmaps, IResourceStore<byte[]> store)
         {
             ScoreInfo = score;
+            bool highPrecisionReplayLoaded = false;
 
             string ezFramesPath = score.Files.FirstOrDefault(f => f.Filename.EndsWith(EzHighPrecisionReplayFrames.EXTENSION, StringComparison.OrdinalIgnoreCase))?.File.GetStoragePath();
 
@@ -34,6 +35,7 @@ namespace osu.Game.Scoring
 
                         Replay = new Replay();
                         EzHighPrecisionReplayFrames.PopulateReplay(Replay, legacyFrames, ruleset, playable);
+                        highPrecisionReplayLoaded = true;
                     }
                 }
             }
@@ -57,7 +59,8 @@ namespace osu.Game.Scoring
                     score.GameplayEnvironmentSnapshot = environment;
                 }
 
-                Replay ??= decoded.Replay;
+                if (!highPrecisionReplayLoaded)
+                    Replay = decoded.Replay;
             }
         }
     }

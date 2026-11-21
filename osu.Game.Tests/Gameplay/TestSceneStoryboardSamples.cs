@@ -354,11 +354,13 @@ namespace osu.Game.Tests.Gameplay
         public void TestStoryboardSampleFollowsHitsoundWithRealTrack()
         {
             DrawableStoryboardSample sample = null;
-            var hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume);
-            var musicVolume = Audio.VolumeTrack;
+            Bindable<double> hitsoundVolume = null;
+            Bindable<double> musicVolume = null;
 
             AddStep("select mania beatmap with a real track", () =>
             {
+                hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume);
+                musicVolume = Audio.VolumeTrack;
                 Beatmap.Value = new RealTrackWorkingBeatmap(new ManiaRuleset().RulesetInfo, Audio);
 
                 var ruleset = new ManiaRuleset();
@@ -380,7 +382,7 @@ namespace osu.Game.Tests.Gameplay
             AddAssert("volume unaffected by music", () => sample.Volume.Value == hitsoundVolume.Value);
 
             AddStep("restore music volume", () => musicVolume.Value = 1);
-            AddStep("restore default", hitsoundVolume.SetDefault);
+            AddStep("restore default", () => hitsoundVolume.SetDefault());
         }
 
         /// <summary>

@@ -197,6 +197,7 @@ namespace osu.Game.Rulesets.Mania.Tests.EzMania.ReplayInputNotes
         private static EzReplayInputNoteModel load(IBeatmap beatmap, Replay replay)
         {
             var model = new EzReplayInputNoteModel();
+            model.ShowOverlay.Value = true;
             model.Load(replay, beatmap);
             return model;
         }
