@@ -32,40 +32,80 @@ namespace osu.Game.EzOsuGame.UserInterface
                 return;
 
             float half = thickness * 0.5f;
-            var edge = new Color4(colour.R, colour.G, colour.B, 0);
+            var drawColour = getStrokeColour(colour);
             int segments = closed ? count : count - 1;
 
             for (int i = 0; i < segments; i++)
             {
-                int next = closed ? (i + 1) % count : i + 1;
-                Vector2 start = points[i];
-                Vector2 end = points[next];
-                Vector2 delta = end - start;
-
-                if (delta.LengthSquared < 0.000001f)
+                if (!tryCreateQuads(points, i, half, closed, out var first, out var second))
                     continue;
 
-                Vector2 side = perpendicular(delta);
-                Vector2 startOffset = miterOffset(points, i, side, half, closed);
-                Vector2 endOffset = miterOffset(points, next, side, half, closed);
-
-                drawHalf(renderer, texture, start, end, startOffset, endOffset, colour, edge);
-                drawHalf(renderer, texture, start, end, -startOffset, -endOffset, colour, edge);
+                renderer.DrawQuad(texture, first, drawColour);
+                renderer.DrawQuad(texture, second, drawColour);
             }
         }
 
-        private static void drawHalf(IRenderer renderer, Texture texture, Vector2 start, Vector2 end, Vector2 startOffset, Vector2 endOffset, Color4 core, Color4 edge)
+        // The destination must hold up to two quads per segment.
+        public static int BuildOpenQuads(ReadOnlySpan<Vector2> points, float thickness, Span<Quad> quads)
         {
-            var quad = new Quad(start + startOffset, end + endOffset, start, end);
-            var colour = new ColourInfo
+            if (thickness <= 0)
+                return 0;
+
+            int count = 0;
+            float half = thickness * 0.5f;
+
+            for (int i = 0; i < points.Length - 1; i++)
+            {
+                if (!tryCreateQuads(points, i, half, false, out var first, out var second))
+                    continue;
+
+                quads[count++] = first;
+                quads[count++] = second;
+            }
+
+            return count;
+        }
+
+        public static void Draw(IRenderer renderer, Texture texture, ReadOnlySpan<Quad> quads, Color4 colour)
+        {
+            var drawColour = getStrokeColour(colour);
+
+            foreach (var quad in quads)
+                renderer.DrawQuad(texture, quad, drawColour);
+        }
+
+        private static ColourInfo getStrokeColour(Color4 core)
+        {
+            var edge = new Color4(core.R, core.G, core.B, 0);
+            return new ColourInfo
             {
                 TopLeft = edge,
                 TopRight = edge,
                 BottomLeft = core,
                 BottomRight = core,
             };
+        }
 
-            renderer.DrawQuad(texture, quad, colour);
+        private static bool tryCreateQuads(ReadOnlySpan<Vector2> points, int index, float half, bool closed, out Quad first, out Quad second)
+        {
+            int next = closed ? (index + 1) % points.Length : index + 1;
+            Vector2 start = points[index];
+            Vector2 end = points[next];
+            Vector2 delta = end - start;
+
+            if (delta.LengthSquared < 0.000001f)
+            {
+                first = second = default;
+                return false;
+            }
+
+            Vector2 side = perpendicular(delta);
+            Vector2 startOffset = miterOffset(points, index, side, half, closed);
+            Vector2 endOffset = miterOffset(points, next, side, half, closed);
+
+            first = new Quad(start + startOffset, end + endOffset, start, end);
+            second = new Quad(start + -startOffset, end + -endOffset, start, end);
+            return true;
         }
 
         private static Vector2 miterOffset(ReadOnlySpan<Vector2> points, int index, Vector2 segmentSide, float half, bool closed)
