@@ -430,6 +430,7 @@ namespace osu.Game.Tests.Visual.Gameplay
                 Origin = Anchor.Centre,
                 Scale = new Vector2(2f),
             }));
+            AddStep("persist global HUD layout", () => skins.CurrentSkin.Value.UpdateDrawableTarget(globalHUDTarget));
             AddStep("save skin", () => skins.Save(skins.CurrentSkin.Value));
 
             AddStep("select another skin", () => skins.CurrentSkinInfo.SetDefault());
@@ -455,6 +456,7 @@ namespace osu.Game.Tests.Visual.Gameplay
                 Origin = Anchor.Centre,
                 Scale = new Vector2(2f),
             }));
+            AddStep("persist global HUD layout", () => skins.CurrentSkin.Value.UpdateDrawableTarget(globalHUDTarget));
             AddStep("save skin", () => skins.Save(skins.CurrentSkin.Value));
 
             AddStep("select another skin", () => skins.CurrentSkinInfo.SetDefault());
@@ -480,6 +482,7 @@ namespace osu.Game.Tests.Visual.Gameplay
                 Origin = Anchor.Centre,
                 Scale = new Vector2(2f),
             }));
+            AddStep("persist global HUD layout", () => skins.CurrentSkin.Value.UpdateDrawableTarget(globalHUDTarget));
             AddStep("save skin", () => skins.Save(skins.CurrentSkin.Value));
 
             AddStep("select another skin", () => skins.CurrentSkinInfo.SetDefault());
