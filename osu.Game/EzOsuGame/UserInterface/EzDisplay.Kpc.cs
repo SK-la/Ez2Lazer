@@ -27,6 +27,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             "Notes per column: blue is notes, yellow is LNs");
 
         private EzManiaSummary? maniaSummary;
+        private object? tooltipContent;
 
         public EzManiaSummary? ManiaSummary
         {
@@ -151,6 +152,8 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             if (lastKnownColumns != null)
                 rebuildAndRender(lastKnownColumns, lastKnownHolds, lastKnownCount);
+
+            tooltipContent = null;
         }
 
         private bool columnsMatchCached(Dictionary<int, int> columnNoteCounts)
@@ -505,6 +508,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             lastKnownColumns = null;
             lastKnownHolds = null;
             lastKnownCount = 0;
+            tooltipContent = null;
         }
 
         protected override void Dispose(bool isDisposing)
@@ -580,7 +584,12 @@ namespace osu.Game.EzOsuGame.UserInterface
 
         public ITooltip<LocalisableString> GetCustomTooltip() => new MarkdownTooltip();
 
-        public LocalisableString TooltipContent => generateTooltipText();
+        public LocalisableString TooltipContent => (LocalisableString)getTooltipContent();
+
+        // TooltipContainer uses the non-generic interface, so cache the boxed content too.
+        object IHasCustomTooltip.TooltipContent => getTooltipContent();
+
+        private object getTooltipContent() => tooltipContent ??= generateTooltipText();
 
 #endregion
     }

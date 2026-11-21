@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Rendering;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
@@ -382,6 +383,9 @@ namespace osu.Game.EzOsuGame.UserInterface
         {
             private Vector2[] points = Array.Empty<Vector2>();
             private int pointCount;
+            private Quad[] quads = Array.Empty<Quad>();
+            private int quadCount;
+            private ulong geometryVersion;
 
             public void ClearPoints()
             {
@@ -389,6 +393,8 @@ namespace osu.Game.EzOsuGame.UserInterface
                     return;
 
                 pointCount = 0;
+                quadCount = 0;
+                geometryVersion++;
                 Invalidate(Invalidation.DrawNode);
             }
 
@@ -401,15 +407,26 @@ namespace osu.Game.EzOsuGame.UserInterface
                 return points.AsSpan(0, count);
             }
 
-            public void CommitPoints() => Invalidate(Invalidation.DrawNode);
+            public void CommitPoints()
+            {
+                int capacity = Math.Max(0, pointCount - 1) * 2;
+
+                if (quads.Length < capacity)
+                    Array.Resize(ref quads, capacity);
+
+                quadCount = EzSoftStroke.BuildOpenQuads(points.AsSpan(0, pointCount), line_thickness, quads);
+                geometryVersion++;
+                Invalidate(Invalidation.DrawNode);
+            }
 
             protected override DrawNode CreateDrawNode() => new KpsStrokeDrawNode(this);
 
             private class KpsStrokeDrawNode : DrawNode
             {
                 private readonly KpsStroke source;
-                private Vector2[] points = Array.Empty<Vector2>();
-                private int pointCount;
+                private Quad[] quads = Array.Empty<Quad>();
+                private int quadCount;
+                private ulong geometryVersion;
 
                 public KpsStrokeDrawNode(KpsStroke source)
                     : base(source)
@@ -421,25 +438,29 @@ namespace osu.Game.EzOsuGame.UserInterface
                 {
                     base.ApplyState();
 
-                    pointCount = source.pointCount;
+                    // Each draw node owns its snapshot. Colour and transform changes can reuse it.
+                    if (geometryVersion == source.geometryVersion)
+                        return;
 
-                    if (points.Length < pointCount)
-                        Array.Resize(ref points, pointCount);
+                    geometryVersion = source.geometryVersion;
+                    quadCount = source.quadCount;
 
-                    if (pointCount > 0)
-                        Array.Copy(source.points, points, pointCount);
+                    if (quads.Length < quadCount)
+                        Array.Resize(ref quads, quadCount);
+
+                    Array.Copy(source.quads, quads, quadCount);
                 }
 
                 protected override void Draw(IRenderer renderer)
                 {
                     base.Draw(renderer);
 
-                    if (pointCount < 2 || DrawColourInfo.Colour.MaxAlpha < 0.001f)
+                    if (quadCount == 0 || DrawColourInfo.Colour.MaxAlpha < 0.001f)
                         return;
 
                     Color4 colour = DrawColourInfo.Colour.TopLeft;
                     renderer.PushLocalMatrix(DrawInfo.Matrix);
-                    EzSoftStroke.Draw(renderer, renderer.WhitePixel, points.AsSpan(0, pointCount), line_thickness, colour, false);
+                    EzSoftStroke.Draw(renderer, renderer.WhitePixel, quads.AsSpan(0, quadCount), colour);
                     renderer.PopLocalMatrix();
                 }
             }
