@@ -229,6 +229,8 @@ namespace osu.Game.Tests.Visual.Edit
                 editorScreen = null!;
             });
 
+            AddStep("exit skin editor host scope", () => EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.Ez));
+
             base.TearDownSteps();
         }
 
