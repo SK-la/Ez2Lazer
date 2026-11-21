@@ -44,6 +44,7 @@ namespace osu.Game.Scoring.Legacy
 
             WorkingBeatmap workingBeatmap;
             ScoreRank? decodedRank = null;
+            double? decodedAccuracy = null;
 
             using (SerializationReader sr = new SerializationReader(stream))
             {
@@ -133,6 +134,7 @@ namespace osu.Game.Scoring.Legacy
                         score.ScoreInfo.MaximumStatistics = readScore.MaximumStatistics;
                         score.ScoreInfo.Mods = readScore.Mods.Select(m => m.ToMod(currentRuleset)).ToArray();
                         score.ScoreInfo.ClientVersion = readScore.ClientVersion;
+                        decodedAccuracy = readScore.Accuracy;
                         decodedRank = readScore.Rank;
                         if (readScore.UserID > 1)
                             score.ScoreInfo.RealmUser.OnlineID = readScore.UserID;
@@ -143,6 +145,9 @@ namespace osu.Game.Scoring.Legacy
                             PopulateTotalScoreWithoutMods(score.ScoreInfo);
 
                         score.ScoreInfo.Pauses.AddRange(readScore.Pauses);
+                        score.ScoreInfo.JudgeMode = readScore.JudgeMode;
+                        score.ScoreInfo.HealthMode = readScore.HealthMode;
+                        score.ScoreInfo.GameplayEnvironmentSnapshot = readScore.GameplayEnvironment;
                     });
                 }
             }
@@ -153,6 +158,9 @@ namespace osu.Game.Scoring.Legacy
                 score.ScoreInfo.LegacyTotalScore = score.ScoreInfo.TotalScore;
 
             StandardisedScoreMigrationTools.UpdateToLatestScoring(score.ScoreInfo, workingBeatmap);
+
+            if (decodedAccuracy is double accuracy)
+                score.ScoreInfo.Accuracy = accuracy;
 
             if (decodedRank != null)
                 score.ScoreInfo.Rank = decodedRank.Value;

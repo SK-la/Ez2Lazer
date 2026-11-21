@@ -34,7 +34,6 @@ namespace osu.Game.Scoring
 
                         Replay = new Replay();
                         EzHighPrecisionReplayFrames.PopulateReplay(Replay, legacyFrames, ruleset, playable);
-                        return;
                     }
                 }
             }
@@ -49,7 +48,16 @@ namespace osu.Game.Scoring
                 if (stream == null)
                     return;
 
-                Replay = new DatabasedLegacyScoreDecoder(rulesets, beatmaps).Parse(stream).Replay;
+                Score decoded = new DatabasedLegacyScoreDecoder(rulesets, beatmaps).Parse(stream);
+
+                if (decoded.ScoreInfo.GameplayEnvironmentSnapshot is { } environment)
+                {
+                    score.JudgeMode = decoded.ScoreInfo.JudgeMode;
+                    score.HealthMode = decoded.ScoreInfo.HealthMode;
+                    score.GameplayEnvironmentSnapshot = environment;
+                }
+
+                Replay ??= decoded.Replay;
             }
         }
     }

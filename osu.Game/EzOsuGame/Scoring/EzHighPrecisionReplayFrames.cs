@@ -19,7 +19,7 @@ namespace osu.Game.EzOsuGame.Scoring
 {
     /// <summary>
     /// Standalone high-precision replay file (<c>replay.ezframes</c>) used as the internal source of truth
-    /// for Session / Race / Timeline. User export still produces Round <c>.osr</c> on demand.
+    /// for Session / Race / Timeline and packaged with exported <c>.ezosr</c> replays.
     /// </summary>
     public static class EzHighPrecisionReplayFrames
     {
@@ -27,6 +27,8 @@ namespace osu.Game.EzOsuGame.Scoring
         public const string EXTENSION = @".ezframes";
         public const int VERSION = 1;
 
+        private const int frame_size = sizeof(double) + 2 * sizeof(float) + sizeof(int);
+        private const int max_frame_count = 10_000_000;
         private static readonly byte[] magic = Encoding.ASCII.GetBytes(@"EZFR");
 
         public static void Write(Stream stream, Score score, IBeatmap? beatmap)
@@ -56,20 +58,36 @@ namespace osu.Game.EzOsuGame.Scoring
                 if (version != VERSION)
                     return false;
 
-                int len = br.ReadInt32();
-                if (len <= 0)
+                int payloadLength = br.ReadInt32();
+                if (payloadLength < sizeof(int) || payloadLength > sizeof(int) + max_frame_count * frame_size)
                     return false;
 
-                byte[] payload = br.ReadBytes(len);
-                if (payload.Length != len)
+                if (stream.CanSeek && stream.Length - stream.Position != payloadLength)
                     return false;
 
-                frames = parsePayload(payload);
+                int count = br.ReadInt32();
+                if (count < 0 || count > max_frame_count || payloadLength != sizeof(int) + count * frame_size)
+                    return false;
+
+                var readFrames = stream.CanSeek ? new List<LegacyReplayFrame>(count) : new List<LegacyReplayFrame>();
+
+                for (int i = 0; i < count; i++)
+                {
+                    double time = br.ReadDouble();
+                    float mouseX = br.ReadSingle();
+                    float mouseY = br.ReadSingle();
+                    var buttons = (ReplayButtonState)br.ReadInt32();
+                    readFrames.Add(new LegacyReplayFrame(time, mouseX, mouseY, buttons));
+                }
+
+                if (!stream.CanSeek && stream.ReadByte() != -1)
+                    return false;
+
+                frames = readFrames;
                 return true;
             }
             catch
             {
-                frames = new List<LegacyReplayFrame>();
                 return false;
             }
         }
@@ -79,14 +97,17 @@ namespace osu.Game.EzOsuGame.Scoring
         /// </summary>
         public static void PopulateReplay(Replay replay, IEnumerable<LegacyReplayFrame> legacyFrames, Ruleset ruleset, IBeatmap beatmap)
         {
+            int offset = beatmap.BeatmapVersion < 5 ? LegacyBeatmapDecoder.EARLY_VERSION_TIMING_OFFSET : 0;
             ReplayFrame? currentFrame = null;
 
             foreach (var legacyFrame in legacyFrames)
             {
-                if (currentFrame != null && legacyFrame.Time < currentFrame.Time)
+                double time = legacyFrame.Time + offset;
+                if (currentFrame != null && time < currentFrame.Time)
                     continue;
 
-                replay.Frames.Add(currentFrame = convertFrame(legacyFrame, currentFrame, ruleset, beatmap));
+                var frame = offset == 0 ? legacyFrame : new LegacyReplayFrame(time, legacyFrame.MouseX, legacyFrame.MouseY, legacyFrame.ButtonState);
+                replay.Frames.Add(currentFrame = convertFrame(frame, currentFrame, ruleset, beatmap));
             }
         }
 
@@ -106,6 +127,7 @@ namespace osu.Game.EzOsuGame.Scoring
             double offset = beatmap?.BeatmapVersion < 5 ? -LegacyBeatmapDecoder.EARLY_VERSION_TIMING_OFFSET : 0;
 
             using var ms = new MemoryStream();
+
             using (var bw = new BinaryWriter(ms, Encoding.UTF8, leaveOpen: true))
             {
                 var scoreFrames = score.Replay?.Frames;
@@ -126,31 +148,6 @@ namespace osu.Game.EzOsuGame.Scoring
             }
 
             return ms.ToArray();
-        }
-
-        private static List<LegacyReplayFrame> parsePayload(byte[] payload)
-        {
-            var result = new List<LegacyReplayFrame>();
-
-            using var ms = new MemoryStream(payload);
-            using var br = new BinaryReader(ms, Encoding.UTF8, leaveOpen: true);
-
-            int count = br.ReadInt32();
-            if (count < 0 || count > 10_000_000)
-                return result;
-
-            result.Capacity = count;
-
-            for (int i = 0; i < count; i++)
-            {
-                double time = br.ReadDouble();
-                float mouseX = br.ReadSingle();
-                float mouseY = br.ReadSingle();
-                var buttons = (ReplayButtonState)br.ReadInt32();
-                result.Add(new LegacyReplayFrame(time, mouseX, mouseY, buttons));
-            }
-
-            return result;
         }
 
         private static ReplayFrame convertFrame(LegacyReplayFrame currentFrame, ReplayFrame? lastFrame, Ruleset ruleset, IBeatmap beatmap)

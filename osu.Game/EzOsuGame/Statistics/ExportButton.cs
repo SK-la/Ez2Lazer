@@ -19,6 +19,7 @@ using osu.Game.Beatmaps.Formats;
 using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -27,7 +28,9 @@ using osu.Game.IO.Archives;
 using osu.Game.Localisation;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Notifications;
+using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Scoring;
 using osu.Game.Screens.Footer;
 using osu.Game.Utils;
 using SharpCompress.Common;
@@ -40,11 +43,13 @@ namespace osu.Game.EzOsuGame.Statistics
     {
         private readonly BeatmapInfo beatmapInfo;
         private readonly IReadOnlyList<Mod> mods;
+        private readonly ScoreInfo? scoreInfo;
 
-        public ExportButton(BeatmapInfo beatmapInfo, IReadOnlyList<Mod> mods)
+        public ExportButton(BeatmapInfo beatmapInfo, IReadOnlyList<Mod> mods, ScoreInfo? scoreInfo = null)
         {
             this.beatmapInfo = beatmapInfo;
             this.mods = mods;
+            this.scoreInfo = scoreInfo;
         }
 
         [BackgroundDependencyLoader]
@@ -57,15 +62,21 @@ namespace osu.Game.EzOsuGame.Statistics
             Action = this.ShowPopover;
         }
 
-        public Popover GetPopover() => new ExportPopover(beatmapInfo, mods);
+        public Popover GetPopover() => new ExportPopover(beatmapInfo, mods, scoreInfo);
 
         private partial class ExportPopover : OsuPopover
         {
             private readonly BeatmapInfo beatmapInfo;
             private readonly IReadOnlyList<Mod> mods;
+            private readonly ScoreInfo? scoreInfo;
+
+            private RulesetInfo exportRuleset => scoreInfo?.Ruleset ?? beatmapInfo.Ruleset;
 
             [Resolved]
             private BeatmapManager beatmapManager { get; set; } = null!;
+
+            [Resolved]
+            private ScoreManager scoreManager { get; set; } = null!;
 
             [Resolved(canBeNull: true)]
             private INotificationOverlay? notifications { get; set; }
@@ -73,11 +84,12 @@ namespace osu.Game.EzOsuGame.Statistics
             private Storage exportStorage = null!;
             private Storage userFileStorage = null!;
 
-            public ExportPopover(BeatmapInfo beatmapInfo, IReadOnlyList<Mod> mods)
+            public ExportPopover(BeatmapInfo beatmapInfo, IReadOnlyList<Mod> mods, ScoreInfo? scoreInfo)
                 : base(false)
             {
                 this.beatmapInfo = beatmapInfo;
                 this.mods = mods;
+                this.scoreInfo = scoreInfo;
 
                 Body.CornerRadius = 4;
                 AllowableAnchors = new[] { Anchor.TopCentre };
@@ -95,13 +107,32 @@ namespace osu.Game.EzOsuGame.Statistics
                     {
                         Items = new[]
                         {
-                            new OsuMenuItem("Export as .osu", MenuItemType.Standard, () => Task.Run(exportOsu)),
-                            new OsuMenuItem("Export as .osz (legacy)", MenuItemType.Standard, () => Task.Run(exportOszLegacy)),
-                            new OsuMenuItem("Export as .olz (lazer)", MenuItemType.Standard, () => Task.Run(exportOlz)),
-                        },
+                            new OsuMenuItem(ExportStrings.EXPORT_OSU, MenuItemType.Standard, () => Task.Run(exportOsu)),
+                            new OsuMenuItem(ExportStrings.EXPORT_OSZ, MenuItemType.Standard, () => Task.Run(exportOszLegacy)),
+                            new OsuMenuItem(ExportStrings.EXPORT_OLZ, MenuItemType.Standard, () => Task.Run(exportOlz)),
+                        }.Concat(createReplayExportItems()).ToArray(),
                         MaxHeight = 375,
                     },
                 };
+            }
+
+            private IEnumerable<OsuMenuItem> createReplayExportItems()
+            {
+                if (scoreInfo == null || !scoreInfo.Ruleset.IsLegacyRuleset() ||
+                    !scoreInfo.Files.Any(f => f.Filename.EndsWith(".osr", StringComparison.OrdinalIgnoreCase) ||
+                                              f.Filename.EndsWith(EzHighPrecisionReplayFrames.EXTENSION, StringComparison.OrdinalIgnoreCase)))
+                    return [];
+
+                var exporter = new ScoreReplayExporter(exportStorage, userFileStorage, scoreManager, beatmapManager)
+                {
+                    PostNotification = notification => notifications?.Post(notification),
+                };
+
+                return
+                [
+                    new OsuMenuItem(ExportStrings.EXPORT_OSR, MenuItemType.Standard, () => Task.Run(() => scoreManager.Export(scoreInfo))),
+                    new OsuMenuItem(ExportStrings.EXPORT_EZOSR, MenuItemType.Standard, () => Task.Run(() => exporter.Export(scoreInfo))),
+                ];
             }
 
             private void exportOszLegacy()
@@ -150,7 +181,7 @@ namespace osu.Game.EzOsuGame.Statistics
                 try
                 {
                     var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo);
-                    var playableBeatmap = workingBeatmap.GetPlayableBeatmap(beatmapInfo.Ruleset, mods);
+                    var playableBeatmap = workingBeatmap.GetPlayableBeatmap(exportRuleset, mods);
 
                     BeatmapExportUtils.ApplyExportMetadata(playableBeatmap, mods);
 
@@ -197,7 +228,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
                     var zipWriterOptions = new ZipWriterOptions(CompressionType.Deflate)
                     {
-                        ArchiveEncoding = useFixedEncoding ? ZipArchiveReader.DEFAULT_ENCODING : new ArchiveEncoding()
+                        ArchiveEncoding = useFixedEncoding ? ZipArchiveReader.DEFAULT_ENCODING : new ArchiveEncoding { Default = Encoding.UTF8, Password = Encoding.UTF8 }
                     };
 
                     using var writer = new ZipWriter(outStream, zipWriterOptions);
@@ -207,7 +238,7 @@ namespace osu.Game.EzOsuGame.Statistics
 
                     foreach (var file in files)
                     {
-                        using var stream = getConvertedFileContents(beatmapSet, file);
+                        using var stream = getConvertedFileContents(file);
 
                         if (stream != null)
                             writer.Write(FilesystemSanityCheckHelpers.GetSafeArchiveEntryName(file.Filename), stream);
@@ -228,25 +259,16 @@ namespace osu.Game.EzOsuGame.Statistics
                 notification.State = ProgressNotificationState.Completed;
             }
 
-            private Stream? getConvertedFileContents(BeatmapSetInfo beatmapSet, INamedFileUsage file)
+            private Stream? getConvertedFileContents(INamedFileUsage file)
             {
-                var beatmap = beatmapSet.Beatmaps.SingleOrDefault(b => b.Hash == file.File.Hash);
+                if (!file.Filename.EndsWith(@".osu", StringComparison.OrdinalIgnoreCase))
+                    return userFileStorage.GetStream(file.File.GetStoragePath());
 
-                // Do not include any original beatmap .osu in archive.
-                if (beatmap == null)
-                {
-                    return file.Filename.EndsWith(@".osu", StringComparison.OrdinalIgnoreCase)
-                        ? null
-                        : userFileStorage.GetStream(file.File.GetStoragePath());
-                }
-
-                 // 只处理当前规则集的谱面，其他规则集直接排除
-                if (!beatmap.Ruleset.MatchesOnlineID(beatmapInfo.Ruleset))
+                if (file.File.Hash != beatmapInfo.Hash)
                     return null;
 
-                // 当前规则集：应用 mods 转换
-                var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmap);
-                var playableBeatmap = workingBeatmap.GetPlayableBeatmap(beatmap.Ruleset, mods);
+                var workingBeatmap = beatmapManager.GetWorkingBeatmap(beatmapInfo);
+                var playableBeatmap = workingBeatmap.GetPlayableBeatmap(exportRuleset, mods);
 
                 BeatmapExportUtils.ApplyExportMetadata(playableBeatmap, mods);
 
@@ -267,11 +289,26 @@ namespace osu.Game.EzOsuGame.Statistics
 
         private static class ExportStrings
         {
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_OSU = new EzLocalizationManager.EzLocalisableString(
+                "导出本次游玩谱面为 .osu", "Export played beatmap as .osu");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_OSZ = new EzLocalizationManager.EzLocalisableString(
+                "导出本次游玩谱包为 .osz", "Export played beatmap set as .osz");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_OLZ = new EzLocalizationManager.EzLocalisableString(
+                "导出本次游玩谱包为 .olz（lazer）", "Export played beatmap set as .olz (lazer)");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_OSR = new EzLocalizationManager.EzLocalisableString(
+                "导出本次游玩回放为 .osr（普通精度）", "Export played replay as .osr (standard precision)");
+
+            internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_EZOSR = new EzLocalizationManager.EzLocalisableString(
+                "导出本次游玩回放为 .ezosr（高精度）", "Export played replay as .ezosr (high precision)");
+
             internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON = new EzLocalizationManager.EzLocalisableString(
                 "导出", "Export");
 
             internal static readonly EzLocalizationManager.EzLocalisableString EXPORT_BUTTON_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-                "导出当前Mods转换后的谱面", "Export the currently converted beatmap with mods applied");
+                "导出本次游玩的谱面或回放", "Export the played beatmap or replay");
         }
     }
 }

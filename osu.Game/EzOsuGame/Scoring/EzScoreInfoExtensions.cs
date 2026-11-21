@@ -66,6 +66,15 @@ namespace osu.Game.EzOsuGame.Scoring
             // 游玩与 Replay 结束进结算均写入当场 Drawable 环境，供 ForStored 解析与左栏 Statistics 对齐。
             score.JudgeMode = snapshot.JudgeMode;
             score.HealthMode = snapshot.HealthMode;
+
+            if (score.GameplayEnvironmentSnapshot is { } environment)
+            {
+                score.GameplayEnvironmentSnapshot = environment with
+                {
+                    JudgeMode = (EzEnumJudgeMode)snapshot.JudgeMode,
+                    HealthMode = (EzEnumHealthMode)snapshot.HealthMode,
+                };
+            }
         }
 
         public static string GetJudgeModeDisplayName(int judgeMode) => getEnumDescription<EzEnumJudgeMode>(judgeMode);

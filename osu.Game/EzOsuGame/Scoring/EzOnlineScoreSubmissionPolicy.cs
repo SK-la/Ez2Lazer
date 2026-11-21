@@ -31,6 +31,8 @@ namespace osu.Game.EzOsuGame.Scoring
             if (score.Ruleset.ShortName == "osu")
                 score.JudgeMode = (int)config.Get<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
 
+            score.GameplayEnvironmentSnapshot = config.ResolveEnvironment(ReplayRunPurpose.ForLive, score);
+
             score.SessionSettingsCaptured = true;
         }
 

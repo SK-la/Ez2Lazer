@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Rulesets.Scoring;
@@ -39,6 +40,9 @@ namespace osu.Game.Scoring.Legacy
         [JsonProperty("client_version")]
         public string ClientVersion = string.Empty;
 
+        [JsonProperty("accuracy", NullValueHandling = NullValueHandling.Ignore, DefaultValueHandling = DefaultValueHandling.Include)]
+        public double? Accuracy { get; set; }
+
         [JsonProperty("rank")]
         [JsonConverter(typeof(StringEnumConverter))]
         public ScoreRank? Rank;
@@ -52,6 +56,15 @@ namespace osu.Game.Scoring.Legacy
         [JsonProperty("pauses")]
         public int[] Pauses { get; set; } = [];
 
+        [JsonProperty("judge_mode")]
+        public int JudgeMode { get; set; }
+
+        [JsonProperty("health_mode")]
+        public int HealthMode { get; set; }
+
+        [JsonProperty("gameplay_environment", NullValueHandling = NullValueHandling.Ignore)]
+        public GameplayEnvironment? GameplayEnvironment { get; set; }
+
         public static LegacyReplaySoloScoreInfo FromScore(ScoreInfo score) => new LegacyReplaySoloScoreInfo
         {
             OnlineID = score.OnlineID,
@@ -59,10 +72,14 @@ namespace osu.Game.Scoring.Legacy
             Statistics = score.Statistics.Where(kvp => kvp.Value != 0).ToDictionary(),
             MaximumStatistics = score.MaximumStatistics.Where(kvp => kvp.Value != 0).ToDictionary(),
             ClientVersion = score.ClientVersion,
+            Accuracy = score.Accuracy,
             Rank = score.Rank,
             UserID = score.User.OnlineID,
             TotalScoreWithoutMods = score.TotalScoreWithoutMods > 0 ? score.TotalScoreWithoutMods : null,
             Pauses = score.Pauses.ToArray(),
+            JudgeMode = score.JudgeMode,
+            HealthMode = score.HealthMode,
+            GameplayEnvironment = score.GameplayEnvironmentSnapshot,
         };
     }
 }

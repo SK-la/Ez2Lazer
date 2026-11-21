@@ -116,7 +116,7 @@ namespace osu.Game.Scoring.Legacy
                 sw.Write((int)score.ScoreInfo.Ruleset.CreateInstance().ConvertToLegacyMods(score.ScoreInfo.Mods));
 
                 sw.Write(getHpGraphFormatted());
-                sw.Write(score.ScoreInfo.Date.DateTime);
+                sw.Write(score.ScoreInfo.Date.UtcDateTime);
                 sw.WriteByteArray(createReplayData());
                 sw.Write(score.ScoreInfo.LegacyOnlineID);
                 writeModSpecificData(score.ScoreInfo, sw);

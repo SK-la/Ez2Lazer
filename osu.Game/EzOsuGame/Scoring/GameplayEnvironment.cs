@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using Newtonsoft.Json;
 using osu.Game.EzOsuGame.Configuration;
 
 namespace osu.Game.EzOsuGame.Scoring
@@ -11,19 +12,26 @@ namespace osu.Game.EzOsuGame.Scoring
     /// </summary>
     public sealed record GameplayEnvironment : IGameplayEnvironment
     {
+        [JsonProperty("judge_mode")]
         public EzEnumJudgeMode JudgeMode { get; init; }
 
+        [JsonProperty("health_mode")]
         public EzEnumHealthMode HealthMode { get; init; }
 
+        [JsonProperty("judge_precedence")]
         public EzEnumJudgePrecedence JudgePrecedence { get; init; }
 
+        [JsonProperty("offset_plus_mania")]
         public double OffsetPlusMania { get; init; }
 
         /// <inheritdoc cref="IGameplayEnvironment.OffsetPlusNonMania"/>
+        [JsonProperty("offset_plus_non_mania")]
         public double OffsetPlusNonMania { get; init; }
 
+        [JsonProperty("bms_poor_hit_result_enable")]
         public bool BmsPoorHitResultEnable { get; init; }
 
+        [JsonProperty("apply_input_offset_via_replay_frame_shift")]
         public bool ApplyInputOffsetViaReplayFrameShift { get; init; }
 
         /// <summary>
