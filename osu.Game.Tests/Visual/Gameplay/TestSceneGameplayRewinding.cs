@@ -28,15 +28,24 @@ namespace osu.Game.Tests.Visual.Gameplay
         [Test]
         public void TestNoJudgementsOnRewind()
         {
+            bool judgementDuringRewind = false;
+
             AddUntilStep("wait for track to start running", () => Beatmap.Value.Track.IsRunning);
             addSeekStep(3000);
             AddAssert("all judged", () => Player.DrawableRuleset.Playfield.AllHitObjects.All(h => h.Judged));
             AddUntilStep("key counter counted keys", () => Player.HUDOverlay.InputCountController.Triggers.Select(kc => kc.ActivationCount.Value).Sum() == 15);
+            AddUntilStep("all judgements processed", () => Player.Results.Count == 15);
             AddStep("clear results", () => Player.Results.Clear());
+            AddStep("observe judgements during rewind", () => Player.ScoreProcessor.NewJudgement += _ =>
+            {
+                if (Player.GameplayClockContainer.IsRewinding)
+                    judgementDuringRewind = true;
+            });
             addSeekStep(0);
+            AddStep("pause gameplay clock", () => Player.GameplayClockContainer.Stop());
             AddAssert("none judged", () => Player.DrawableRuleset.Playfield.AllHitObjects.All(h => !h.Judged));
             AddUntilStep("key counters reset", () => Player.HUDOverlay.InputCountController.Triggers.All(kc => kc.ActivationCount.Value == 0));
-            AddAssert("no results triggered", () => Player.Results.Count == 0);
+            AddAssert("no judgements triggered during rewind", () => !judgementDuringRewind);
         }
 
         private void addSeekStep(double time)

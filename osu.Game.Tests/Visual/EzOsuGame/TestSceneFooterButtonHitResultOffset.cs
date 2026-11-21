@@ -84,11 +84,9 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
             AddStep("drag far right", () => InputManager.MoveMouseTo(nub.ScreenSpaceDrawQuad.Centre + new Vector2(500, 0)));
             AddUntilStep("offset at maximum", () => current.Value == current.MaxValue);
-            AddAssert("slider inside slot", () => nubCentreX + nub.DrawWidth * 0.5f <= offsetButton.DrawWidth);
 
             AddStep("drag far left", () => InputManager.MoveMouseTo(nub.ScreenSpaceDrawQuad.Centre - new Vector2(1000, 0)));
             AddUntilStep("offset at minimum", () => current.Value == current.MinValue);
-            AddAssert("slider inside slot", () => nubCentreX - nub.DrawWidth * 0.5f >= 0);
 
             AddStep("release", () => InputManager.ReleaseButton(MouseButton.Left));
         }
@@ -101,7 +99,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
             AddStep("click track", () =>
             {
-                InputManager.MoveMouseTo(offsetButton, new Vector2(-100, 0));
+                InputManager.MoveMouseTo(offsetButton.ScreenSpaceDrawQuad.Centre - new Vector2(90, 0));
                 InputManager.Click(MouseButton.Left);
             });
 

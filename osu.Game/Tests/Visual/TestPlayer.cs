@@ -51,6 +51,8 @@ namespace osu.Game.Tests.Visual
         [Resolved]
         private SpectatorClient spectatorClient { get; set; }
 
+        private bool spectatorSessionEnded;
+
         public TestPlayer(bool allowPause = true, bool showResults = true, bool pauseOnFocusLost = false)
             : base(new PlayerConfiguration
             {
@@ -111,8 +113,11 @@ namespace osu.Game.Tests.Visual
             // SubmittingPlayer performs EndPlaying on a fire-and-forget async task, which allows for the chance of BeginPlaying to be called before EndPlaying is called here.
             // Until this is handled properly at game-side, ensure EndPlaying is called before exiting player.
             // see: https://github.com/ppy/osu/issues/22220
-            if (LoadedBeatmapSuccessfully)
+            if (LoadedBeatmapSuccessfully && !spectatorSessionEnded)
+            {
+                spectatorSessionEnded = true;
                 spectatorClient?.EndPlaying(null, GameplayState);
+            }
 
             return exiting;
         }
@@ -123,8 +128,11 @@ namespace osu.Game.Tests.Visual
 
             // Specific to tests, the player can be disposed without OnExiting() ever being called.
             // We should make sure that the gameplay session has finished even in this case.
-            if (LoadedBeatmapSuccessfully)
+            if (LoadedBeatmapSuccessfully && !spectatorSessionEnded)
+            {
+                spectatorSessionEnded = true;
                 spectatorClient?.EndPlaying(null, GameplayState);
+            }
         }
     }
 }

@@ -9,12 +9,15 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Sprites;
 using osu.Framework.Testing;
 using osu.Framework.Timing;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Edit.Settings;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Rulesets.Mania.Beatmaps;
 using osu.Game.Rulesets.Mania.Objects;
 using osu.Game.Rulesets.Mania.Objects.Drawables;
@@ -33,6 +36,9 @@ namespace osu.Game.Rulesets.Mania.Tests
 
         [Resolved]
         private Ez2ConfigManager ezConfig { get; set; }
+
+        [Resolved]
+        private EzConfigStore configStore { get; set; }
 
         private ManualClock clock;
         private DrawableManiaRuleset drawableRuleset;
@@ -71,6 +77,14 @@ namespace osu.Game.Rulesets.Mania.Tests
         public void TestToggleOffScreen()
         {
             AddStep("disable column colouring", () => ezConfig.GetBindable<bool>(Ez2Setting.ColorSettingsEnabled).Value = false);
+            AddStep("use explicit display tint settings", () =>
+            {
+                ezConfig.GetBindable<EzColouringMode>(Ez2Setting.ColouringMode).Value = EzColouringMode.Direct;
+                ezConfig.GetBindable<EzColouringRange>(Ez2Setting.ColouringRange).Value = EzColouringRange.All;
+
+                foreach (int divisor in ManiaEditorBeatLinePalette.EDITOR_LINE_DIVISORS)
+                    configStore.BeatmapEditor.Colouring.BeatLines.GetBindable(divisor).Value = Colour4.Red;
+            });
             AddStep("enable", () => configTimingBasedNoteColouring.Value = true);
 
             seekTo(10000);
@@ -84,7 +98,12 @@ namespace osu.Game.Rulesets.Mania.Tests
             AddAssert("some notes coloured", () => this.ChildrenOfType<DrawableNote>().Any(note => headColour(note) != Colour4.White));
         }
 
-        private static Colour4 headColour(DrawableNote note) => note.ChildrenOfType<SkinnableDrawable>().First().Colour;
+        private static Colour4 headColour(DrawableNote note)
+        {
+            var colorizeSprite = note.ChildrenOfType<ColorizeSprite>().FirstOrDefault();
+
+            return colorizeSprite?.Tint ?? note.ChildrenOfType<SkinnableDrawable>().First().Colour;
+        }
 
         private void seekTo(double time)
         {

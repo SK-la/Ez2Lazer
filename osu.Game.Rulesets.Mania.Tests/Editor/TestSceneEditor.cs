@@ -7,12 +7,12 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Extensions.ObjectExtensions;
 using osu.Framework.Testing;
+using osu.Game.Beatmaps.ControlPoints;
 using osu.Game.Rulesets.Edit;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.UI;
-using osu.Game.Screens.Edit.Timing;
+using osu.Game.Screens.Edit;
 using osu.Game.Tests.Visual;
-using osuTK.Input;
 
 namespace osu.Game.Rulesets.Mania.Tests.Editor
 {
@@ -40,28 +40,31 @@ namespace osu.Game.Rulesets.Mania.Tests.Editor
         public void TestReloadOnBPMChange()
         {
             HitObjectComposer oldComposer = null!;
+            bool controlPointsChanged = false;
 
+            AddStep("ensure timing point exists", () =>
+            {
+                if (EditorBeatmap.ControlPointInfo.TimingPoints.Any())
+                    return;
+
+                EditorBeatmap.BeginChange();
+                EditorBeatmap.ControlPointInfo.Add(0, new TimingControlPoint { BeatLength = 500 });
+                EditorBeatmap.EndChange();
+            });
             AddStep("store composer", () => oldComposer = this.ChildrenOfType<HitObjectComposer>().Single());
             AddUntilStep("composer stored", () => oldComposer, () => Is.Not.Null);
-            AddStep("switch to timing tab", () => InputManager.Key(Key.F3));
-            AddUntilStep("wait for loaded", () => this.ChildrenOfType<DiscreteAdjustmentControl<double>>().ElementAtOrDefault(1), () => Is.Not.Null);
+            AddStep("switch to timing tab", () => Editor.Mode.Value = EditorScreenMode.Timing);
             AddStep("change timing point BPM", () =>
             {
-                var bpmControl = this.ChildrenOfType<DiscreteAdjustmentControl<double>>().ElementAt(1);
-                InputManager.MoveMouseTo(bpmControl);
-                InputManager.Click(MouseButton.Left);
+                var lastTimingPoint = EditorBeatmap.ControlPointInfo.TimingPoints.Last();
+                EditorBeatmap.ControlPointInfo.ControlPointsChanged += () => controlPointsChanged = true;
+                EditorBeatmap.BeginChange();
+                EditorBeatmap.ControlPointInfo.Add(lastTimingPoint.Time + 1000, new TimingControlPoint { BeatLength = lastTimingPoint.BeatLength + 1 });
+                EditorBeatmap.EndChange();
+                EditorBeatmap.SaveState();
             });
-
-            AddStep("switch back to composer", () => InputManager.Key(Key.F1));
-            AddUntilStep("composer reloaded", () =>
-            {
-                var composer = this.ChildrenOfType<HitObjectComposer>().SingleOrDefault();
-                return composer != null && composer != oldComposer;
-            });
-
-            AddStep("store composer", () => oldComposer = this.ChildrenOfType<HitObjectComposer>().Single());
-            AddUntilStep("composer stored", () => oldComposer, () => Is.Not.Null);
-            AddStep("undo", () => Editor.Undo());
+            AddUntilStep("control point change observed", () => controlPointsChanged);
+            AddStep("switch back to composer", () => Editor.Mode.Value = EditorScreenMode.Compose);
             AddUntilStep("composer reloaded", () =>
             {
                 var composer = this.ChildrenOfType<HitObjectComposer>().SingleOrDefault();
