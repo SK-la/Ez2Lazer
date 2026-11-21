@@ -71,6 +71,9 @@ namespace osu.Game.Screens.Select
         private IBindable<EzAnalysisResult>? ezAnalysisBindable;
         private CancellationTokenSource? ezAnalysisCancellationSource;
 
+        private Bindable<bool>? ezAnalysisFilter;
+        private Bindable<string>? analysisSystemSelection;
+
         private string? scratchText;
 
         private Bindable<EzMaterialUiMode> materialUiMode = null!;
@@ -326,8 +329,8 @@ namespace osu.Game.Screens.Select
 
             mods.BindValueChanged(_ => updateKeyCount(), true);
 
-            var ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
-            var analysisSystemSelection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
+            ezAnalysisFilter = ezConfig.GetBindable<bool>(Ez2Setting.EzAnalysisFilter);
+            analysisSystemSelection = ezConfig.GetBindable<string>(Ez2Setting.AnalysisSystemSelection);
 
             void updateStarFilterIcon()
             {
@@ -434,6 +437,13 @@ namespace osu.Game.Screens.Select
             starDifficultyCancellationSource = null;
 
             clearEzAnalysisBinding();
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            analysisSystemSelection?.UnbindAll();
+            ezAnalysisFilter?.UnbindAll();
+            base.Dispose(isDisposing);
         }
 
         private void clearEzAnalysisBinding(bool resetDisplay = true)
