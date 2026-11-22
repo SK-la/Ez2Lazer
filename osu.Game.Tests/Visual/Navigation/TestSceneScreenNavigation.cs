@@ -711,6 +711,11 @@ namespace osu.Game.Tests.Visual.Navigation
                 InputManager.Click(MouseButton.Right);
             });
 
+            AddStep("finish context menu transforms", () => Game.ChildrenOfType<BeatmapLeaderboardWedge>().First().FinishTransforms(true));
+            AddUntilStep("wait for delete menu item", () => Game.ChildrenOfType<BeatmapLeaderboardWedge>().First()
+                                                                        .ChildrenOfType<DrawableOsuMenuItem>()
+                                                                        .Any(i => i.Item.Text.Value == CommonStrings.ButtonsDelete));
+
             AddStep("click delete", () =>
             {
                 var dropdownItem = Game

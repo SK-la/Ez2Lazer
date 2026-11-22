@@ -595,6 +595,7 @@ namespace osu.Game.Tests.Visual.Gameplay
         public void TestQuickRetry()
         {
             TestPlayer getCurrentPlayer() => loader.CurrentPlayer as TestPlayer;
+
             bool checkSkipButtonVisible() => player.ChildrenOfType<SkipOverlay>().FirstOrDefault()?.IsButtonVisible == true;
 
             TestPlayer previousPlayer = null;
@@ -626,7 +627,7 @@ namespace osu.Game.Tests.Visual.Gameplay
         {
             Notification notification = null;
 
-            AddUntilStep("wait for notification", () => (notification = notificationOverlay.ChildrenOfType<Notification>().FirstOrDefault()) != null);
+            AddUntilStep("wait for notification", () => (notification = notificationOverlay.ChildrenOfType<Notification>().FirstOrDefault(n => !n.WasClosed && !n.Read)) != null);
             AddStep("open notification overlay", () => notificationOverlay.Show());
             AddStep("click notification", () => notification.TriggerClick());
         }

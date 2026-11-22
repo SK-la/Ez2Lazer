@@ -70,7 +70,7 @@ namespace osu.Game.Tests.Visual.Online
         [TestCase("[https://dev.ppy.sh/home New site] (new link format)", LinkAction.External)]
         [TestCase("[osu forums](https://dev.ppy.sh/forum) (new link format 2)", LinkAction.External)]
         [TestCase("[https://dev.ppy.sh/home This is only a link to the new osu webpage but this is supposed to test word wrap.]", LinkAction.External)]
-        [TestCase("Let's (try)[https://dev.ppy.sh/home] [https://dev.ppy.sh/b/252238 multiple links] https://dev.ppy.sh/home", LinkAction.External, LinkAction.OpenBeatmap, LinkAction.External)]
+        [TestCase("Let's (try)[https://dev.ppy.sh/home] [https://dev.ppy.sh/b/252238 multiple links] https://dev.ppy.sh/home", LinkAction.External, LinkAction.External, LinkAction.External)]
         [TestCase("[https://dev.ppy.sh/home New link format with escaped [and \\[ paired] braces]", LinkAction.External)]
         [TestCase("[Markdown link format with escaped [and \\[ paired] braces](https://dev.ppy.sh/home)", LinkAction.External)]
         [TestCase("(Old link format with escaped (and \\( paired) parentheses)[https://dev.ppy.sh/home] and [[also a rogue wiki link]]", LinkAction.External, LinkAction.OpenWiki)]
@@ -78,8 +78,8 @@ namespace osu.Game.Tests.Visual.Online
         [TestCase("Join my multiplayer game osu://room/12346.", LinkAction.JoinRoom)]
         [TestCase("Join my multiplayer gameosu://room/12346.", LinkAction.JoinRoom)]
         [TestCase("Join my [multiplayer game](osu://room/12346).", LinkAction.JoinRoom)]
-        [TestCase("Join my multiplayer game http://dev.ppy.sh/multiplayer/rooms/12346", LinkAction.JoinRoom)]
-        [TestCase("Join my [multiplayer game](http://dev.ppy.sh/multiplayer/rooms/12346).", LinkAction.JoinRoom)]
+        [TestCase("Join my multiplayer game http://dev.ppy.sh/multiplayer/rooms/12346", LinkAction.External)]
+        [TestCase("Join my [multiplayer game](http://dev.ppy.sh/multiplayer/rooms/12346).", LinkAction.External)]
         [TestCase($"Join my [#english]({OsuGameBase.OSU_PROTOCOL}chan/#english).", LinkAction.OpenChannel)]
         [TestCase($"Join my {OsuGameBase.OSU_PROTOCOL}chan/#english.", LinkAction.OpenChannel)]
         [TestCase($"Join my{OsuGameBase.OSU_PROTOCOL}chan/#english.", LinkAction.OpenChannel)]
@@ -91,8 +91,8 @@ namespace osu.Game.Tests.Visual.Online
             addMessageWithChecks(text, expectedActions: actions);
         }
 
-        [TestCase("is now listening to [https://dev.ppy.sh/s/93523 IMAGE -MATERIAL- <Version 0>]", true, false, LinkAction.OpenBeatmapSet)]
-        [TestCase("is now playing [https://dev.ppy.sh/b/252238 IMAGE -MATERIAL- <Version 0>]", true, false, LinkAction.OpenBeatmap)]
+        [TestCase("is now listening to [https://dev.ppy.sh/s/93523 IMAGE -MATERIAL- <Version 0>]", true, false, LinkAction.External)]
+        [TestCase("is now playing [https://dev.ppy.sh/b/252238 IMAGE -MATERIAL- <Version 0>]", true, false, LinkAction.External)]
         [TestCase("I am important!", false, true)]
         [TestCase("feels important", true, true)]
         [TestCase("likes to post this [https://dev.ppy.sh/home link].", true, true, LinkAction.External)]

@@ -15,9 +15,11 @@ using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Track;
 using osu.Framework.Bindables;
+using osu.Framework.Configuration;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Video;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
@@ -574,6 +576,7 @@ namespace osu.Game.Tests.Visual
             protected override void LoadAsyncComplete()
             {
                 GlobalConfigStore.EnsureInitialized(Storage);
+                Dependencies.Get<FrameworkConfigManager>().SetValue(FrameworkSetting.HardwareVideoDecoder, HardwareVideoDecoder.None);
 
                 // this has to be run here rather than LoadComplete because
                 // TestScene.cs is checking the IsLoaded state (on another thread) and expects

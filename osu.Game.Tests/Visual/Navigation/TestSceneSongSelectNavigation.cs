@@ -124,6 +124,7 @@ namespace osu.Game.Tests.Visual.Navigation
         public void TestSongContinuesAfterExitPlayer(bool withUserPause)
         {
             Player? player = null;
+            double trackTimeBeforeExit = 0;
 
             IWorkingBeatmap beatmap() => Game.Beatmap.Value;
 
@@ -148,11 +149,14 @@ namespace osu.Game.Tests.Visual.Navigation
 
             AddUntilStep("wait for track stop", () => !Game.MusicController.IsPlaying);
             AddAssert("Ensure time before preview point", () => Game.MusicController.CurrentTrack.CurrentTime < beatmap().BeatmapInfo.Metadata.PreviewTime);
+            AddStep("record stopped track time", () => trackTimeBeforeExit = Game.MusicController.CurrentTrack.CurrentTime);
 
             pushEscape();
 
             AddUntilStep("wait for track playing", () => Game.MusicController.IsPlaying);
-            AddAssert("Ensure time wasn't reset to preview point", () => Game.MusicController.CurrentTrack.CurrentTime < beatmap().BeatmapInfo.Metadata.PreviewTime);
+            AddAssert("Ensure time wasn't reset to preview point",
+                () => Game.MusicController.CurrentTrack.CurrentTime,
+                () => Is.GreaterThanOrEqualTo(trackTimeBeforeExit - 50));
         }
 
         [Test]
