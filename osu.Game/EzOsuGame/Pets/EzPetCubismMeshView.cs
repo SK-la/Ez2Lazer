@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using Live2DCSharpSDK.Framework.Rendering;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -27,6 +28,7 @@ namespace osu.Game.EzOsuGame.Pets
         private EzPetCubismSession? session;
         private Storage? petsStorage;
         private Texture[] textures = [];
+        private readonly Lock frameLock = new Lock();
         private EzPetCubismFrameSnapshot? latestFrame;
         private IRenderer? renderer;
         private bool captureSuspended;
@@ -36,7 +38,7 @@ namespace osu.Game.EzOsuGame.Pets
         public void SuspendCapture()
         {
             captureSuspended = true;
-            latestFrame = null;
+            setLatestFrame(null);
             Invalidate(Invalidation.DrawNode);
         }
 
@@ -54,8 +56,8 @@ namespace osu.Game.EzOsuGame.Pets
         public void Clear()
         {
             session = null;
+            setLatestFrame(null);
             disposeTextures();
-            latestFrame = null;
             Invalidate(Invalidation.DrawNode);
         }
 
@@ -75,18 +77,41 @@ namespace osu.Game.EzOsuGame.Pets
 
             if (captureSuspended || session?.IsReady != true)
             {
-                latestFrame = null;
+                setLatestFrame(null);
                 return;
             }
 
-            latestFrame = session.CaptureFrame();
+            setLatestFrame(session.CaptureFrame());
             Invalidate(Invalidation.DrawNode);
+        }
+
+        private void setLatestFrame(EzPetCubismFrameSnapshot? frame)
+        {
+            EzPetCubismFrameSnapshot? previous;
+
+            lock (frameLock)
+            {
+                previous = latestFrame;
+                latestFrame = frame;
+            }
+
+            previous?.Release();
+        }
+
+        private EzPetCubismFrameSnapshot? acquireLatestFrame()
+        {
+            lock (frameLock)
+            {
+                latestFrame?.Acquire();
+                return latestFrame;
+            }
         }
 
         protected override DrawNode CreateDrawNode() => new CubismMeshDrawNode(this);
 
         protected override void Dispose(bool isDisposing)
         {
+            setLatestFrame(null);
             disposeTextures();
             base.Dispose(isDisposing);
         }
@@ -165,7 +190,12 @@ namespace osu.Game.EzOsuGame.Pets
             public override void ApplyState()
             {
                 base.ApplyState();
-                frame = Source.latestFrame;
+
+                var latest = Source.acquireLatestFrame();
+                var previous = frame;
+                frame = latest;
+                previous?.Release();
+
                 textures = Source.textures;
                 drawSize = Source.DrawSize;
             }
@@ -178,7 +208,7 @@ namespace osu.Game.EzOsuGame.Pets
                 if (DrawColourInfo.Colour.MaxAlpha < 0.001f)
                     return;
 
-                if (frame == null || frame.Parts.Length == 0 || textures.Length == 0)
+                if (frame == null || frame.PartCount == 0 || textures.Length == 0)
                     return;
 
                 BindTextureShader(renderer);
@@ -193,8 +223,10 @@ namespace osu.Game.EzOsuGame.Pets
 
                 Color4 drawCol = DrawColourInfo.Colour.TopLeft.SRGB;
 
-                foreach (var part in frame.Parts)
+                for (int partIndex = 0; partIndex < frame.PartCount; partIndex++)
                 {
+                    var part = frame.GetPart(partIndex);
+
                     if (part.TextureIndex < 0 || part.TextureIndex >= textures.Length)
                         continue;
 
@@ -264,6 +296,8 @@ namespace osu.Game.EzOsuGame.Pets
 
             protected override void Dispose(bool isDisposing)
             {
+                frame?.Release();
+                frame = null;
                 base.Dispose(isDisposing);
                 batch?.Dispose();
             }
