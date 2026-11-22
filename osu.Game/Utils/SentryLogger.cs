@@ -53,15 +53,20 @@ namespace osu.Game.Utils
             if (!game.SubmitErrorsToSentry)
                 return;
 
+            string? dsn = Environment.GetEnvironmentVariable("SENTRY_DSN");
+
+            if (string.IsNullOrWhiteSpace(dsn))
+                return;
+
             if (DebugUtils.IsNUnitRunning)
                 return;
 
-            if (!game.IsDeployedBuild || !game.CreateEndpoints().WebsiteUrl.EndsWith(@".ppy.sh", StringComparison.Ordinal))
+            if (!game.IsDeployedBuild)
                 return;
 
             sentrySession = SentrySdk.Init(options =>
             {
-                options.Dsn = string.Empty;
+                options.Dsn = dsn;
                 options.AutoSessionTracking = true;
                 options.IsEnvironmentUser = false;
                 options.IsGlobalModeEnabled = true;

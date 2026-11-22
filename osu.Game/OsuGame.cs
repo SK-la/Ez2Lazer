@@ -111,6 +111,8 @@ namespace osu.Game
     [Cached(typeof(OsuGame))]
     public partial class OsuGame : OsuGameBase, IKeyBindingHandler<GlobalAction>, ILocalUserPlayInfo, IPerformFromScreenRunner, IOverlayManager, ILinkHandler
     {
+        public override bool SubmitErrorsToSentry => true;
+
 #if DEBUG
         // Different port allows running release and debug builds alongside each other.
         public const string IPC_PIPE_NAME = "ez2lazer-debug";

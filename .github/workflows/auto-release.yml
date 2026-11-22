@@ -270,6 +270,7 @@ jobs:
           PYTHONUTF8: '1'
           PYTHONIOENCODING: 'utf-8'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
         run: |
           $tag = '${{ needs.prepare.outputs.publish_version_tag }}'
           if ([string]::IsNullOrWhiteSpace($tag)) {
