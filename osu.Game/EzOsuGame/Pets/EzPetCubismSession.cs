@@ -29,6 +29,9 @@ namespace osu.Game.EzOsuGame.Pets
         private CubismPhysics? physics;
         private readonly CubismMotionManager motionManager = new CubismMotionManager();
         private readonly Dictionary<string, CubismMotion> motions = new Dictionary<string, CubismMotion>(StringComparer.OrdinalIgnoreCase);
+        private readonly EzPetCubismFrameSnapshotPool frameSnapshotPool = new EzPetCubismFrameSnapshotPool();
+        private int[] drawableOrder = [];
+        private int[] drawableSortKeys = [];
 
         private readonly List<string> eyeBlinkParameterIds =
         [
@@ -596,6 +599,8 @@ namespace osu.Game.EzOsuGame.Pets
             if (!IsReady || moc == null)
                 return null;
 
+            EzPetCubismFrameSnapshot? snapshot = null;
+
             try
             {
                 var model = moc.Model;
@@ -606,23 +611,34 @@ namespace osu.Game.EzOsuGame.Pets
                 float canvasW = Math.Max(0.001f, model.GetCanvasWidth());
                 float canvasH = Math.Max(0.001f, model.GetCanvasHeight());
 
-                int[] order = new int[count];
+                if (drawableOrder.Length < count)
+                {
+                    Array.Resize(ref drawableOrder, count);
+                    Array.Resize(ref drawableSortKeys, count);
+                }
+
                 for (int i = 0; i < count; i++)
-                    order[i] = i;
+                    drawableOrder[i] = i;
 
                 // Cubism 5.3+ renamed csmGetDrawableRenderOrders → csmGetRenderOrders.
                 // Fall back to draw-orders / index order so older/newer Core both work.
                 int* sortKeys = EzPetCubismCoreCompat.TryGetDrawableSortOrders(model.Model);
-                if (sortKeys != null)
-                    Array.Sort(order, (a, b) => sortKeys[a].CompareTo(sortKeys[b]));
 
-                var parts = new List<EzPetCubismMeshPart>(count);
+                if (sortKeys != null)
+                {
+                    for (int i = 0; i < count; i++)
+                        drawableSortKeys[i] = sortKeys[i];
+
+                    Array.Sort(drawableSortKeys, drawableOrder, 0, count);
+                }
+
+                snapshot = frameSnapshotPool.Rent(canvasW, canvasH);
                 int* maskCounts = model.GetDrawableMaskCounts();
                 float eyeFade = Math.Clamp(currentEyeOpen, 0f, 1f);
 
                 for (int o = 0; o < count; o++)
                 {
-                    int di = order[o];
+                    int di = drawableOrder[o];
 
                     if (!model.GetDrawableDynamicFlagIsVisible(di))
                         continue;
@@ -646,41 +662,32 @@ namespace osu.Game.EzOsuGame.Pets
                     var uvsPtr = model.GetDrawableVertexUvs(di);
                     ushort* indicesPtr = model.GetDrawableVertexIndices(di);
 
-                    var positions = new Vector2[vertexCount];
-                    var uvs = new Vector2[vertexCount];
+                    var part = snapshot.AddPart(
+                        model.GetDrawableTextureIndex(di),
+                        opacity,
+                        model.GetDrawableBlendMode(di),
+                        vertexCount,
+                        indexCount);
 
                     for (int v = 0; v < vertexCount; v++)
                     {
                         var p = positionsPtr[v];
                         var uv = uvsPtr[v];
-                        positions[v] = new Vector2(p.X, p.Y);
-                        uvs[v] = new Vector2(uv.X, uv.Y);
+                        part.Positions[v] = new Vector2(p.X, p.Y);
+                        part.UVs[v] = new Vector2(uv.X, uv.Y);
                     }
 
-                    ushort[] indices = new ushort[indexCount];
                     for (int i = 0; i < indexCount; i++)
-                        indices[i] = indicesPtr[i];
-
-                    parts.Add(new EzPetCubismMeshPart
-                    {
-                        TextureIndex = model.GetDrawableTextureIndex(di),
-                        Opacity = opacity,
-                        BlendMode = model.GetDrawableBlendMode(di),
-                        Positions = positions,
-                        UVs = uvs,
-                        Indices = indices,
-                    });
+                        part.Indices[i] = indicesPtr[i];
                 }
 
-                return new EzPetCubismFrameSnapshot
-                {
-                    CanvasWidth = canvasW,
-                    CanvasHeight = canvasH,
-                    Parts = parts.ToArray(),
-                };
+                var completedSnapshot = snapshot;
+                snapshot = null;
+                return completedSnapshot;
             }
             catch (Exception ex)
             {
+                snapshot?.Release();
                 Logger.Error(ex, "Ez pet Cubism: CaptureFrame failed");
                 return null;
             }
@@ -778,6 +785,7 @@ namespace osu.Game.EzOsuGame.Pets
 
         public void Dispose()
         {
+            frameSnapshotPool.Dispose();
             breath = null;
             physics = null;
             motions.Clear();

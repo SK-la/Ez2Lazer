@@ -41,6 +41,8 @@ namespace osu.Game.EzOsuGame.Audio
 
         private readonly SampleSchedulerState sampleScheduler = new SampleSchedulerState();
         private readonly PlaybackState playback = new PlaybackState();
+        private readonly Action<ScheduledHitSound> triggerHitSoundAction;
+        private readonly Action<ScheduledStoryboardSample> triggerStoryboardSampleAction;
 
         private Track? currentTrack;
         private IWorkingBeatmap? currentBeatmap;
@@ -51,6 +53,12 @@ namespace osu.Game.EzOsuGame.Audio
         // LRU 缓存：按 BeatmapID 缓存调度数据，避免跨难度复用。
         private readonly LinkedList<string> beatmapAccessOrder = new LinkedList<string>();
         private readonly Dictionary<string, BeatmapSampleCache> sampleCache = new Dictionary<string, BeatmapSampleCache>();
+
+        public EzPreviewTrackManager()
+        {
+            triggerHitSoundAction = triggerHitSound;
+            triggerStoryboardSampleAction = triggerStoryboardSample;
+        }
 
         /// <summary>
         /// 覆盖预览起点时间（毫秒）。若为 null，则使用谱面元数据的 PreviewTime。
@@ -515,10 +523,10 @@ namespace osu.Game.EzOsuGame.Audio
             processPreloadQueue();
 
             if (previewHitSoundsEnabled)
-                processScheduledEvents(sampleScheduler.ScheduledHitSounds, ref sampleScheduler.NextHitSoundIndex, logicalTime, triggerHitSound);
+                processScheduledEvents(sampleScheduler.ScheduledHitSounds, ref sampleScheduler.NextHitSoundIndex, logicalTime, triggerHitSoundAction);
 
             if (previewStoryboardEnabled)
-                processScheduledEvents(sampleScheduler.ScheduledStoryboardSamples, ref sampleScheduler.NextStoryboardSampleIndex, logicalTime, triggerStoryboardSample);
+                processScheduledEvents(sampleScheduler.ScheduledStoryboardSamples, ref sampleScheduler.NextStoryboardSampleIndex, logicalTime, triggerStoryboardSampleAction);
 
             cleanupInactiveChannels();
             playback.LastTrackTime = physicalTime;
