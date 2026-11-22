@@ -21,6 +21,7 @@ using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.Configuration;
+using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics.Carousel;
@@ -38,6 +39,7 @@ using osu.Game.Overlays.Notifications;
 using osu.Game.Overlays.Toolbar;
 using osu.Game.Overlays.Volume;
 using osu.Game.Resources.Localisation.Web;
+using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu.Mods;
@@ -1361,6 +1363,77 @@ namespace osu.Game.Tests.Visual.Navigation
             AddUntilStep("nothing selected", () => Game.Beatmap.IsDefault);
             AddStep("present deleted beatmap", () => Game.PresentBeatmap(beatmap));
             AddAssert("still nothing selected", () => Game.Beatmap.IsDefault);
+        }
+
+        [Test]
+        public void TestDeleteSelectedSetSelectsAnotherAvailableBeatmap()
+        {
+            BeatmapSetInfo deletedSet = null!;
+            BeatmapSetInfo availableSet = null!;
+            Screens.Select.SongSelect songSelect = null!;
+
+            PushAndConfirm(() => songSelect = new SoloSongSelect());
+            AddUntilStep("wait for song select", () => songSelect.CarouselItemsPresented);
+
+            AddStep("insert two osu beatmap sets", () => Game.Realm.Write(r =>
+            {
+                deletedSet = TestResources.CreateTestBeatmapSetInfo(1, [r.Find<RulesetInfo>("osu")]);
+                r.Add(deletedSet);
+                availableSet = TestResources.CreateTestBeatmapSetInfo(1, [r.Find<RulesetInfo>("osu")]);
+                r.Add(availableSet);
+                deletedSet = deletedSet.Detach();
+                availableSet = availableSet.Detach();
+            }));
+
+            AddUntilStep("wait for both beatmaps", () => songSelect.ChildrenOfType<BeatmapCarousel>().Single().MatchedBeatmapsCount >= 2);
+            AddStep("select set to delete", () => Game.Beatmap.Value = Game.BeatmapManager.GetWorkingBeatmap(deletedSet.Beatmaps.Single()));
+            AddUntilStep("target set selected", () => Game.Beatmap.Value.BeatmapSetInfo.ID == deletedSet.ID);
+
+            AddStep("delete selected set", () => Game.BeatmapManager.Delete(Game.Beatmap.Value.BeatmapSetInfo));
+            AddUntilStep("remaining set selected", () => Game.Beatmap.Value.BeatmapSetInfo.ID == availableSet.ID);
+        }
+
+        [Test]
+        public void TestFilteringSelectedSetSelectsAnotherRulesetBeatmap()
+        {
+            BeatmapSetInfo osuSet = null!;
+            BeatmapSetInfo taikoSet = null!;
+            Screens.Select.SongSelect songSelect = null!;
+
+            PushAndConfirm(() => songSelect = new SoloSongSelect());
+            AddUntilStep("wait for song select", () => songSelect.CarouselItemsPresented);
+
+            AddStep("switch to osu", () =>
+            {
+                InputManager.PressKey(Key.ControlLeft);
+                InputManager.Key(Key.Number1);
+                InputManager.ReleaseKey(Key.ControlLeft);
+            });
+            AddUntilStep("osu ruleset active", () => Game.Ruleset.Value.ShortName == "osu");
+
+            AddStep("insert osu and taiko beatmap sets", () => Game.Realm.Write(r =>
+            {
+                osuSet = TestResources.CreateTestBeatmapSetInfo(1, [r.Find<RulesetInfo>("osu")]);
+                r.Add(osuSet);
+                taikoSet = TestResources.CreateTestBeatmapSetInfo(1, [r.Find<RulesetInfo>("taiko")]);
+                r.Add(taikoSet);
+                osuSet = osuSet.Detach();
+                taikoSet = taikoSet.Detach();
+            }));
+
+            AddStep("select osu beatmap", () => Game.Beatmap.Value = Game.BeatmapManager.GetWorkingBeatmap(osuSet.Beatmaps.Single()));
+            AddUntilStep("osu beatmap selected", () => Game.Beatmap.Value.BeatmapSetInfo.ID == osuSet.ID);
+
+            AddStep("hide converted beatmaps", () => Game.LocalConfig.SetValue(OsuSetting.ShowConvertedBeatmaps, false));
+            AddStep("switch to taiko", () =>
+            {
+                InputManager.PressKey(Key.ControlLeft);
+                InputManager.Key(Key.Number2);
+                InputManager.ReleaseKey(Key.ControlLeft);
+            });
+
+            AddUntilStep("taiko ruleset active", () => Game.Ruleset.Value.ShortName == "taiko");
+            AddUntilStep("taiko fallback selected", () => Game.Beatmap.Value.BeatmapSetInfo.ID == taikoSet.ID);
         }
 
         [Test]

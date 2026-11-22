@@ -46,6 +46,7 @@ namespace osu.Game.Tests.Visual.Gameplay
             AddAssert("none judged", () => Player.DrawableRuleset.Playfield.AllHitObjects.All(h => !h.Judged));
             AddUntilStep("key counters reset", () => Player.HUDOverlay.InputCountController.Triggers.All(kc => kc.ActivationCount.Value == 0));
             AddAssert("no judgements triggered during rewind", () => !judgementDuringRewind);
+            AddAssert("no results recorded after rewind", () => Player.Results.Count, () => Is.Zero);
         }
 
         private void addSeekStep(double time)

@@ -66,6 +66,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         /// </summary>
         private const double radar_median_ms = 600;
 
+        private const int gen2_collection_ceiling = 1;
+
         /// <summary>
         /// Gen1 collections per structure pass. Today's worst case (7K, hold-heavy) sits at 0.5; a pass that starts
         /// triggering one collection per run has either grown its allocation by an order of magnitude or started
@@ -130,8 +132,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
         }
 
         /// <summary>
-        /// Reports collection pressure for a whole structure pass and guards its per-run Gen1 rate.
-        /// Gen2 counts are process-wide collection counts, so they cannot establish whether pass allocations survive.
+        /// Reports collection pressure for a whole structure pass. One process-wide Gen2 collection is allowed to
+        /// absorb unrelated background activity while repeated Gen2 pressure remains a failure.
         /// </summary>
         [TestCase(4, 0.0)]
         [TestCase(4, 0.5)]
@@ -152,6 +154,8 @@ namespace osu.Game.Tests.EzOsuGame.Skills
 
             Assert.That(sample.Gen1PerRun, Is.LessThanOrEqualTo(gen1_per_run_ceiling),
                 $"the structure pass collected gen1 {sample.Gen1PerRun:F2} times per run; the ceiling is {gen1_per_run_ceiling}");
+            Assert.That(sample.Gen2, Is.LessThanOrEqualTo(gen2_collection_ceiling),
+                $"the structure pass triggered {sample.Gen2} Gen2 collections over {runs} runs");
         }
 
         /// <summary>
@@ -251,8 +255,13 @@ namespace osu.Game.Tests.EzOsuGame.Skills
             Assert.That(fleet.AverageKb, Is.LessThanOrEqualTo(single.AverageKb * 4 * 1.35),
                 "chain allocation grew faster than linearly with chart count");
 
-            // Gen2 is reported by the sample. The pass creates large transient arrays, so a process-wide Gen2
-            // collection does not distinguish their reclamation from retained allocations.
+            if (holdRatio == 0)
+            {
+                Assert.That(fleet.Gen2, Is.LessThanOrEqualTo(gen2_collection_ceiling),
+                    $"the sequential RC chain triggered {fleet.Gen2} Gen2 collections over {runs} runs");
+            }
+
+            // Hold-heavy chains currently create enough transient arrays to trigger process-wide Gen2 collections.
             TestContext.Progress.WriteLine($"chain triggered {fleet.Gen2} process-wide Gen2 collection(s) over 48 chart passes");
         }
 

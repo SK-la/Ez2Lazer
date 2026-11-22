@@ -42,19 +42,19 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
     /// builder drives one produce the same timeline for the same score.
     /// </summary>
     /// <remarks>
-    /// The fixture has to be a chart the score itself is filed under. Mania and Osu can use a beatmap provider, which
-    /// re-derives the chart from the score's beatmap; this fixture keeps Osu on that path while Mania uses a shared
-    /// playable conversion. The replay is generated from the databased chart's own playable so both paths use the same
-    /// source chart.
+    /// The fixture has to be a chart the score itself is filed under. Osu uses a beatmap provider, while Mania covers
+    /// both its provider and shared-playable paths. Taiko and Catch reuse a shared playable conversion. The replay is
+    /// generated from the databased chart's own playable so every path uses the same source chart.
     /// </remarks>
     [TestFixture]
     public class EzScoreTimelineTryBuildFourModeIntegrationTest : ImportTest
     {
-        [TestCase(typeof(OsuRuleset))]
-        [TestCase(typeof(ManiaRuleset))]
-        [TestCase(typeof(TaikoRuleset))]
-        [TestCase(typeof(CatchRuleset))]
-        public void TryBuildMatchesSessionTimelineDirect(Type rulesetType)
+        [TestCase(typeof(OsuRuleset), false)]
+        [TestCase(typeof(ManiaRuleset), false)]
+        [TestCase(typeof(ManiaRuleset), true)]
+        [TestCase(typeof(TaikoRuleset), true)]
+        [TestCase(typeof(CatchRuleset), true)]
+        public void TryBuildMatchesSessionTimelineDirect(Type rulesetType, bool useSharedPlayable)
         {
             using var host = new CleanRunHeadlessGameHost();
 
@@ -97,9 +97,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                         Assert.That(databasedScore?.ScoreInfo.Files.Select(file => file.Filename), Does.Contain("replay.osr"), "the imported score must retain its replay file");
                         Assert.That(databasedScore?.Replay?.Frames, Is.Not.Empty, "the imported score must retain its replay frames");
 
-                        // This fixture exercises Osu's beatmap-provider path and reuses a session-ready conversion for
-                        // Mania, Taiko and Catch.
-                        bool usesProvider = usesBeatmapProvider(ruleset);
+                        // This fixture covers both Mania paths, Osu's provider path, and shared conversions for Taiko and Catch.
+                        bool usesProvider = usesBeatmapProvider(ruleset, useSharedPlayable);
                         var sharedPlayable = usesProvider
                             ? null
                             : EzScoreRacePlayableResolver.GetSessionReady(workingBeatmap, ruleset.RulesetInfo, Array.Empty<Mod>());
@@ -138,8 +137,13 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             }
         }
 
-        private static bool usesBeatmapProvider(Ruleset ruleset)
-            => EzScoreRaceRulesetSupport.GetGhostTimelineMode(ruleset.RulesetInfo) == EzScoreRaceGhostTimelineMode.OsuSession;
+        private static bool usesBeatmapProvider(Ruleset ruleset, bool useSharedPlayable)
+        {
+            var timelineMode = EzScoreRaceRulesetSupport.GetGhostTimelineMode(ruleset.RulesetInfo);
+
+            return timelineMode == EzScoreRaceGhostTimelineMode.OsuSession
+                   || (timelineMode == EzScoreRaceGhostTimelineMode.ManiaSession && !useSharedPlayable);
+        }
 
         private static BeatmapInfo findBeatmap(BeatmapManager beatmapManager, RulesetInfo rulesetInfo)
         {
