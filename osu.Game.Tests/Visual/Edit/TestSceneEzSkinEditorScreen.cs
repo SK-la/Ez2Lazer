@@ -209,6 +209,7 @@ namespace osu.Game.Tests.Visual.Edit
         [SetUpSteps]
         public override void SetUpSteps()
         {
+            resetSkinEditorHostScope();
             base.SetUpSteps();
 
             // 测试会导入并选中的皮肤会留在 SkinManager 里，影响后续用例（例如「内置皮肤下导出应禁用」）。
@@ -229,9 +230,16 @@ namespace osu.Game.Tests.Visual.Edit
                 editorScreen = null!;
             });
 
-            AddStep("exit skin editor host scope", () => EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.Ez));
+            AddStep("reset skin editor host scope", resetSkinEditorHostScope);
 
             base.TearDownSteps();
+        }
+
+        private static void resetSkinEditorHostScope()
+        {
+            EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.OfficialHud);
+            EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.Ez);
+            EzSkinEditorHostScope.EndTransition();
         }
 
         protected override void LoadComplete()

@@ -25,6 +25,7 @@ using osu.Game.EzOsuGame.Edit.Components;
 using osu.Game.EzOsuGame.Edit.Screens;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.UserInterface;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Online.API;
 using osu.Game.Overlays.Mods;
 using osu.Game.Overlays.Settings;
@@ -56,6 +57,49 @@ namespace osu.Game.Tests.Visual.Navigation
         private EzSkinEditorOverlay ezSkinEditor => Game.ChildrenOfType<EzSkinEditorOverlay>().Single();
 
         private SkinEditorOverlay skinEditorOverlay => Game.Dependencies.Get<SkinEditorOverlay>();
+
+        private void addSongSelectCompatibleComponent()
+        {
+            var button = skinEditor.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>()
+                                   .Single(candidate => candidate.ChildrenOfType<OsuSpriteText>().Any(text => text.Text.ToString() == "EzHUDDynamicSpeedDisplay"));
+
+            button.TriggerClick();
+        }
+
+        public override void SetUpSteps()
+        {
+            AddStep("close residual skin editors", closeSkinEditorsAndResetScope);
+            base.SetUpSteps();
+        }
+
+        public override void TearDownSteps()
+        {
+            AddStep("close skin editors and reset scope", closeSkinEditorsAndResetScope);
+            base.TearDownSteps();
+        }
+
+        private void closeSkinEditorsAndResetScope()
+        {
+            if (Game?.Parent != null)
+            {
+                var officialOverlay = Game.ChildrenOfType<SkinEditorOverlay>().FirstOrDefault();
+                if (officialOverlay?.State.Value == Visibility.Visible)
+                    officialOverlay.Hide();
+
+                var ezOverlay = Game.ChildrenOfType<EzSkinEditorOverlay>().FirstOrDefault();
+                if (ezOverlay?.State.Value == Visibility.Visible)
+                    ezOverlay.Hide();
+            }
+
+            resetSkinEditorHostScope();
+        }
+
+        private static void resetSkinEditorHostScope()
+        {
+            EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.OfficialHud);
+            EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.Ez);
+            EzSkinEditorHostScope.EndTransition();
+        }
 
         [Test]
         public void TestEzEditorKeepsLastEditedSongSelect()
@@ -662,7 +706,10 @@ namespace osu.Game.Tests.Visual.Navigation
 
             AddStep("add skinnable component", () =>
             {
-                skinEditor.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>().First().TriggerClick();
+                var button = skinEditor.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>()
+                                       .Single(candidate => candidate.ChildrenOfType<OsuSpriteText>().Any(text => text.Text.ToString() == "EzHUDDynamicSpeedDisplay"));
+
+                button.TriggerClick();
             });
 
             AddUntilStep("newly added component selected", () => skinEditor.SelectedComponents.Count == 1);
@@ -797,10 +844,14 @@ namespace osu.Game.Tests.Visual.Navigation
             AddAssert("blueprint container present", () => skinEditor.ChildrenOfType<SkinBlueprintContainer>().Count(), () => Is.EqualTo(1));
             AddAssert("placeholder not present", () => skinEditor.ChildrenOfType<NonSkinnableScreenPlaceholder>().Count(), () => Is.Zero);
             AddAssert("editor sidebars not empty", () => skinEditor.ChildrenOfType<EditorSidebar>().SelectMany(sidebar => sidebar.Children).Count(), () => Is.GreaterThan(0));
+            AddUntilStep("skin component targets loaded", () => Game.ChildrenOfType<SkinnableContainer>().All(target => target.ComponentsLoaded));
 
             AddStep("add skinnable component", () =>
             {
-                skinEditor.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>().First().TriggerClick();
+                var button = skinEditor.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>()
+                                       .Single(candidate => candidate.ChildrenOfType<OsuSpriteText>().Any(text => text.Text.ToString() == "EzHUDDynamicSpeedDisplay"));
+
+                button.TriggerClick();
             });
             AddUntilStep("newly added component selected", () => skinEditor.SelectedComponents, () => Has.Count.EqualTo(1));
 
@@ -882,10 +933,12 @@ namespace osu.Game.Tests.Visual.Navigation
 
             Guid editedSkinId = Guid.Empty;
             AddStep("save skin id", () => editedSkinId = Game.Dependencies.Get<SkinManager>().CurrentSkinInfo.Value.ID);
+            AddUntilStep("skin component targets loaded", () => Game.ChildrenOfType<SkinnableContainer>().All(target => target.ComponentsLoaded));
             AddStep("add skinnable component", () =>
             {
-                skinEditor.ChildrenOfType<SkinComponentToolbox.ToolboxComponentButton>().First().TriggerClick();
+                addSongSelectCompatibleComponent();
             });
+            AddUntilStep("newly added component selected", () => skinEditor.SelectedComponents.Count == 1);
 
             AddStep("change to triangles skin", () => Game.Dependencies.Get<SkinManager>().SetSkinFromConfiguration(SkinInfo.TRIANGLES_SKIN.ToString()));
             AddUntilStep("components loaded", () => Game.ChildrenOfType<SkinnableContainer>().All(c => c.ComponentsLoaded));
