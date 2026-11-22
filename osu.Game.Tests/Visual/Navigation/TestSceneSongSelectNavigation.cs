@@ -255,6 +255,16 @@ namespace osu.Game.Tests.Visual.Navigation
             PushAndConfirm(() => new SoloSongSelect());
 
             AddUntilStep("wait for selected", () => !Game.Beatmap.IsDefault);
+            AddStep("select osu! beatmap", () =>
+            {
+                selectedBeatmap = beatmapSet.Beatmaps.First(b => b.Ruleset.OnlineID == 0);
+                Game.Beatmap.Value = Game.BeatmapManager.GetWorkingBeatmap(selectedBeatmap);
+            });
+            AddUntilStep("osu! beatmap selected", () => Game.Beatmap.Value.BeatmapInfo, () => Is.EqualTo(selectedBeatmap));
+            AddStep("show converts while osu! beatmap is selected", () => Game.LocalConfig.SetValue(OsuSetting.ShowConvertedBeatmaps, true));
+            AddUntilStep("selected osu! beatmap remains selected", () => Game.Beatmap.Value.BeatmapInfo, () => Is.EqualTo(selectedBeatmap));
+            AddStep("hide converts while osu! beatmap is selected", () => Game.LocalConfig.SetValue(OsuSetting.ShowConvertedBeatmaps, false));
+            AddUntilStep("selected osu! beatmap remains selected", () => Game.Beatmap.Value.BeatmapInfo, () => Is.EqualTo(selectedBeatmap));
 
             AddStep("change ruleset to taiko", () =>
             {
@@ -265,9 +275,9 @@ namespace osu.Game.Tests.Visual.Navigation
             AddStep("show converts", () => Game.LocalConfig.SetValue(OsuSetting.ShowConvertedBeatmaps, true));
             AddStep("select osu! beatmap", () =>
             {
-                selectedBeatmap = beatmapSet.Beatmaps.First(b => b.Ruleset.OnlineID == 0);
                 Game.Beatmap.Value = Game.BeatmapManager.GetWorkingBeatmap(selectedBeatmap);
             });
+            AddUntilStep("explicit osu! selection remains selected", () => Game.Beatmap.Value.BeatmapInfo, () => Is.EqualTo(selectedBeatmap));
 
             pushEscape();
             AddUntilStep("went back to main menu", () => Game.ScreenStack.CurrentScreen is MainMenu);

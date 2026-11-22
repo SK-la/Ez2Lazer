@@ -931,6 +931,8 @@ namespace osu.Game.Screens.Select
             if (!this.IsCurrentScreen())
                 return;
 
+            // An explicit global selection supersedes any pending carousel suggestion.
+            cancelDebounceSelection();
             ensureGlobalBeatmapValid();
 
             ensurePlayingSelected();
