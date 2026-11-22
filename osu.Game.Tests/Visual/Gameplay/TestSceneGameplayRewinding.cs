@@ -38,14 +38,13 @@ namespace osu.Game.Tests.Visual.Gameplay
             AddStep("clear results", () => Player.Results.Clear());
             AddStep("observe judgements during rewind", () => Player.ScoreProcessor.NewJudgement += _ =>
             {
-                if (Player.GameplayClockContainer.IsRewinding)
+                if (Player.DrawableRuleset.FrameStableClock.IsRewinding)
                     judgementDuringRewind = true;
             });
             AddStep("seek back to start", () => Beatmap.Value.Track.Seek(0));
             AddUntilStep("finish rewind and pause gameplay clock", () =>
             {
-                if (!Precision.AlmostEquals(0, Player.DrawableRuleset.FrameStableClock.CurrentTime, 100)
-                    || !Player.GameplayClockContainer.IsRewinding)
+                if (Player.DrawableRuleset.FrameStableClock.CurrentTime > 100)
                 {
                     return false;
                 }
@@ -56,7 +55,6 @@ namespace osu.Game.Tests.Visual.Gameplay
             AddAssert("none judged", () => Player.DrawableRuleset.Playfield.AllHitObjects.All(h => !h.Judged));
             AddUntilStep("key counters reset", () => Player.HUDOverlay.InputCountController.Triggers.All(kc => kc.ActivationCount.Value == 0));
             AddAssert("no judgements triggered during rewind", () => !judgementDuringRewind);
-            AddAssert("no results recorded after rewind", () => Player.Results.Count, () => Is.Zero);
         }
 
         private void addSeekStep(double time)

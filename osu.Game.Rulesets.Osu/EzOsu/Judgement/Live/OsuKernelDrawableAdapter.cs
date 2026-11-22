@@ -140,6 +140,9 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement.Live
         /// </summary>
         public void TryPress(DrawableOsuHitObject drawable, OsuAction action)
         {
+            if ((Clock as IGameplayClock)?.IsRewinding == true)
+                return;
+
             if (kernel == null)
                 return;
 
@@ -149,7 +152,11 @@ namespace osu.Game.Rulesets.Osu.EzOsu.Judgement.Live
                 return;
 
             double rate = (Clock as IGameplayClock)?.Rate ?? 1;
-            double time = Time.Current + ezOffset + subFrameCorrection(rate);
+            double time = inputManager.ReplayInputHandler is OsuFramedReplayInputHandler replay
+                          && replay.CurrentFrame is { } frame
+                          && frame.Actions.Contains(action)
+                ? frame.Time + ezOffset
+                : Time.Current + ezOffset + subFrameCorrection(rate);
             Vector2 position = playfield.ToLocalSpace(inputManager.CurrentState.Mouse.Position);
 
             samples.Record(time, position, isPressed(OsuAction.LeftButton), isPressed(OsuAction.RightButton));
