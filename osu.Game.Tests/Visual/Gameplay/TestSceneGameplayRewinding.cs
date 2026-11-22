@@ -41,8 +41,18 @@ namespace osu.Game.Tests.Visual.Gameplay
                 if (Player.GameplayClockContainer.IsRewinding)
                     judgementDuringRewind = true;
             });
-            addSeekStep(0);
-            AddStep("pause gameplay clock", () => Player.GameplayClockContainer.Stop());
+            AddStep("seek back to start", () => Beatmap.Value.Track.Seek(0));
+            AddUntilStep("finish rewind and pause gameplay clock", () =>
+            {
+                if (!Precision.AlmostEquals(0, Player.DrawableRuleset.FrameStableClock.CurrentTime, 100)
+                    || !Player.GameplayClockContainer.IsRewinding)
+                {
+                    return false;
+                }
+
+                Player.GameplayClockContainer.Stop();
+                return true;
+            });
             AddAssert("none judged", () => Player.DrawableRuleset.Playfield.AllHitObjects.All(h => !h.Judged));
             AddUntilStep("key counters reset", () => Player.HUDOverlay.InputCountController.Triggers.All(kc => kc.ActivationCount.Value == 0));
             AddAssert("no judgements triggered during rewind", () => !judgementDuringRewind);

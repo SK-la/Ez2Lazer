@@ -59,7 +59,7 @@ namespace osu.Game.Online
                  || (!string.IsNullOrEmpty(s.Hash) && s.Hash == hash))
                 && !s.DeletePending), (items, _) =>
             {
-                if (items.Any())
+                if (items.Any(hasLocalReplay))
                     Schedule(() => UpdateState(DownloadState.LocallyAvailable));
                 else
                 {
@@ -71,6 +71,10 @@ namespace osu.Game.Online
                 }
             });
         }
+
+        private static bool hasLocalReplay(ScoreInfo score)
+            => score.Files.Any(file => file.Filename.EndsWith(".osr", StringComparison.OrdinalIgnoreCase)
+                                       || file.Filename.EndsWith(".ezosr", StringComparison.OrdinalIgnoreCase));
 
         private void downloadBegan(ArchiveDownloadRequest<IScoreInfo> request) => Schedule(() =>
         {

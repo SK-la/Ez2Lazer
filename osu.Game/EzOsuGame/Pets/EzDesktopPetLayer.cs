@@ -109,8 +109,7 @@ namespace osu.Game.EzOsuGame.Pets
 
                 temporaryHidden = value;
 
-                if (enabled != null)
-                    updateVisibility();
+                updateVisibility();
             }
         }
 
@@ -360,6 +359,9 @@ namespace osu.Game.EzOsuGame.Pets
 
         protected override void Dispose(bool isDisposing)
         {
+            if (!IsLoaded)
+                return;
+
             if (game != null)
             {
                 game.ScreenStack.ScreenPushed -= onScreenChanged;
@@ -370,13 +372,13 @@ namespace osu.Game.EzOsuGame.Pets
             stateMachine.ClipChanged -= onClipChanged;
             stateMachine.VisibilityAction -= onVisibilityAction;
             stateMachine.MotionRequested -= onMotionRequested;
+
+            base.Dispose(isDisposing);
+
             motionDriver.Stop();
-            animation.ClearFrames();
             clipTextures.Clear();
             cubismSession?.Dispose();
             cubismSession = null;
-
-            base.Dispose(isDisposing);
         }
 
         private void reloadPack()

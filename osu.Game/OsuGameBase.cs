@@ -136,8 +136,8 @@ namespace osu.Game
 
         public virtual EndpointConfiguration CreateEndpoints()
         {
-            if (UseDevelopmentServer && GlobalConfigStore.UseDevelopmentEndpointsForTests)
-                return new DevelopmentEndpointConfiguration();
+            // if (UseDevelopmentServer && GlobalConfigStore.UseDevelopmentEndpointsForTests)
+            //     return new DevelopmentEndpointConfiguration();
 
             // 如果Ez2ConfigManager已初始化，根据服务器预设选择对应的配置
             if (Ez2ConfigManager != null)
@@ -156,7 +156,8 @@ namespace osu.Game
             Logger.Log("[EzServer] Switch server failed: Ez2ConfigManager not initialized. Falling back to default configuration.", Ez2ConfigManager.LOGGER_NAME, LogLevel.Debug);
 
             // 否则使用默认配置
-            return UseDevelopmentServer ? new DevelopmentEndpointConfiguration() : new ProductionEndpointConfiguration();
+            return new GuServerEndpointConfiguration();
+            // return UseDevelopmentServer ? new DevelopmentEndpointConfiguration() : new ProductionEndpointConfiguration();
         }
 
         protected override OnlineStore CreateOnlineStore() => new TrustedDomainOnlineStore();

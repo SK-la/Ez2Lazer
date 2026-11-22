@@ -3,6 +3,8 @@
 
 #nullable disable
 
+using System;
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Graphics;
@@ -13,9 +15,13 @@ using osu.Framework.Extensions;
 using osu.Framework.Testing;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.IO.Archives;
+using osu.Game.Online.API;
+using osu.Game.Online.API.Requests;
 using osu.Game.Overlays;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Scoring;
+using osu.Game.Scoring.Legacy;
 using osu.Game.Screens.Ranking;
 using osu.Game.Tests.Resources;
 using osuTK.Input;
@@ -38,6 +44,22 @@ namespace osu.Game.Tests.Visual.Gameplay
 
         [Resolved]
         private ScoreManager scoreManager { get; set; }
+
+        protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
+        {
+            var dependencies = new DependencyContainer(base.CreateChildDependencies(parent));
+            var api = (DummyAPIAccess)API;
+            api.HandleRequest = request =>
+            {
+                if (request is not DownloadReplayRequest)
+                    return false;
+
+                Schedule(() => request.Fail(new OperationCanceledException()));
+                return true;
+            };
+            dependencies.Cache(new ScoreModelDownloader(parent.Get<ScoreManager>(), api));
+            return dependencies;
+        }
 
         [BackgroundDependencyLoader]
         private void load()
@@ -182,7 +204,14 @@ namespace osu.Game.Tests.Visual.Gameplay
             AddUntilStep("wait for load", () => downloadButton.IsLoaded);
             checkState(DownloadState.NotDownloaded);
 
-            AddStep("import score", () => imported = scoreManager.Import(getScoreInfo(true)));
+            AddStep("import score with replay file", () =>
+            {
+                var score = new Score { ScoreInfo = getScoreInfo(false) };
+                using var stream = new MemoryStream();
+                new LegacyScoreEncoder(score, null).Encode(stream);
+                using var archive = new ByteArrayArchiveReader(stream.ToArray(), "replay.osr");
+                imported = scoreManager.Import(score.ScoreInfo, archive);
+            });
 
             checkState(DownloadState.LocallyAvailable);
             AddAssert("button is enabled", () => downloadButton.Enabled.Value);
@@ -214,18 +243,23 @@ namespace osu.Game.Tests.Visual.Gameplay
         private void checkState(DownloadState expectedState) =>
             AddUntilStep($"state is {expectedState}", () => downloadButton.State.Value, () => Is.EqualTo(expectedState));
 
-        private ScoreInfo getScoreInfo(bool replayAvailable, bool hasOnlineId = true) => new ScoreInfo
+        private ScoreInfo getScoreInfo(bool replayAvailable, bool hasOnlineId = true)
         {
-            OnlineID = hasOnlineId ? online_score_id : 0,
-            Ruleset = new OsuRuleset().RulesetInfo,
-            BeatmapInfo = beatmapManager.GetAllUsableBeatmapSets().First().Beatmaps.First(),
-            HasOnlineReplay = replayAvailable,
-            User = new APIUser
+            var score = new ScoreInfo
             {
-                Id = 39828,
-                Username = @"WubWoofWolf",
-            }
-        };
+                OnlineID = hasOnlineId ? online_score_id : 0,
+                Ruleset = new OsuRuleset().RulesetInfo,
+                BeatmapInfo = beatmapManager.GetAllUsableBeatmapSets().First().Beatmaps.First(),
+                HasOnlineReplay = replayAvailable,
+                User = new APIUser
+                {
+                    Id = APIUser.SYSTEM_USER_ID,
+                    Username = @"System",
+                }
+            };
+
+            return score;
+        }
 
         private partial class TestReplayDownloadButton : ReplayDownloadButton
         {
