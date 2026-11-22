@@ -17,7 +17,7 @@ namespace osu.Desktop
     [SupportedOSPlatform("windows")]
     internal static class NVAPI
     {
-        private const string osu_filename = "osu!.exe";
+        private const string osu_filename = "Ez2osu!.exe";
 
         // This is a good reference:
         // https://github.com/errollw/Warp-and-Blend-Quadros/blob/master/WarpBlend-Quadros/UnwarpAll-Quadros/include/nvapi.h

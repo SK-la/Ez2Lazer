@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="640" alt="osu! logo" src="assets/Ez2Lazer-previewr.png">
+  <img width="1280" alt="ez2lazer logo" src="assets/Ez2Lazer-previewr.png">
 </p>
 
 <div align="center">
@@ -34,10 +34,10 @@ Game resources are covered by a separate licence in [ppy/osu-resources](https://
 
 - Latest releases: [SK-la/Ez2Lazer Releases](https://github.com/SK-la/Ez2Lazer/releases)
 - Resource pack: [EzResources (OneDrive)](https://1drv.ms/f/c/f3cc2de32b3b7226/IgBk_21pXWxGS68n3ucCBC5lAappj0tXAeQAUBnNG1eWki0?e=nTkpPz)
-- Runtime: [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
+- Runtime: [.NET 11 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/11.0)
 
 **Auto-update (recommended)**  
-- Windows: use `ez2lazer-win-Setup.exe` from Releases (requires [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)); in-game updates download deltas afterward.  
+- Windows: use `ez2lazer-win-Setup.exe` from Releases (requires [.NET 11 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/11.0)); in-game updates download deltas afterward.  
 - For manual installs use `Ez2Lazer_release_*.zip`; zip installs cannot receive delta updates until you switch to Setup once.
 
 > Without EzResources, Ez Pro Skin and Ez HUD widgets will miss textures.
