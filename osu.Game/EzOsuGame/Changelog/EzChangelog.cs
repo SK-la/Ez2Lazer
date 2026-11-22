@@ -224,8 +224,8 @@ namespace osu.Game.EzOsuGame.Changelog
             GitHubRelease[] cached = Array.Empty<GitHubRelease>();
             bool fresh = false;
             bool hasCache = storage != null
-                              && EzGitHubChangelogReleaseCache.TryRead(storage, out cached, out fresh)
-                              && cached.Length > 0;
+                            && EzGitHubChangelogReleaseCache.TryRead(storage, out cached, out fresh)
+                            && cached.Length > 0;
 
             if (hasCache && fresh)
                 return materialise(cached);
@@ -274,7 +274,7 @@ namespace osu.Game.EzOsuGame.Changelog
             request.AddHeader("Accept", "application/vnd.github+json");
 
             string? token = Environment.GetEnvironmentVariable("EZ2LAZER_GITHUB_TOKEN")
-                ?? Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+                            ?? Environment.GetEnvironmentVariable("GITHUB_TOKEN");
 
             if (!string.IsNullOrWhiteSpace(token))
                 request.AddHeader("Authorization", $"Bearer {token.Trim()}");
@@ -350,6 +350,9 @@ namespace osu.Game.EzOsuGame.Changelog
 
         public static IReadOnlyList<APIUpdateStream> CreateUpdateStreams(IReadOnlyList<APIChangelogBuild> builds)
         {
+            if (builds.Count == 0)
+                return Array.Empty<APIUpdateStream>();
+
             var stream = new APIUpdateStream
             {
                 Id = ez2lazer_stream.Id,
