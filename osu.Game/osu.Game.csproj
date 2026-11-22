@@ -65,7 +65,7 @@
     <PackageReference Include="Realm" Version="20.1.0"/>
     <PackageReference Include="ez2lazer.Framework" Version="[$(Ez2LazerFrameworkVersion)]" Condition="'$(UseEz2LazerLocalFrameworkProject)' != 'true'"/>
     <PackageReference Include="ez2lazer.Game.Resources" Version="[$(Ez2LazerGameResourcesVersion)]" Condition="'$(UseEz2LazerLocalResourcesProject)' != 'true'"/>
-    <PackageReference Include="Sentry" Version="6.12.1" />
+    <PackageReference Include="Sentry" Version="7.0.1" />
     <PackageReference Include="SharpCompress" Version="0.50.8"/>
     <PackageReference Include="NUnit" Version="5.0.0" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5"/>
