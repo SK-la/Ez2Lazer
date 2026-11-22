@@ -398,30 +398,31 @@ namespace osu.Game.Scoring
                 if (maximumStatistics != null)
                     return maximumStatistics;
 
+                var parsedStatistics = new Dictionary<HitResult, int>();
+
                 if (!string.IsNullOrEmpty(MaximumStatisticsJson))
                 {
                     try
                     {
                         var raw = JsonConvert.DeserializeObject<Dictionary<string, int>>(MaximumStatisticsJson);
-                        maximumStatistics = new Dictionary<HitResult, int>();
 
                         if (raw != null)
                         {
                             foreach (var kv in raw)
                             {
                                 if (Enum.TryParse<HitResult>(kv.Key, ignoreCase: true, out var parsed))
-                                    maximumStatistics[parsed] = kv.Value;
+                                    parsedStatistics[parsed] = kv.Value;
                                 // Unknown keys are skipped.
                             }
                         }
                     }
                     catch (JsonException)
                     {
-                        maximumStatistics = new Dictionary<HitResult, int>();
+                        // If the JSON is malformed, publish empty statistics.
                     }
                 }
 
-                return maximumStatistics ??= new Dictionary<HitResult, int>();
+                return maximumStatistics ??= parsedStatistics;
             }
             set => maximumStatistics = value;
         }
