@@ -79,7 +79,10 @@ namespace osu.Game.Tests.Visual.Editing
                 };
             });
 
-            AddUntilStep("wait for load", () => graph.Loaded.IsSet);
+            if (resolution == 0)
+                AddUntilStep("wait for graph load", () => graph.IsLoaded);
+            else
+                AddUntilStep("wait for waveform regeneration", () => graph.Loaded.IsSet);
         }
 
         [Test]

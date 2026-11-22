@@ -543,6 +543,7 @@ namespace osu.Game.Screens.Select
 
         private BeatmapInfo? debounceQueuedSelection;
         private double debounceElapsedTime;
+        private bool isEnsuringGlobalBeatmapValid;
 
         private void debounceQueueSelection(BeatmapInfo beatmap)
         {
@@ -572,23 +573,22 @@ namespace osu.Game.Screens.Select
 
         private void performDebounceSelection()
         {
-            if (debounceQueuedSelection == null) return;
+            BeatmapInfo? selection = debounceQueuedSelection;
 
-            try
-            {
-                if (Beatmap.Value.BeatmapInfo.Equals(debounceQueuedSelection))
-                    return;
+            if (selection == null)
+                return;
 
-                var workingBeatmap = beatmaps.GetWorkingBeatmap(debounceQueuedSelection);
-                if (!checkBeatmapValidForSelection(workingBeatmap.BeatmapInfo))
-                    return;
+            debounceQueuedSelection = null;
+            debounceElapsedTime = 0;
 
-                Beatmap.Value = workingBeatmap;
-            }
-            finally
-            {
-                cancelDebounceSelection();
-            }
+            if (Beatmap.Value.BeatmapInfo.Equals(selection))
+                return;
+
+            var workingBeatmap = beatmaps.GetWorkingBeatmap(selection);
+            if (!checkBeatmapValidForSelection(workingBeatmap.BeatmapInfo))
+                return;
+
+            Beatmap.Value = workingBeatmap;
         }
 
         private void cancelDebounceSelection()
@@ -729,75 +729,86 @@ namespace osu.Game.Screens.Select
 
         private bool ensureGlobalBeatmapValid(bool refetch = false)
         {
-            if (!this.IsCurrentScreen())
+            if (!this.IsCurrentScreen() || isEnsuringGlobalBeatmapValid)
                 return false;
 
-            performDebounceSelection();
+            isEnsuringGlobalBeatmapValid = true;
 
-            // While filtering, let's not ever attempt to change selection.
-            // This will be resolved after the filter completes, see `newItemsPresented`.
-            if (IsFiltering)
-                return false;
-
-            // Refetch only if explicitly requested (e.g. when returning to screen after potential external changes).
-            // Avoid refetching during normal beatmap selection to prevent unnecessary cache invalidation and memory spikes.
-            if (!refetch && !Beatmap.IsDefault)
+            try
             {
-                var id = Beatmap.Value.BeatmapInfo.ID;
-
-                bool stillPresent = realm.Run(r =>
-                {
-                    var found = r.Find<BeatmapInfo>(id);
-                    return found?.BeatmapSet is { DeletePending: false };
-                });
-
-                if (!stillPresent)
-                {
-                    Beatmap.SetDefault();
-                    performDebounceSelection();
-                    return false;
-                }
-            }
-
-            var currentBeatmap = beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, refetch);
-            bool validSelection = checkBeatmapValidForSelection(currentBeatmap.BeatmapInfo);
-
-            if (validSelection)
-            {
-                carousel.CurrentBeatmap = currentBeatmap.BeatmapInfo;
-                return true;
-            }
-
-            // If there was no beatmap selected, pick a random one.
-            if (Beatmap.IsDefault)
-            {
-                validSelection = carousel.NextRandom();
                 performDebounceSelection();
-                return validSelection;
-            }
 
-            // If a previous non-default selection became non-valid, it was likely hidden or deleted.
-            if (!validSelection)
-            {
-                // In the case a difficulty was hidden or removed, prefer selecting another difficulty from the same set.
-                var activeSet = currentBeatmap.BeatmapSetInfo;
+                // While filtering, let's not ever attempt to change selection.
+                // This will be resolved after the filter completes, see `newItemsPresented`.
+                if (IsFiltering)
+                    return false;
 
-                var validBeatmaps = activeSet.Beatmaps.Where(checkBeatmapValidForSelection).ToArray();
-
-                if (validBeatmaps.Any())
+                // Refetch only if explicitly requested (e.g. when returning to screen after potential external changes).
+                // Avoid refetching during normal beatmap selection to prevent unnecessary cache invalidation and memory spikes.
+                if (!refetch && !Beatmap.IsDefault)
                 {
-                    var beatmap = difficultyRecommender?.GetRecommendedBeatmap(validBeatmaps) ?? validBeatmaps.First();
-                    carousel.CurrentBeatmap = beatmap;
-                    debounceQueueSelection(beatmap);
+                    var id = Beatmap.Value.BeatmapInfo.ID;
+
+                    bool stillPresent = realm.Run(r =>
+                    {
+                        var found = r.Find<BeatmapInfo>(id);
+                        return found?.BeatmapSet is { DeletePending: false };
+                    });
+
+                    if (!stillPresent)
+                    {
+                        Beatmap.SetDefault();
+                        bool picked = carousel.NextRandom();
+                        performDebounceSelection();
+                        return picked;
+                    }
+                }
+
+                var currentBeatmap = beatmaps.GetWorkingBeatmap(Beatmap.Value.BeatmapInfo, refetch);
+                bool validSelection = checkBeatmapValidForSelection(currentBeatmap.BeatmapInfo);
+
+                if (validSelection)
+                {
+                    carousel.CurrentBeatmap = currentBeatmap.BeatmapInfo;
                     return true;
                 }
+
+                // If there was no beatmap selected, pick a random one.
+                if (Beatmap.IsDefault)
+                {
+                    validSelection = carousel.NextRandom();
+                    performDebounceSelection();
+                    return validSelection;
+                }
+
+                // If a previous non-default selection became non-valid, it was likely hidden or deleted.
+                if (!validSelection)
+                {
+                    // In the case a difficulty was hidden or removed, prefer selecting another difficulty from the same set.
+                    var activeSet = currentBeatmap.BeatmapSetInfo;
+
+                    var validBeatmaps = activeSet.Beatmaps.Where(checkBeatmapValidForSelection).ToArray();
+
+                    if (validBeatmaps.Any())
+                    {
+                        var beatmap = difficultyRecommender?.GetRecommendedBeatmap(validBeatmaps) ?? validBeatmaps.First();
+                        carousel.CurrentBeatmap = beatmap;
+                        debounceQueueSelection(beatmap);
+                        return true;
+                    }
+                }
+
+                // If all else fails, use the default beatmap, then try a random selection.
+                Beatmap.SetDefault();
+                validSelection = carousel.NextRandom();
+                performDebounceSelection();
+
+                return validSelection;
             }
-
-            // If all else fails, use the default beatmap.
-            Beatmap.SetDefault();
-            performDebounceSelection();
-
-            return validSelection;
+            finally
+            {
+                isEnsuringGlobalBeatmapValid = false;
+            }
         }
 
         private bool checkBeatmapValidForSelection(BeatmapInfo beatmap)
@@ -920,6 +931,8 @@ namespace osu.Game.Screens.Select
             if (!this.IsCurrentScreen())
                 return;
 
+            // An explicit global selection supersedes any pending carousel suggestion.
+            cancelDebounceSelection();
             ensureGlobalBeatmapValid();
 
             ensurePlayingSelected();

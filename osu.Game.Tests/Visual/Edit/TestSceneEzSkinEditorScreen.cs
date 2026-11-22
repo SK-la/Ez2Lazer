@@ -209,6 +209,7 @@ namespace osu.Game.Tests.Visual.Edit
         [SetUpSteps]
         public override void SetUpSteps()
         {
+            resetSkinEditorHostScope();
             base.SetUpSteps();
 
             // 测试会导入并选中的皮肤会留在 SkinManager 里，影响后续用例（例如「内置皮肤下导出应禁用」）。
@@ -229,7 +230,16 @@ namespace osu.Game.Tests.Visual.Edit
                 editorScreen = null!;
             });
 
+            AddStep("reset skin editor host scope", resetSkinEditorHostScope);
+
             base.TearDownSteps();
+        }
+
+        private static void resetSkinEditorHostScope()
+        {
+            EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.OfficialHud);
+            EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.Ez);
+            EzSkinEditorHostScope.EndTransition();
         }
 
         protected override void LoadComplete()
@@ -338,7 +348,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("song select group rail syncs", () => rail.CurrentScene.Value == EzEditorSceneType.SongSelectHud);
             AddAssert("song select group lists beatmap preview", () =>
                 EzSkinEditorSceneRegistry.ForGroup(EzEditorSceneGroup.SongSelect)
-                                          .Any(s => s.SceneType == EzEditorSceneType.BeatmapPreview && s.IsAvailable));
+                                         .Any(s => s.SceneType == EzEditorSceneType.BeatmapPreview && s.IsAvailable));
             AddAssert("song select group lists results and music player", () =>
             {
                 var scenes = EzSkinEditorSceneRegistry.ForGroup(EzEditorSceneGroup.SongSelect).Select(s => s.SceneType).ToArray();
@@ -408,7 +418,7 @@ namespace osu.Game.Tests.Visual.Edit
             });
 
             AddUntilStep("controls laid out", () => layer.ScreenSpaceDrawQuad.Width > 0 && picker.ScreenSpaceDrawQuad.Width > 0
-                                                        && bar.ScreenSpaceDrawQuad.Width > 0);
+                                                                                        && bar.ScreenSpaceDrawQuad.Width > 0);
 
             // The layer dropdown is the rightmost control; every later button is inserted to its left.
             AddAssert("layer dropdown hugs the right edge", () =>
@@ -566,7 +576,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("layer changed to ruleset", () => sceneBar.ActiveLayer.Value == EzHUDLayer.EzHudRuleset);
             AddUntilStep("layer stays visible", () => hud.LayerVisible.Value);
             AddUntilStep("button text updated", () => editorScreen.ChildrenOfType<EzEditorLayerButton>().Single().Text.ToString()
-                                                        == EzSkinEditorLayerOptions.GetDisplayName(EzHUDLayer.EzHudRuleset, sceneBar.Ruleset.Value).ToString());
+                                                      == EzSkinEditorLayerOptions.GetDisplayName(EzHUDLayer.EzHudRuleset, sceneBar.Ruleset.Value).ToString());
         }
 
         [Test]
@@ -1050,6 +1060,7 @@ namespace osu.Game.Tests.Visual.Edit
         {
             const string marker = "; exit apply test";
 
+            AddStep("enter skin editor host scope", () => EzSkinEditorHostScope.Enter(EzSkinEditorHostScope.Host.Ez));
             importLegacySkin();
             AddStep("load screen", loadScreen);
             waitForScreenLoaded();
@@ -1078,6 +1089,7 @@ namespace osu.Game.Tests.Visual.Edit
             AddUntilStep("skin.ini applied on disk or session clean", () =>
                 !editorScreen.SkinIniSession!.IsDirty || skinIniSavedTextContains(marker));
             AddAssert("saved text contains marker", () => skinIniSavedTextContains(marker));
+            AddStep("exit skin editor host scope", () => EzSkinEditorHostScope.Exit(EzSkinEditorHostScope.Host.Ez));
         }
 
         [Test]
@@ -1182,7 +1194,7 @@ namespace osu.Game.Tests.Visual.Edit
             {
                 var rail = editorScreen.ChildrenOfType<EzSkinEditorSidebarGroupRail>().Single();
                 var panel = editorScreen.ChildrenOfType<OsuScrollContainer>()
-                                       .FirstOrDefault(s => s.Parent is Container c && c.Width == EzSkinEditorSidebar.CONTENT_WIDTH);
+                                        .FirstOrDefault(s => s.Parent is Container c && c.Width == EzSkinEditorSidebar.CONTENT_WIDTH);
 
                 return panel != null
                        && rail.ScreenSpaceDrawQuad.Width > 0

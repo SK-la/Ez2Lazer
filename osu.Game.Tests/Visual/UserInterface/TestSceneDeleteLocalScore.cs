@@ -73,7 +73,7 @@ namespace osu.Game.Tests.Visual.UserInterface
 
         private DrawableOsuMenuItem getDeleteMenuItem() =>
             this.ChildrenOfType<DrawableOsuMenuItem>()
-                .First(i => i.Item.Text.Value.ToString() == CommonStrings.ButtonsDelete.ToString());
+                .First(i => i.Item is OsuMenuItem menu && menu.Type == MenuItemType.Destructive);
 
         protected override IReadOnlyDependencyContainer CreateChildDependencies(IReadOnlyDependencyContainer parent)
         {
@@ -162,7 +162,7 @@ namespace osu.Game.Tests.Visual.UserInterface
             AddStep("finish transforms", () => leaderboard.FinishTransforms(true));
 
             AddUntilStep("context menu has delete", () => this.ChildrenOfType<DrawableOsuMenuItem>()
-                                                                   .Any(i => i.Item is OsuMenuItem menu && menu.Type == MenuItemType.Destructive));
+                                                              .Any(i => i.Item is OsuMenuItem menu && menu.Type == MenuItemType.Destructive));
             AddStep("click delete option", () =>
             {
                 InputManager.MoveMouseTo(getDeleteMenuItem());
@@ -207,7 +207,8 @@ namespace osu.Game.Tests.Visual.UserInterface
                 leaderboard.Show();
             });
 
-            AddUntilStep("wait for drawables", () => leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().Any());
+            AddUntilStep("wait for corrupted score drawable", () =>
+                leaderboard.ChildrenOfType<BeatmapLeaderboardScore>().Any(s => s.Score.ID == scoreBeingDeleted.ID));
 
             AddStep("open menu for corrupted score", () =>
             {
@@ -221,7 +222,7 @@ namespace osu.Game.Tests.Visual.UserInterface
             // Ensure the context menu and delete dialog are shown without crashing.
             AddStep("finish transforms", () => leaderboard.FinishTransforms(true));
             AddUntilStep("context menu has delete", () => this.ChildrenOfType<DrawableOsuMenuItem>()
-                                                                .Any(i => i.Item.Text.Value.ToString() == CommonStrings.ButtonsDelete.ToString()));
+                                                              .Any(i => i.Item.Text.Value.ToString() == CommonStrings.ButtonsDelete.ToString()));
             AddStep("click delete option", () =>
             {
                 InputManager.MoveMouseTo(getDeleteMenuItem());

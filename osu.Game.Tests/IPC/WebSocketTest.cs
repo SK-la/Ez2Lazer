@@ -265,10 +265,14 @@ namespace osu.Game.Tests.IPC
         {
             const int port = 54321;
 
-            var server = new WebSocketServer(port);
-            await server.StartAsync();
-            await server.StopAsync();
-            server.Dispose();
+            for (int i = 0; i < 10; i++)
+            {
+                var server = new WebSocketServer(port);
+                await server.StartAsync();
+                await Task.Delay(10);
+                await server.StopAsync();
+                server.Dispose();
+            }
         }
     }
 }

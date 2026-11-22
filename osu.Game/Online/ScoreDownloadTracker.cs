@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using osu.Framework.Allocation;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Extensions;
 using osu.Game.Online.API;
 using osu.Game.Scoring;
@@ -59,7 +60,7 @@ namespace osu.Game.Online
                  || (!string.IsNullOrEmpty(s.Hash) && s.Hash == hash))
                 && !s.DeletePending), (items, _) =>
             {
-                if (items.Any())
+                if (items.Any(hasLocalReplay))
                     Schedule(() => UpdateState(DownloadState.LocallyAvailable));
                 else
                 {
@@ -70,6 +71,13 @@ namespace osu.Game.Online
                     });
                 }
             });
+        }
+
+        private static bool hasLocalReplay(ScoreInfo score)
+        {
+            // .ezosr is an import/export container. Its extracted .osr and internal .ezframes files are attached to the score.
+            return score.Files.Any(file => file.Filename.EndsWith(".osr", StringComparison.OrdinalIgnoreCase)
+                                           || file.Filename.EndsWith(EzHighPrecisionReplayFrames.EXTENSION, StringComparison.OrdinalIgnoreCase));
         }
 
         private void downloadBegan(ArchiveDownloadRequest<IScoreInfo> request) => Schedule(() =>

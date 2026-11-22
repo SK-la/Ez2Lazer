@@ -371,7 +371,7 @@ namespace osu.Game.Tests.Beatmaps.Formats
             using (var sw = new SerializationWriter(memoryStream, true))
             {
                 sw.Write((byte)3); // ruleset id (mania).
-                                   // mania is used intentionally as it is the only ruleset wherein default accuracy calculation is changed in lazer
+                // mania is used intentionally as it is the only ruleset wherein default accuracy calculation is changed in lazer
                 sw.Write(20240116); // version (anything below `LegacyScoreEncoder.FIRST_LAZER_VERSION` is stable)
                 sw.Write(string.Empty.ComputeMD5Hash()); // beatmap hash, irrelevant to this test
                 sw.Write("username"); // irrelevant to this test
@@ -449,6 +449,8 @@ namespace osu.Game.Tests.Beatmaps.Formats
             var ruleset = new OsuRuleset().RulesetInfo;
 
             var scoreInfo = TestResources.CreateTestScoreInfo(ruleset);
+            const double stored_accuracy = 0.95;
+            scoreInfo.Accuracy = stored_accuracy;
             scoreInfo.Mods = new Mod[] { new OsuModFlashlight() };
             scoreInfo.Statistics = new Dictionary<HitResult, int>
             {
@@ -475,7 +477,8 @@ namespace osu.Game.Tests.Beatmaps.Formats
             {
                 Assert.That(decodedAfterEncode.ScoreInfo.TotalScore, Is.EqualTo(284_537));
                 Assert.That(decodedAfterEncode.ScoreInfo.LegacyTotalScore, Is.Null);
-                Assert.That(decodedAfterEncode.ScoreInfo.Accuracy, Is.EqualTo((double)(199 * 300 + 30) / (200 * 300 + 30)));
+                // The encoded accuracy is preserved even when the current statistics imply a different value.
+                Assert.That(decodedAfterEncode.ScoreInfo.Accuracy, Is.EqualTo(stored_accuracy));
                 Assert.That(decodedAfterEncode.ScoreInfo.Rank, Is.EqualTo(ScoreRank.A));
             });
         }

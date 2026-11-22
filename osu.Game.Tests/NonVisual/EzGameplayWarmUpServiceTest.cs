@@ -116,20 +116,22 @@ namespace osu.Game.Tests.NonVisual
         }
 
         [Test]
-        public void TestCancellationReleasesWait()
+        public async Task TestCancellationReleasesWait()
         {
             var service = new EzGameplayWarmUpService();
             service.BeginSession();
 
             // 一个无视取消令牌、永远不结束的实现，也必须能被取消放行（否则只能干等超时）。
-            service.Register(new BlockingWarmUp { IgnoreCancellation = true });
+            var warmUp = new BlockingWarmUp { IgnoreCancellation = true };
+            service.Register(warmUp);
 
             using var cts = new CancellationTokenSource();
             Task waitTask = service.WarmUpAllAsync(cts.Token);
 
-            cts.CancelAfter(TimeSpan.FromMilliseconds(100));
+            Assert.That(warmUp.Started, Is.True);
+            cts.Cancel();
 
-            Assert.CatchAsync<OperationCanceledException>(async () => await waitTask.WaitAsync(TimeSpan.FromSeconds(5)));
+            await Assert.CatchAsync<OperationCanceledException>(async () => await waitTask.WaitAsync(TimeSpan.FromSeconds(5)));
         }
 
         [Test]

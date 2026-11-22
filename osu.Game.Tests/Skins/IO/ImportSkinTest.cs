@@ -417,7 +417,7 @@ namespace osu.Game.Tests.Skins.IO
         }
 
         /// <remarks>
-        /// Note that this test passing / failing is platform / OS-specific (if it is to fail, it'll fail on windows).
+        /// Filename sanitisation should produce the same result on every platform.
         /// </remarks>
         [Test]
         public async Task TestExternallyMountingImportWithInvalidFilename()

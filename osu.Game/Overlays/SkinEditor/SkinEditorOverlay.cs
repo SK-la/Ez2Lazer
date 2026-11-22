@@ -571,11 +571,16 @@ namespace osu.Game.Overlays.SkinEditor
             if (Editor?.ExternalEditInProgress == true)
                 return;
 
-            base.ToggleVisibility();
+            if (State.Value == Visibility.Visible)
+                Hide();
+            else
+                Show();
         }
 
         protected override void Dispose(bool isDisposing)
         {
+            restoreSkinEditorRelevantSettings();
+
             base.Dispose(isDisposing);
 
             externalEditOverlayRegistration?.Dispose();
