@@ -248,7 +248,7 @@ namespace osu.Game.Overlays.Settings.Sections
 
         private partial class SkinDropdown : FormDropdown<Live<SkinInfo>>
         {
-            protected override LocalisableString GenerateItemText(Live<SkinInfo> item) => item.ToString();
+            protected override LocalisableString GenerateItemText(Live<SkinInfo> item) => item.PerformRead(EzLegacySkinFolders.GetDisplayName);
         }
 
         public partial class RenameSkinButton : SettingsButtonV2, IHasPopover
