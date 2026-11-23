@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Game.Database;
+using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -62,7 +63,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
                                                                          .Where(s => !s.DeletePending)
                                                                          .OrderBy(s => s.Name, StringComparer.OrdinalIgnoreCase), skinsChanged);
 
-            skins.CurrentSkinInfo.BindValueChanged(e => Text = e.NewValue.ToString() ?? string.Empty, true);
+            skins.CurrentSkinInfo.BindValueChanged(e => Text = e.NewValue.PerformRead(EzLegacySkinFolders.GetDisplayName), true);
 
             skins.ScriptedSkinsCatalogUpdated += refreshSkinsList;
             skins.LegacySkinsCatalogUpdated += refreshSkinsList;
@@ -178,7 +179,7 @@ namespace osu.Game.EzOsuGame.Edit.Components
 
                 foreach (var skin in items)
                 {
-                    string name = skin.ToString() ?? string.Empty;
+                    string name = skin.PerformRead(EzLegacySkinFolders.GetDisplayName);
 
                     if (!string.IsNullOrWhiteSpace(query)
                         && name.IndexOf(query, StringComparison.OrdinalIgnoreCase) < 0)
