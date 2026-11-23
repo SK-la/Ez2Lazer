@@ -19,6 +19,7 @@ using osu.Framework.Input;
 using osu.Framework.Input.Events;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Graphics.Cursor;
 using osu.Game.Input.Handlers;
 using osu.Game.Overlays;
@@ -98,6 +99,14 @@ namespace osu.Game.Rulesets.UI
         private OnScreenDisplay onScreenDisplay { get; set; }
 
         private readonly PlayfieldAdjustmentContainer playfieldAdjustmentContainer;
+
+        private Container gameplayObjectRenderLayer;
+        private Container unbufferedPlayfieldLayer;
+        private BufferedContainer antialiasedPlayfieldLayer;
+        private Bindable<bool> gameplayObjectAntialiasing;
+
+        [Resolved(CanBeNull = true)]
+        private Ez2ConfigManager ezConfig { get; set; }
 
         private IDisposable configTracker;
         private FrameStabilityContainer frameStabilityContainer;
@@ -187,7 +196,7 @@ namespace osu.Game.Rulesets.UI
                         KeyBindingInputManager
                             .WithChildren(new Drawable[]
                             {
-                                playfieldAdjustmentContainer.WithChild(Playfield),
+                                gameplayObjectRenderLayer = createGameplayObjectRenderLayer(),
                                 Overlays
                             }),
                     }),
@@ -205,6 +214,13 @@ namespace osu.Game.Rulesets.UI
                         .WithChild(ResumeOverlay)));
             }
 
+            if (ezConfig != null)
+            {
+                gameplayObjectAntialiasing = ezConfig.GetBindable<bool>(Ez2Setting.GameplayObjectAntialiasing);
+                gameplayObjectAntialiasing.ValueChanged += onGameplayObjectAntialiasingChanged;
+                applyGameplayObjectAntialiasing(gameplayObjectAntialiasing.Value);
+            }
+
             hitsoundVolume = config.GetBindable<double>(OsuSetting.HitsoundVolume);
             gameplayMixer.Volume.BindTo(hitsoundVolume);
 
@@ -216,6 +232,57 @@ namespace osu.Game.Rulesets.UI
         /// <summary>
         /// Creates and adds drawable representations of hit objects to the play field.
         /// </summary>
+        private Container createGameplayObjectRenderLayer()
+        {
+            unbufferedPlayfieldLayer = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Child = playfieldAdjustmentContainer.WithChild(Playfield),
+            };
+
+            antialiasedPlayfieldLayer = new BufferedContainer(pixelSnapping: false, cachedFrameBuffer: false)
+            {
+                RelativeSizeAxes = Axes.Both,
+                FrameBufferScale = new Vector2(2),
+                Alpha = 0,
+            };
+
+            return new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Children = new Drawable[]
+                {
+                    unbufferedPlayfieldLayer,
+                    antialiasedPlayfieldLayer,
+                },
+            };
+        }
+
+        private void onGameplayObjectAntialiasingChanged(ValueChangedEvent<bool> change) =>
+            Schedule(() => applyGameplayObjectAntialiasing(change.NewValue));
+
+        private void applyGameplayObjectAntialiasing(bool enabled)
+        {
+            if (enabled)
+            {
+                if (playfieldAdjustmentContainer.Parent == antialiasedPlayfieldLayer)
+                    return;
+
+                unbufferedPlayfieldLayer.Remove(playfieldAdjustmentContainer, false);
+                antialiasedPlayfieldLayer.Child = playfieldAdjustmentContainer;
+                antialiasedPlayfieldLayer.Alpha = 1;
+            }
+            else
+            {
+                if (playfieldAdjustmentContainer.Parent != antialiasedPlayfieldLayer)
+                    return;
+
+                antialiasedPlayfieldLayer.Remove(playfieldAdjustmentContainer, false);
+                unbufferedPlayfieldLayer.Child = playfieldAdjustmentContainer;
+                antialiasedPlayfieldLayer.Alpha = 0;
+            }
+        }
+
         private void loadObjects(CancellationToken cancellationToken)
         {
             foreach (TObject h in Beatmap.HitObjects)
@@ -407,6 +474,9 @@ namespace osu.Game.Rulesets.UI
             base.Dispose(isDisposing);
 
             configTracker?.Dispose();
+
+            if (gameplayObjectAntialiasing != null)
+                gameplayObjectAntialiasing.ValueChanged -= onGameplayObjectAntialiasingChanged;
 
             // Dispose the components created by this dependency container.
             dependencies?.Dispose();
