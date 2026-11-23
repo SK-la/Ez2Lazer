@@ -92,6 +92,14 @@ namespace osu.Game.EzOsuGame
             }
         }
 
+        internal static string GetDisplayName(SkinInfo skin)
+        {
+            if (!TryGetDirectory(skin, out string directory))
+                return skin.ToString();
+
+            return $"{Path.GetFileName(directory)} / {skin}";
+        }
+
         public static bool AnyFolders()
         {
             try

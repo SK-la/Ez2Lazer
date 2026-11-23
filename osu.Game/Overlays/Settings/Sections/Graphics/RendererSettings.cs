@@ -50,6 +50,15 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 {
                     Keywords = new[] { @"compatibility", @"directx" },
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.GAMEPLAY_OBJECT_ANTIALIASING,
+                    HintText = EzSettingsStrings.GAMEPLAY_OBJECT_ANTIALIASING_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.GameplayObjectAntialiasing),
+                })
+                {
+                    Keywords = new[] { "gameplay", "object", "playfield", "smooth" },
+                },
                 new SettingsItemV2(new FormSliderBar<double>
                 {
                     Caption = EzSettingsStrings.FRAME_LIMITER_BASE,

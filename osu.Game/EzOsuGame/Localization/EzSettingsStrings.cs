@@ -33,6 +33,12 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString SAVE_BUTTON = new EzLocalizationManager.EzLocalisableString("保存", "Save");
         public static readonly EzLocalizationManager.EzLocalisableString CANCEL_BUTTON = new EzLocalizationManager.EzLocalisableString("取消", "Cancel");
 
+        public static readonly EzLocalizationManager.EzLocalisableString GAMEPLAY_OBJECT_ANTIALIASING = new EzLocalizationManager.EzLocalisableString("游戏物件抗锯齿", "Gameplay object anti-aliasing");
+
+        public static readonly EzLocalizationManager.EzLocalisableString GAMEPLAY_OBJECT_ANTIALIASING_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "对游玩区域进行 2 倍超采样，包括轨道背景、边框和判定效果，不影响 HUD 与菜单。开启后会增加显卡负载。",
+            "Supersamples the playfield at 2x, including lane backgrounds, borders, and judgement effects. HUD and menus are unchanged. Increases GPU load.");
+
         #endregion
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_GAME_SECTION_HEADER = new EzLocalizationManager.EzLocalisableString("Ez 游玩", "Ez Gameplay");
