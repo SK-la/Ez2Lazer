@@ -11,6 +11,8 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString SCALING_GAME_MODE = new EzLocalizationManager.EzLocalisableString("缩放游戏模式", "Scaling Game Mode");
 
+        public static readonly EzLocalizationManager.EzLocalisableString SCALE_SKIN_ELEMENTS = new EzLocalizationManager.EzLocalisableString("缩放皮肤元素", "Scale skin elements");
+
         public static readonly EzLocalizationManager.EzLocalisableString SCALING_GAME_MODE_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "缩放游戏模式会根据当前游戏模式自动调整界面元素的大小。"
             + "\n开启后，界面元素会根据当前游戏模式进行缩放，以提供更适合的视觉体验。"

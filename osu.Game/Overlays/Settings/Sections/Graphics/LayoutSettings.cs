@@ -173,6 +173,14 @@ namespace osu.Game.Overlays.Settings.Sections.Graphics
                 {
                     Keywords = new[] { "scale", "letterbox" },
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSettingsStrings.SCALE_SKIN_ELEMENTS,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.ScaleSkinElements),
+                })
+                {
+                    Keywords = new[] { "scale", "skin", "hud" },
+                },
                 new SettingsItemV2(new FormEnumDropdown<ScalingMode>
                 {
                     Caption = GraphicsSettingsStrings.ScreenScaling,

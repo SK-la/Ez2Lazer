@@ -3,6 +3,7 @@
 
 #nullable disable
 
+using System;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
@@ -10,7 +11,10 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Primitives;
 using osu.Framework.Graphics.Shapes;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Graphics.Containers;
+using osu.Game.Skinning;
 using osuTK;
 using osuTK.Graphics;
 
@@ -21,6 +25,11 @@ namespace osu.Game.Tests.Visual.UserInterface
     {
         private OsuConfigManager osuConfigManager { get; set; }
 
+        private Ez2ConfigManager ezConfigManager { get; set; }
+
+        private EzHudSkinnableContainer skinScaleContainer;
+        private ScaleTestComponent testComponent;
+
         private ScalingContainer scaling1;
         private ScalingContainer scaling2;
         private Box scaleTarget;
@@ -29,8 +38,10 @@ namespace osu.Game.Tests.Visual.UserInterface
         private void load()
         {
             osuConfigManager = new OsuConfigManager(LocalStorage);
+            ezConfigManager = new Ez2ConfigManager(LocalStorage);
 
             Dependencies.CacheAs(osuConfigManager);
+            Dependencies.CacheAs(ezConfigManager);
 
             Children = new Drawable[]
             {
@@ -65,6 +76,11 @@ namespace osu.Game.Tests.Visual.UserInterface
                                             Colour = Color4.White,
                                             Size = new Vector2(100),
                                         },
+                                        skinScaleContainer = new EzHudSkinnableContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.SongSelect))
+                                        {
+                                            Anchor = Anchor.BottomRight,
+                                            Origin = Anchor.BottomRight,
+                                        },
                                     }
                                 }
                             }
@@ -72,6 +88,26 @@ namespace osu.Game.Tests.Visual.UserInterface
                     }
                 },
             };
+        }
+
+        [Test]
+        public void TestOuterContainerCanBeAnimated()
+        {
+            AddStep("set independent scaling", () =>
+            {
+                osuConfigManager.SetValue(OsuSetting.UIScale, 1.4f);
+                ezConfigManager.SetValue(Ez2Setting.ScaleSkinElements, false);
+            });
+
+            AddUntilStep("skin scale container loaded", () => skinScaleContainer.ComponentsLoaded);
+            AddStep("animate outer container", () =>
+            {
+                skinScaleContainer.ResizeWidthTo(1.2f, 0);
+                skinScaleContainer.ScaleTo(1.2f, 0);
+            });
+            AddWaitStep("apply animation", 2);
+            AddAssert("outer container keeps animated size and scale", () =>
+                Math.Abs(skinScaleContainer.Size.X - 1.2f) < 0.001f && Math.Abs(skinScaleContainer.Scale.X - 1.2f) < 0.001f);
         }
 
         [Test]
@@ -84,6 +120,38 @@ namespace osu.Game.Tests.Visual.UserInterface
             AddStep("adjust scale", () => osuConfigManager.SetValue(OsuSetting.UIScale, 0.5f));
 
             checkForCorrectness();
+        }
+
+        [Test]
+        public void TestSkinElementScaleCanBeIndependentOfUIScale()
+        {
+            Quad baseline = default;
+
+            AddStep("set scale defaults", () =>
+            {
+                osuConfigManager.SetValue(OsuSetting.UIScale, 1f);
+                ezConfigManager.SetValue(Ez2Setting.ScaleSkinElements, false);
+            });
+
+            AddUntilStep("skin scale container loaded", () => skinScaleContainer.ComponentsLoaded);
+            AddStep("add test component", () => skinScaleContainer.Add(testComponent = new ScaleTestComponent()));
+            AddUntilStep("test component loaded", () => testComponent.IsLoaded);
+            AddStep("capture baseline", () => baseline = testComponent.ScreenSpaceDrawQuad);
+
+            AddStep("change interface scale while independent", () => osuConfigManager.SetValue(OsuSetting.UIScale, 1.4f));
+            AddWaitStep("finish interface scale animation", 40);
+            AddAssert("skin component retains size and position", () => testComponent.ScreenSpaceDrawQuad.AlmostEquals(baseline));
+
+            AddStep("enable skin element scaling", () => ezConfigManager.SetValue(Ez2Setting.ScaleSkinElements, true));
+            AddWaitStep("apply skin element scaling", 2);
+            AddAssert("skin component follows interface scale", () => Math.Abs(
+                testComponent.ScreenSpaceDrawQuad.AABBFloat.Width - baseline.AABBFloat.Width * 1.4f) < 0.5f);
+
+            AddStep("restore scale defaults", () =>
+            {
+                osuConfigManager.SetValue(OsuSetting.UIScale, 1f);
+                ezConfigManager.SetValue(Ez2Setting.ScaleSkinElements, false);
+            });
         }
 
         private void checkForCorrectness()
@@ -111,6 +179,24 @@ namespace osu.Game.Tests.Visual.UserInterface
 
                 return scalingFinished;
             });
+        }
+
+        private partial class ScaleTestComponent : CompositeDrawable, ISerialisableDrawable
+        {
+            public bool UsesFixedAnchor { get; set; }
+
+            public ScaleTestComponent()
+            {
+                Anchor = Anchor.TopLeft;
+                Origin = Anchor.TopLeft;
+                Position = new Vector2(40, 50);
+                Size = new Vector2(100);
+                InternalChild = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Colour = Color4.Red,
+                };
+            }
         }
     }
 }
