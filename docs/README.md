@@ -16,6 +16,7 @@
 | [`EZ-UPSTREAM-MERGE.md`](./EZ-UPSTREAM-MERGE.md) | 上游合并 |
 | [`EzSkinSystemNotes.md`](./EzSkinSystemNotes.md) | 皮肤 |
 | [`ScriptedSkin-Security.md`](./ScriptedSkin-Security.md) | ScriptedSkin |
+| [`weather-api.md`](./weather-api.md) | 天气数据 API、天气效果和 Mod 接入设计 |
 | [`桌宠使用说明.md`](./桌宠使用说明.md) / [`Pets/`](./Pets/) | 桌宠 |
 
 根目录 `README.md` / `CONTRIBUTING.md` 保留（上游约定）。
