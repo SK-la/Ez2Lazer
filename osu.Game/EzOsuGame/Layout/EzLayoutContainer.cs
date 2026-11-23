@@ -117,11 +117,28 @@ namespace osu.Game.EzOsuGame.Layout
     public partial class EzHudSkinnableContainer : SkinnableContainer
     {
         private IBindable<bool>? scaleSkinElements;
+        private Container? compensation;
 
         public EzHudSkinnableContainer(GlobalSkinnableContainerLookup lookup)
             : base(lookup)
         {
             RelativeSizeAxes = Axes.Both;
+            OnComponentsLoaded += _ => wrapComponents();
+        }
+
+        private void wrapComponents()
+        {
+            if (InternalChildren.FirstOrDefault() is not Container content)
+                return;
+
+            RemoveInternal(content, false);
+            AddInternal(compensation = new Container
+            {
+                RelativeSizeAxes = Axes.Both,
+                Anchor = Anchor,
+                Origin = Origin,
+                Child = content,
+            });
         }
 
         [BackgroundDependencyLoader]
@@ -133,6 +150,15 @@ namespace osu.Game.EzOsuGame.Layout
         protected override void Update()
         {
             base.Update();
+
+            if (compensation?.Parent != this)
+                return;
+
+            if (compensation.Anchor != Anchor)
+                compensation.Anchor = Anchor;
+
+            if (compensation.Origin != Origin)
+                compensation.Origin = Origin;
 
             if (scaleSkinElements == null || Lookup.Lookup == GlobalSkinnableContainers.Playfield)
                 return;
@@ -151,11 +177,11 @@ namespace osu.Game.EzOsuGame.Layout
             Vector2 containerSize = scaleSkinElements.Value ? Vector2.One : new Vector2(uiScale);
             Vector2 containerScale = scaleSkinElements.Value ? Vector2.One : new Vector2(1 / uiScale);
 
-            if (Size != containerSize)
-                Size = containerSize;
+            if (compensation.Size != containerSize)
+                compensation.Size = containerSize;
 
-            if (Scale != containerScale)
-                Scale = containerScale;
+            if (compensation.Scale != containerScale)
+                compensation.Scale = containerScale;
         }
     }
 }

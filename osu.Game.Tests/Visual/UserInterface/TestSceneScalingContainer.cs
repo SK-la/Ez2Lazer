@@ -91,6 +91,26 @@ namespace osu.Game.Tests.Visual.UserInterface
         }
 
         [Test]
+        public void TestOuterContainerCanBeAnimated()
+        {
+            AddStep("set independent scaling", () =>
+            {
+                osuConfigManager.SetValue(OsuSetting.UIScale, 1.4f);
+                ezConfigManager.SetValue(Ez2Setting.ScaleSkinElements, false);
+            });
+
+            AddUntilStep("skin scale container loaded", () => skinScaleContainer.ComponentsLoaded);
+            AddStep("animate outer container", () =>
+            {
+                skinScaleContainer.ResizeWidthTo(1.2f, 0);
+                skinScaleContainer.ScaleTo(1.2f, 0);
+            });
+            AddWaitStep("apply animation", 2);
+            AddAssert("outer container keeps animated size and scale", () =>
+                Math.Abs(skinScaleContainer.Size.X - 1.2f) < 0.001f && Math.Abs(skinScaleContainer.Scale.X - 1.2f) < 0.001f);
+        }
+
+        [Test]
         public void TestScaling()
         {
             AddStep("adjust scale", () => osuConfigManager.SetValue(OsuSetting.UIScale, 2f));
