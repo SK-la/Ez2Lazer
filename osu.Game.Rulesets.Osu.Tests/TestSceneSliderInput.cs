@@ -4,9 +4,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using osu.Framework.Allocation;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Screens;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.ControlPoints;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Replays;
 using osu.Game.Rulesets.Judgements;
 using osu.Game.Rulesets.Objects;
@@ -15,6 +18,7 @@ using osu.Game.Rulesets.Osu.Objects;
 using osu.Game.Rulesets.Osu.Replays;
 using osu.Game.Rulesets.Replays;
 using osu.Game.Rulesets.Scoring;
+using osu.Game.Rulesets.UI;
 using osu.Game.Scoring;
 using osu.Game.Screens.Play;
 using osu.Game.Tests.Visual;
@@ -33,6 +37,9 @@ namespace osu.Game.Rulesets.Osu.Tests
         private const double time_slider_end = 4000;
 
         private ScoreAccessibleReplayPlayer currentPlayer = null!;
+
+        [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         private const float slider_path_length = 25;
 
@@ -165,6 +172,24 @@ namespace osu.Game.Rulesets.Osu.Tests
             // If not, hitsounds will not play on time.
             AddAssert("Judgement offset is zero", () => judgementResults.Last().TimeOffset == 0);
             AddAssert("Slider judged at end time", () => judgementResults.Last().TimeAbsolute, () => Is.EqualTo(slider.EndTime));
+        }
+
+        [Test]
+        public void TestSliderInputWithGameplayObjectAntialiasing()
+        {
+            AddStep("enable gameplay object antialiasing", () => ezConfig.SetValue(Ez2Setting.GameplayObjectAntialiasing, true));
+
+            performTest(new List<ReplayFrame>
+            {
+                new OsuReplayFrame { Position = Vector2.Zero, Actions = { OsuAction.LeftButton, OsuAction.RightButton }, Time = time_slider_start },
+                new OsuReplayFrame { Position = Vector2.Zero, Actions = { OsuAction.RightButton }, Time = time_during_slide_1 },
+            });
+
+            assertAllMaxJudgements();
+            AddAssert("playfield uses the supersampled layer", () => currentPlayer.DrawableRuleset.PlayfieldAdjustmentContainer.Parent is BufferedContainer buffer
+                && buffer.FrameBufferScale == new Vector2(2));
+            AddStep("disable gameplay object antialiasing", () => ezConfig.SetValue(Ez2Setting.GameplayObjectAntialiasing, false));
+            AddUntilStep("playfield returns to direct rendering", () => currentPlayer.DrawableRuleset.PlayfieldAdjustmentContainer.Parent is not BufferedContainer);
         }
 
         [Test]
@@ -612,6 +637,7 @@ namespace osu.Game.Rulesets.Osu.Tests
         private partial class ScoreAccessibleReplayPlayer : ReplayPlayer
         {
             public new ScoreProcessor ScoreProcessor => base.ScoreProcessor;
+            public new DrawableRuleset DrawableRuleset => base.DrawableRuleset;
 
             protected override bool PauseOnFocusLost => false;
 
