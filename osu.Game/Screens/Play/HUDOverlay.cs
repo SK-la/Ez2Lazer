@@ -14,6 +14,7 @@ using osu.Framework.Graphics.Primitives;
 using osu.Framework.Input.Bindings;
 using osu.Framework.Input.Events;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Input;
 using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
@@ -433,7 +434,7 @@ namespace osu.Game.Screens.Play
             }
         }
 
-        private partial class HUDComponentsContainer : SkinnableContainer
+        private partial class HUDComponentsContainer : EzHudSkinnableContainer
         {
             private Bindable<ScoringMode> scoringMode;
 

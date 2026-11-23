@@ -352,7 +352,7 @@ namespace osu.Game.Screens.Select
                         },
                     }
                 },
-                skinnableContent = new SkinnableContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.SongSelect))
+                skinnableContent = new EzHudSkinnableContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.SongSelect))
                 {
                     Anchor = Anchor.Centre,
                     Origin = Anchor.Centre,

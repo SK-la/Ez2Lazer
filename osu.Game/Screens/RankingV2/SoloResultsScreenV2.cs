@@ -5,6 +5,7 @@ using System.Linq;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.Overlays;
 using osu.Game.Scoring;
 using osu.Game.Screens.Footer;
@@ -33,7 +34,7 @@ namespace osu.Game.Screens.RankingV2
         {
             InternalChildren =
             [
-                mainScreen = new SkinnableContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.Results))
+                mainScreen = new EzHudSkinnableContainer(new GlobalSkinnableContainerLookup(GlobalSkinnableContainers.Results))
                 {
                     RelativeSizeAxes = Axes.Both,
                 },

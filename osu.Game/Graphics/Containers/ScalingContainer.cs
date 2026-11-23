@@ -95,7 +95,9 @@ namespace osu.Game.Graphics.Containers
 
             private Bindable<float>? uiScale;
 
-            protected float CurrentScale { get; private set; } = 1;
+            protected internal float CurrentScale { get; private set; } = 1;
+
+            internal bool AppliesUIScale => applyUIScale;
 
             public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) => true;
 

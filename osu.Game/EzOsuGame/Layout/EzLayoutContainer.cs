@@ -4,8 +4,11 @@
 using System;
 using System.Linq;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Graphics.Containers;
 using osu.Game.Overlays.SkinEditor;
 using osu.Game.Rulesets;
 using osu.Game.Skinning;
@@ -17,7 +20,7 @@ namespace osu.Game.EzOsuGame.Layout
     /// A skinnable-style container that reloads from <see cref="EzConfigLayoutStore"/> instead of the current skin.
     /// Lives on <see cref="EzLayoutLayer"/> so the official skin editor cannot see it.
     /// </summary>
-    public partial class EzLayoutContainer : SkinnableContainer
+    public partial class EzLayoutContainer : EzHudSkinnableContainer
     {
         private CompositeDrawable? dependencyDonor;
 
@@ -106,5 +109,53 @@ namespace osu.Game.EzOsuGame.Layout
 
         public override bool ReceivePositionalInputAt(Vector2 screenSpacePos) =>
             Alpha > 0 && InternalChildren.Any(c => c.IsPresent && c.ReceivePositionalInputAt(screenSpacePos));
+    }
+
+    /// <summary>
+    /// A full-screen skin layer that can counteract the global interface scale while preserving its anchors.
+    /// </summary>
+    public partial class EzHudSkinnableContainer : SkinnableContainer
+    {
+        private IBindable<bool>? scaleSkinElements;
+
+        public EzHudSkinnableContainer(GlobalSkinnableContainerLookup lookup)
+            : base(lookup)
+        {
+            RelativeSizeAxes = Axes.Both;
+        }
+
+        [BackgroundDependencyLoader]
+        private void load(Ez2ConfigManager ezConfig)
+        {
+            scaleSkinElements = ezConfig.GetBindable<bool>(Ez2Setting.ScaleSkinElements);
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (scaleSkinElements == null || Lookup.Lookup == GlobalSkinnableContainers.Playfield)
+                return;
+
+            float uiScale = 1;
+
+            for (Drawable? ancestor = Parent; ancestor != null; ancestor = ancestor.Parent)
+            {
+                if (ancestor is not ScalingContainer.ScalingDrawSizePreservingFillContainer scalingContainer || !scalingContainer.AppliesUIScale)
+                    continue;
+
+                uiScale = scalingContainer.CurrentScale;
+                break;
+            }
+
+            Vector2 containerSize = scaleSkinElements.Value ? Vector2.One : new Vector2(uiScale);
+            Vector2 containerScale = scaleSkinElements.Value ? Vector2.One : new Vector2(1 / uiScale);
+
+            if (Size != containerSize)
+                Size = containerSize;
+
+            if (Scale != containerScale)
+                Scale = containerScale;
+        }
     }
 }
