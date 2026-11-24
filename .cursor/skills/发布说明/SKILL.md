@@ -32,6 +32,7 @@ Raw（与客户端一致）：
 - 不要在 `auto-release` 或其它 CI 里生成/上传 `changelog-releases.json`。
 - 不要把「只改 GitHub Release Description」当作游戏内已更新。
 - 不要把 `api.github.com/.../releases` 当作游戏内数据源（旧客户端除外）。
+- **不要**写「合并的 PR / Merged PRs」等单独汇总段（见下节）。
 
 ## Wiki 清单结构
 
@@ -50,8 +51,18 @@ Raw（与客户端一致）：
 
 1. 可选：`## zh` 之前的共用摘要（中英界面都显示）。
 2. `## zh` / `## en` 各为完整正文。
-3. 标题、列表、emoji、Issue/PR、图片链接可用；游戏内不解析 `<details>`。
+3. 标题、列表、emoji、图片链接可用；游戏内不解析 `<details>`。
 4. `<!-- ez-changelog-format: 1 -->` 可删可留。
+
+## 条目与 PR / 作者（必守）
+
+- **禁止**单独开「合并的 PR」「Merged PRs」「🔀 合并的 PR」等**汇总段**，不要在文末或文内把已在正文中写过的 PR **再列一遍**。
+- 每条功能 / 修复在**该条目**上标明 PR 与作者（条目前或条末均可，全篇风格统一即可）。
+- **推荐（中文）**：`- 描述文字（#312 @贡献者）`；多 PR：`- 描述（#311 @a、#312 @b）`。
+- **推荐（英文）**：`- Description (#312 @contributor)`.
+- 也可用前缀：`- **#312** @user：描述`（与上一种勿混用同一段落内两种风格）。
+- 无单独 PR 的杂项可不写作者；有 PR 则**只出现一次**，勿正文 + 汇总各写一次。
+- Issue 与 PR 若相同编号习惯用 `#n`；链接可用 `(SK-la/Ez2Lazer#n)`。
 
 ## 推荐发版流程
 
@@ -64,6 +75,7 @@ Raw（与客户端一致）：
 ## Agent 代写时的输出
 
 - 给出可贴入 JSON 的 `body`（或 zh/en 块 + 提醒转义）。
+- 每条列表项自带 `#PR @作者`；**不要**生成「合并的 PR」附录。
 - 给出 `tag_name`、`published_at`、`html_url`。
 - **明确提醒**在 Wiki 保存 manifest，勿只给 Release 网页 Markdown。
 - 勿擅自改客户端 Wiki URL（除非用户要求）。
