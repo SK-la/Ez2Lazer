@@ -10,6 +10,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Colour;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Shapes;
 using osu.Framework.Graphics.Sprites;
@@ -40,6 +41,7 @@ using osu.Game.Input.Bindings;
 using osu.Game.Localisation;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
+using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Screens.Select.Filter;
@@ -62,6 +64,8 @@ namespace osu.Game.Screens.Select
         private ShearedToggleButton showConvertedBeatmapsButton = null!;
         private DifficultyRangeSlider difficultyRangeSlider = null!;
         private SortModeDropdown sortDropdown = null!; // Ez功能
+        private SortDirectionButton sortDirectionButton = null!;
+        private Bindable<SortDirection> sortDirection = null!;
         private SkillAxisDropdown sortAxisDropdown = null!;
         private GroupModeDropdown groupDropdown = null!;
         private SkillAxisDropdown groupAxisDropdown = null!;
@@ -122,6 +126,8 @@ namespace osu.Game.Screens.Select
         [BackgroundDependencyLoader]
         private void load(IAPIProvider api)
         {
+            sortDirection = ezConfig.GetBindable<SortDirection>(Ez2Setting.SongSelectSortDirection);
+
             RelativeSizeAxes = Axes.X;
             AutoSizeAxes = Axes.Y;
 
@@ -246,7 +252,11 @@ namespace osu.Game.Screens.Select
                                             {
                                                 RelativeSizeAxes = Axes.X,
                                             },
-                                            Empty(),
+                                            sortDirectionButton = new SortDirectionButton(sortDirection)
+                                            {
+                                                Anchor = Anchor.Centre,
+                                                Origin = Anchor.Centre,
+                                            },
                                         }
                                     }
                                 },
@@ -347,6 +357,7 @@ namespace osu.Game.Screens.Select
             ezConfig.BindWith(Ez2Setting.KeySoundPreviewMode, ksPreviewButton.State);
             configSkillSortAxis = ezConfig.GetBindable<string>(Ez2Setting.SongSelectSkillSortAxis);
             configSkillGroupAxis = ezConfig.GetBindable<string>(Ez2Setting.SongSelectSkillGroupAxis);
+            sortDirection.ValueChanged += onSortDirectionChanged;
 
             ruleset.BindValueChanged(_ =>
             {
@@ -590,6 +601,9 @@ namespace osu.Game.Screens.Select
         {
             base.Dispose(isDisposing);
             collectionsSubscription?.Dispose();
+
+            if (sortDirection != null)
+                sortDirection.ValueChanged -= onSortDirectionChanged;
         }
 
         /// <summary>
@@ -609,6 +623,7 @@ namespace osu.Game.Screens.Select
             {
                 SelectedBeatmapSet = ScopedBeatmapSet.Value,
                 Sort = sortDropdown.Current.Value,
+                SortDirection = sortDirection.Value,
                 Group = groupDropdown.Current.Value?.Value ?? GroupMode.None,
                 AllowConvertedBeatmaps = showConvertedBeatmapsButton.Active.Value,
                 Ruleset = ruleset.Value,
@@ -650,6 +665,8 @@ namespace osu.Game.Screens.Select
         private void applyCircleSizeFilter(FilterCriteria criteria) => csSelector.ApplyToFilterCriteria(criteria);
 
         private int criteriaUpdateSuppression;
+
+        private void onSortDirectionChanged(ValueChangedEvent<SortDirection> _) => updateCriteria();
 
         private void updateCriteria(bool clearScopedSet = true)
         {
@@ -821,6 +838,103 @@ namespace osu.Game.Screens.Select
                     background.FadeColour(normalColour, 100, Easing.Out);
                     base.OnHoverLost(e);
                 }
+            }
+        }
+
+        private partial class SortDirectionButton : ShearedButton
+        {
+            private readonly Bindable<SortDirection> direction;
+            private readonly Box directionGradient;
+            private readonly SpriteIcon ascendingIcon;
+            private readonly SpriteIcon descendingIcon;
+
+            public SortDirectionButton(Bindable<SortDirection> direction)
+            {
+                this.direction = direction;
+                Name = "Song select sort direction";
+                Width = 56;
+                Height = 30;
+                Text = string.Empty;
+                ButtonContent.AutoSizeAxes = Axes.None;
+                ButtonContent.RelativeSizeAxes = Axes.Both;
+                ButtonContent.Padding = new MarginPadding(3);
+                ButtonContent.Child = new Container
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Children = new Drawable[]
+                    {
+                        directionGradient = new Box { RelativeSizeAxes = Axes.Both },
+                        new GridContainer
+                        {
+                            RelativeSizeAxes = Axes.Both,
+                            ColumnDimensions = new[] { new Dimension(), new Dimension() },
+                            Content = new[]
+                            {
+                                new Drawable[]
+                                {
+                                    new Container
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                        Child = ascendingIcon = new SpriteIcon
+                                        {
+                                            Anchor = Anchor.Centre,
+                                            Origin = Anchor.Centre,
+                                            Icon = FontAwesome.Solid.SortUp,
+                                            Size = new Vector2(16),
+                                        },
+                                    },
+                                    new Container
+                                    {
+                                        RelativeSizeAxes = Axes.Both,
+                                        Child = descendingIcon = new SpriteIcon
+                                        {
+                                            Anchor = Anchor.Centre,
+                                            Origin = Anchor.Centre,
+                                            Icon = FontAwesome.Solid.SortDown,
+                                            Size = new Vector2(16),
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                };
+                Action = toggleDirection;
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+                direction.ValueChanged += onDirectionChanged;
+                updateDirection();
+            }
+
+            private void toggleDirection() =>
+                direction.Value = direction.Value == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending;
+
+            private void onDirectionChanged(ValueChangedEvent<SortDirection> _) => updateDirection();
+
+            private void updateDirection()
+            {
+                bool ascending = direction.Value == SortDirection.Ascending;
+                var accent = ColourProvider.Highlight1;
+
+                ColourInfo gradient = ascending
+                    ? ColourInfo.GradientHorizontal(accent.Opacity(0.2f), accent.Opacity(0f))
+                    : ColourInfo.GradientHorizontal(accent.Opacity(0f), accent.Opacity(0.2f));
+
+                directionGradient.TransformTo(nameof(Colour), gradient, 150, Easing.OutQuint);
+                ascendingIcon.FadeColour(ascending ? ColourProvider.Highlight1 : ColourProvider.Content2, 150, Easing.OutQuint);
+                descendingIcon.FadeColour(ascending ? ColourProvider.Content2 : ColourProvider.Highlight1, 150, Easing.OutQuint);
+                TooltipText = ascending ? EzSongSelectStrings.SORT_DIRECTION_ASCENDING_TOOLTIP : EzSongSelectStrings.SORT_DIRECTION_DESCENDING_TOOLTIP;
+            }
+
+            protected override void Dispose(bool isDisposing)
+            {
+                if (isDisposing && IsLoaded)
+                    direction.ValueChanged -= onDirectionChanged;
+
+                base.Dispose(isDisposing);
             }
         }
 

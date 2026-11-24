@@ -10,6 +10,7 @@ using NUnit.Framework;
 using osu.Framework.Extensions.IEnumerableExtensions;
 using osu.Game.Beatmaps;
 using osu.Game.Graphics.Carousel;
+using osu.Game.Overlays;
 using osu.Game.Screens.Select;
 using osu.Game.Screens.Select.Filter;
 using osu.Game.Tests.Resources;
@@ -56,6 +57,53 @@ namespace osu.Game.Tests.Visual.SongSelect
 
             Assert.That(results.Last().Metadata.Artist, Is.EqualTo(zzz_uppercase));
             Assert.That(results.SkipLast(diff_count).Last().Metadata.Artist, Is.EqualTo(zzz_lowercase));
+        }
+
+        [TestCase(SortDirection.Ascending)]
+        [TestCase(SortDirection.Descending)]
+        public async Task TestSortingDateAddedHonoursDirection(SortDirection direction)
+        {
+            var beatmapSets = new List<BeatmapSetInfo>();
+
+            for (int i = 1; i <= 5; i++)
+                addBeatmapSet(set => set.DateAdded = DateTimeOffset.FromUnixTimeSeconds(i), beatmapSets, out _);
+
+            var results = await runSorting(SortMode.DateAdded, beatmapSets, direction: direction);
+            var dates = results.Select(beatmap => beatmap.BeatmapSet!.DateAdded);
+
+            Assert.That(dates, direction == SortDirection.Ascending ? Is.Ordered.Ascending : Is.Ordered.Descending);
+        }
+
+        [TestCase(SortDirection.Ascending)]
+        [TestCase(SortDirection.Descending)]
+        public async Task TestSortingPpKeepsMissingValuesAtEnd(SortDirection direction)
+        {
+            var beatmapSets = new List<BeatmapSetInfo>();
+            addBeatmapSet(_ => { }, beatmapSets, out var low);
+            addBeatmapSet(_ => { }, beatmapSets, out var high);
+            addBeatmapSet(_ => { }, beatmapSets, out var missing);
+
+            var ppValues = new Dictionary<BeatmapInfo, double>
+            {
+                [low.Beatmaps[0]] = 100,
+                [high.Beatmaps[0]] = 900,
+            };
+
+            var results = (await runSorting(SortMode.PP, beatmapSets, ppValueProvider: _ => ppValues, direction: direction)).ToList();
+
+            Assert.That(results[^1], Is.EqualTo(missing.Beatmaps[0]));
+            Assert.That(results.Take(2), direction == SortDirection.Ascending
+                ? Is.EqualTo(new[] { low.Beatmaps[0], high.Beatmaps[0] })
+                : Is.EqualTo(new[] { high.Beatmaps[0], low.Beatmaps[0] }));
+        }
+
+        [Test]
+        public void TestSortDirectionChangeRequiresResorting()
+        {
+            var ascending = new FilterCriteria { Sort = SortMode.Title, SortDirection = SortDirection.Ascending };
+            var descending = new FilterCriteria { Sort = SortMode.Title, SortDirection = SortDirection.Descending };
+
+            Assert.That(ascending.RequiresSorting(descending), Is.True);
         }
 
         [Test]
@@ -253,7 +301,8 @@ namespace osu.Game.Tests.Visual.SongSelect
                 beatmapSets,
                 skillAxisValueProvider: _ => axisValues,
                 skillAxisSystem: osu.Game.EzOsuGame.Analysis.EzAnalysisSystem.Mina,
-                skillAxisId: "stream")).ToList();
+                skillAxisId: "stream",
+                direction: SortDirection.Descending)).ToList();
 
             Assert.That(results[0], Is.EqualTo(high.Beatmaps[0]));
             Assert.That(results[1], Is.EqualTo(low.Beatmaps[0]));
@@ -284,12 +333,14 @@ namespace osu.Game.Tests.Visual.SongSelect
                                                                        Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? ppValueProvider = null,
                                                                        Func<IEnumerable<BeatmapInfo>, IReadOnlyDictionary<BeatmapInfo, double>>? skillAxisValueProvider = null,
                                                                        osu.Game.EzOsuGame.Analysis.EzAnalysisSystem skillAxisSystem = default,
-                                                                       string? skillAxisId = null)
+                                                                       string? skillAxisId = null,
+                                                                       SortDirection direction = SortDirection.Ascending)
         {
             var sorter = new BeatmapCarouselFilterSorting(
                 () => new FilterCriteria
                 {
                     Sort = sort,
+                    SortDirection = direction,
                     SkillAxisSortSystem = skillAxisSystem,
                     SkillAxisSortId = skillAxisId,
                 },

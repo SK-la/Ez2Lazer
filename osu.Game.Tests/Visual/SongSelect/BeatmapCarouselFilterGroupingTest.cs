@@ -14,6 +14,7 @@ using osu.Game.Collections;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Localisation;
+using osu.Game.Overlays;
 using osu.Game.Resources.Localisation.Web;
 using osu.Game.Scoring;
 using osu.Game.Screens.Select;
@@ -125,6 +126,23 @@ namespace osu.Game.Tests.Visual.SongSelect
             assertGroup(results, 4, BeatmapCarouselFilterGroupingStrings.MonthsAgo(1), oneMonthAgoBeatmap.Beatmaps, ref total);
             assertGroup(results, 5, BeatmapCarouselFilterGroupingStrings.MonthsAgo(2), twoMonthsAgoBeatmap.Beatmaps, ref total);
             assertTotal(results, total);
+        }
+
+        [Test]
+        public async Task TestGroupingByDateAddedFollowsAscendingSortDirection()
+        {
+            var beatmapSets = new List<BeatmapSetInfo>();
+            addBeatmapSet(set => set.DateAdded = DateTimeOffset.Now.AddHours(-5), beatmapSets, out _);
+            addBeatmapSet(set => set.DateAdded = DateTimeOffset.Now.AddDays(-1), beatmapSets, out _);
+            addBeatmapSet(set => set.DateAdded = DateTimeOffset.Now.AddDays(-4), beatmapSets, out _);
+            addBeatmapSet(set => set.DateAdded = DateTimeOffset.Now.AddDays(-21), beatmapSets, out _);
+            addBeatmapSet(set => set.DateAdded = DateTimeOffset.Now.AddMonths(-2).AddDays(-3), beatmapSets, out _);
+
+            var results = await runGrouping(GroupMode.DateAdded, beatmapSets, sort: SortMode.DateAdded, sortDirection: SortDirection.Ascending);
+            var groups = results.Select(item => item.Model).OfType<GroupDefinition>().Select(group => group.Title).ToArray();
+
+            Assert.That(groups.First(), Is.EqualTo(BeatmapCarouselFilterGroupingStrings.MonthsAgo(2)));
+            Assert.That(groups.Last(), Is.EqualTo(BeatmapCarouselFilterGroupingStrings.Today));
         }
 
         [Test]
@@ -515,13 +533,17 @@ namespace osu.Game.Tests.Visual.SongSelect
             Func<BeatmapInfo, double>? getSunnySR = null,
             Func<BeatmapInfo, double?>? getSkillAxis = null,
             EzAnalysisSystem skillAxisSystem = EzAnalysisSystem.None,
-            string? skillAxisId = null)
+            string? skillAxisId = null,
+            SortMode sort = SortMode.Title,
+            SortDirection sortDirection = SortDirection.Ascending)
         {
             var groupingFilter = new BeatmapCarouselFilterGrouping
             {
                 GetCriteria = () => new FilterCriteria
                 {
                     Group = group,
+                    Sort = sort,
+                    SortDirection = sortDirection,
                     SkillAxisGroupSystem = skillAxisSystem,
                     SkillAxisGroupId = skillAxisId,
                 },

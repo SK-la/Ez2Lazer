@@ -19,6 +19,7 @@ using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Online;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Scoring.Bonus;
+using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Scoring;
 
@@ -105,6 +106,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.AnalysisSystemSelection, string.Empty);
             SetDefault(Ez2Setting.SongSelectSkillSortAxis, string.Empty);
             SetDefault(Ez2Setting.SongSelectSkillGroupAxis, string.Empty);
+            SetDefault(Ez2Setting.SongSelectSortDirection, SortDirection.Ascending);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
             SetDefault(Ez2Setting.MenuLogoText, "(´・ω・｀),120");
@@ -1082,6 +1084,9 @@ namespace osu.Game.EzOsuGame.Configuration
 
         /// <summary>选歌「技能轴」分组所选轴，格式同 <see cref="SongSelectSkillSortAxis"/>。</summary>
         SongSelectSkillGroupAxis,
+
+        /// <summary>选歌界面排序方向；分组与排序字段相同时也同步调整分组顺序。</summary>
+        SongSelectSortDirection,
 
         HideMainMenuOnlineBanner,
 

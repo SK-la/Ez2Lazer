@@ -6,8 +6,11 @@ using osu.Framework.Graphics;
 using osu.Framework.Graphics.UserInterface;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
+using osu.Game.Overlays;
 using osu.Game.Overlays.Mods.Input;
 
 namespace osu.Game.Overlays.Settings.Sections.UserInterface
@@ -17,7 +20,7 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
         protected override LocalisableString Header => UserInterfaceStrings.SongSelectHeader;
 
         [BackgroundDependencyLoader]
-        private void load(OsuConfigManager config)
+        private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             Children = new Drawable[]
             {
@@ -28,6 +31,15 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                 })
                 {
                     Keywords = new[] { "converts", "converted" }
+                },
+                new SettingsItemV2(new SortDirectionDropdown
+                {
+                    Caption = EzSongSelectStrings.SORT_DIRECTION,
+                    HintText = EzSongSelectStrings.SORT_DIRECTION_TOOLTIP,
+                    Current = ezConfig.GetBindable<SortDirection>(Ez2Setting.SongSelectSortDirection),
+                })
+                {
+                    Keywords = new[] { "sort", "ascending", "descending", "order" },
                 },
                 new SettingsItemV2(new FormEnumDropdown<RandomSelectAlgorithm>
                 {
@@ -55,6 +67,16 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                     Caption = GameplaySettingsStrings.BackgroundBlur,
                     Current = config.GetBindable<bool>(OsuSetting.SongSelectBackgroundBlur),
                 }),
+            };
+        }
+
+        private partial class SortDirectionDropdown : FormEnumDropdown<SortDirection>
+        {
+            protected override LocalisableString GenerateItemText(SortDirection item) => item switch
+            {
+                SortDirection.Ascending => EzSongSelectStrings.SORT_DIRECTION_ASCENDING,
+                SortDirection.Descending => EzSongSelectStrings.SORT_DIRECTION_DESCENDING,
+                _ => base.GenerateItemText(item),
             };
         }
     }

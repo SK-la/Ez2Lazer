@@ -14,6 +14,7 @@ using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Carousel;
 using osu.Game.Localisation;
+using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Scoring;
@@ -136,7 +137,7 @@ namespace osu.Game.Screens.Select
                     return null;
                 }
 
-                var groups = getGroups(itemList, criteria, getDifficulty, getPp, getSkillAxis);
+                var groups = orderMatchingGroupsBySortDirection(getGroups(itemList, criteria, getDifficulty, getPp, getSkillAxis), criteria);
                 int displayedBeatmapsCount = 0;
 
                 foreach (var (group, itemsInGroup) in groups)
@@ -240,6 +241,51 @@ namespace osu.Game.Screens.Select
 
             // In the majority case we group sets together for display.
             return true;
+        }
+
+        private static List<GroupMapping> orderMatchingGroupsBySortDirection(List<GroupMapping> groups, FilterCriteria criteria)
+        {
+            bool naturallyDescending;
+
+            switch (criteria.Group)
+            {
+                case GroupMode.Artist when criteria.Sort == SortMode.Artist:
+                case GroupMode.Author when criteria.Sort == SortMode.Author:
+                case GroupMode.Title when criteria.Sort == SortMode.Title:
+                case GroupMode.BPM when criteria.Sort == SortMode.BPM:
+                case GroupMode.Difficulty when criteria.Sort == SortMode.Difficulty:
+                case GroupMode.PP when criteria.Sort == SortMode.PP:
+                case GroupMode.Length when criteria.Sort == SortMode.Length:
+                    naturallyDescending = false;
+                    break;
+
+                case GroupMode.DateAdded when criteria.Sort == SortMode.DateAdded:
+                case GroupMode.DateRanked when criteria.Sort == SortMode.DateRanked:
+                case GroupMode.LastPlayed when criteria.Sort == SortMode.LastPlayed:
+                case GroupMode.SkillAxis when criteria.Sort == SortMode.SkillAxis:
+                    naturallyDescending = true;
+                    break;
+
+                default:
+                    return groups;
+            }
+
+            bool requestedDescending = criteria.SortDirection == SortDirection.Descending;
+
+            if (requestedDescending == naturallyDescending)
+                return groups;
+
+            bool isMissingGroup(GroupMapping group) => criteria.Group switch
+            {
+                GroupMode.DateRanked => group.Group!.Order == 0,
+                GroupMode.LastPlayed or GroupMode.PP or GroupMode.SkillAxis => group.Group!.Order == int.MaxValue,
+                _ => false,
+            };
+
+            List<GroupMapping> sortableGroups = groups.Where(g => !isMissingGroup(g)).Reverse().ToList();
+            List<GroupMapping> missingGroups = groups.Where(isMissingGroup).ToList();
+            sortableGroups.AddRange(missingGroups);
+            return sortableGroups;
         }
 
         private List<GroupMapping> getGroups(List<CarouselItem> items, FilterCriteria criteria, Func<BeatmapInfo, double> getDifficulty, Func<BeatmapInfo, double?> getPp,
