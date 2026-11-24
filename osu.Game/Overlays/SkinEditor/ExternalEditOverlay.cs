@@ -299,11 +299,13 @@ namespace osu.Game.Overlays.SkinEditor
                 return;
             }
 
+            Live<SkinInfo>? newSkin;
+
             try
             {
-                var imported = await editOperation!.Finish().ConfigureAwait(false);
+                newSkin = await editOperation!.Finish().ConfigureAwait(false);
 
-                if (imported == null)
+                if (newSkin == null)
                 {
                     Logger.Log("External skin edit finished without importing changes (skin not tracked in Realm).", LoggingTarget.Database, LogLevel.Error);
                     Schedule(() =>
@@ -333,11 +335,22 @@ namespace osu.Game.Overlays.SkinEditor
                 setGlobalSkinDisabled(false);
 
                 if (skinManager.CurrentSkinInfo.Value.PerformRead(s => EzLegacySkinFolders.TryGetDirectory(s, out _)))
+                {
                     skinManager.ReloadCurrentLegacyFolderSkinIfActive();
+                }
                 else
                 {
                     var oldSkin = skinManager.CurrentSkin!.Value;
-                    skinManager.CurrentSkin.Value = oldSkin.SkinInfo.Value.CreateInstance(skinManager);
+                    skinManager.CurrentSkin.Value = newSkin.PerformRead(s =>
+                    {
+                        // Even though we are 100% on an update thread, we need to wait for realm callbacks to fire (to correctly invalidate caches in RealmBackedResourceStore).
+                        // See https://github.com/realm/realm-dotnet/discussions/2634#discussioncomment-2483573 for further discussion.
+                        // This is the best we can do for now.
+                        s.Realm!.Refresh();
+
+                        return s.CreateInstance(skinManager);
+                    });
+
                     oldSkin.Dispose();
                 }
 
