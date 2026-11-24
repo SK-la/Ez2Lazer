@@ -232,35 +232,35 @@ namespace osu.Game.EzOsuGame.Changelog
             if (hasCache && fresh)
                 return materialise(cached);
 
+            IReadOnlyList<GitHubRelease> working = cached;
+
             if (storage != null)
             {
                 GitHubRelease[]? fromBundle = await tryFetchReleaseChangelogBundleAsync(cancellationToken).ConfigureAwait(false);
 
                 if (fromBundle != null && fromBundle.Length > 0)
-                {
-                    var merged = mergeByTag(cached, fromBundle);
-
-                    EzGitHubChangelogReleaseCache.Write(storage, merged);
-                    return materialise(merged);
-                }
+                    working = mergeByTag(working, fromBundle);
             }
 
             try
             {
                 GitHubRelease[] head = await fetchHeadPagesFromGitHubAsync(cancellationToken).ConfigureAwait(false);
-                var merged = mergeByTag(cached, head);
+                var merged = mergeByTag(working, head);
 
                 if (storage != null)
                     EzGitHubChangelogReleaseCache.Write(storage, merged);
 
                 return materialise(merged);
             }
-            catch (Exception ex) when (hasCache)
+            catch (Exception ex) when (hasCache || working.Count > 0)
             {
                 Logger.Log($"GitHub releases API failed ({ex.Message}); using cached changelog.", level: LogLevel.Important);
-                return materialise(cached);
+                return materialise(working.Count > 0 ? working : cached);
             }
         }
+
+        internal static IReadOnlyList<GitHubRelease> MergeReleasesByTagForTesting(IReadOnlyList<GitHubRelease>? cached, IReadOnlyList<GitHubRelease> head) =>
+            mergeByTag(cached, head);
 
         private static async Task<GitHubRelease[]?> tryFetchReleaseChangelogBundleAsync(CancellationToken cancellationToken)
         {
@@ -302,12 +302,22 @@ namespace osu.Game.EzOsuGame.Changelog
             }
 
             foreach (var release in head)
-            {
-                if (!string.IsNullOrEmpty(release.TagName))
-                    byTag[release.TagName] = release;
-            }
+                addOrMergeRelease(byTag, release);
 
             return byTag.Values.OrderByDescending(r => r.PublishedAt ?? DateTime.MinValue).ToList();
+        }
+
+        private static void addOrMergeRelease(Dictionary<string, GitHubRelease> byTag, GitHubRelease release)
+        {
+            if (string.IsNullOrEmpty(release.TagName))
+                return;
+
+            if (byTag.TryGetValue(release.TagName, out var existing)
+                && string.IsNullOrWhiteSpace(release.Body)
+                && !string.IsNullOrWhiteSpace(existing.Body))
+                return;
+
+            byTag[release.TagName] = release;
         }
 
         private static void configureGitHubRequest(OsuJsonWebRequest<GitHubRelease[]> request)

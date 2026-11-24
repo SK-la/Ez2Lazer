@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -28,6 +29,17 @@ namespace osu.Game.Tests.EzOsuGame.Changelog
             APIChangelogBuild[] builds = Array.Empty<APIChangelogBuild>();
 
             Assert.That(EzGitHubChangelogCatalogue.CreateUpdateStreams(builds), Is.Empty);
+        }
+
+        [Test]
+        public void TestMergeReleasesByTagKeepsExistingBodyWhenHeadIsEmpty()
+        {
+            var cached = new[] { sampleRelease("2026.1102.0-ez2lazer", "cached-body") };
+            var head = new[] { sampleRelease("2026.1102.0-ez2lazer", "   ") };
+
+            var merged = EzGitHubChangelogCatalogue.MergeReleasesByTagForTesting(cached, head);
+
+            Assert.That(merged.Single().Body, Is.EqualTo("cached-body"));
         }
 
         [Test]
