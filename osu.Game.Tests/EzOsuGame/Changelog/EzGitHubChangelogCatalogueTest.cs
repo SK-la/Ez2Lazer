@@ -34,7 +34,7 @@ namespace osu.Game.Tests.EzOsuGame.Changelog
         public void TestReleaseChangelogBundleUrlIsGitHubReleaseAsset()
         {
             Assert.That(
-                EzGitHubChangelogCatalogue.ReleaseChangelogBundleUrl,
+                EzGitHubChangelogCatalogue.RELEASE_CHANGELOG_BUNDLE_URL,
                 Does.Contain("/releases/latest/download/changelog-releases.json"));
         }
 

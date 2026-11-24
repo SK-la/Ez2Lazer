@@ -90,7 +90,7 @@ namespace osu.Game.EzOsuGame.Changelog
 
         private static string extractPreamble(string markdown)
         {
-            var lines = markdown.Replace("\r\n", "\n").Split('\n');
+            string[] lines = markdown.Replace("\r\n", "\n").Split('\n');
             var preamble = new List<string>();
 
             foreach (string rawLine in lines)
@@ -200,14 +200,13 @@ namespace osu.Game.EzOsuGame.Changelog
                 Logger.Log($"Ez changelog cache write failed: {ex.Message}", level: LogLevel.Debug);
             }
         }
-
     }
 
     public sealed class EzGitHubChangelogCatalogue
     {
         private const string releases_api_base = "https://api.github.com/repos/SK-la/Ez2Lazer/releases";
         /// <summary>Release asset published by CI; not subject to GitHub REST core rate limits.</summary>
-        public const string ReleaseChangelogBundleUrl = "https://github.com/SK-la/Ez2Lazer/releases/latest/download/changelog-releases.json";
+        public const string RELEASE_CHANGELOG_BUNDLE_URL = "https://github.com/SK-la/Ez2Lazer/releases/latest/download/changelog-releases.json";
         private const int releases_per_page = 10;
         /// <summary>Only the newest pages are refreshed live; older tags stay in <see cref="EzGitHubChangelogReleaseCache"/>.</summary>
         private const int dynamic_head_page_count = 2;
@@ -265,12 +264,12 @@ namespace osu.Game.EzOsuGame.Changelog
 
         private static async Task<GitHubRelease[]?> tryFetchReleaseChangelogBundleAsync(CancellationToken cancellationToken)
         {
-            var request = new OsuWebRequest(ReleaseChangelogBundleUrl);
+            var request = new OsuWebRequest(RELEASE_CHANGELOG_BUNDLE_URL);
 
             try
             {
                 await request.PerformAsync(cancellationToken).ConfigureAwait(false);
-                string json = request.GetResponseString();
+                string? json = request.GetResponseString();
 
                 if (string.IsNullOrWhiteSpace(json))
                     return null;
