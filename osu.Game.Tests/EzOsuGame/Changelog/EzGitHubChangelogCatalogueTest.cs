@@ -2,6 +2,7 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -138,7 +139,7 @@ namespace osu.Game.Tests.EzOsuGame.Changelog
             string bundleJson = JsonConvert.SerializeObject(new EzGitHubChangelogReleaseCache.CachedFile
             {
                 FetchedAt = DateTimeOffset.UtcNow,
-                Releases = { sampleRelease(bundleTag, "bundle-body") },
+                Releases = new List<GitHubRelease> { sampleRelease(bundleTag, "bundle-body") },
             });
 
             using var listener = new HttpListener();
