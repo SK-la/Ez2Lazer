@@ -7,9 +7,8 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.IO.Stores;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Processing;
 
 namespace osu.Game.Beatmaps
 {
@@ -59,33 +58,26 @@ namespace osu.Game.Beatmaps
 
         private TextureUpload limitTextureUploadSize(TextureUpload textureUpload)
         {
-            var image = Image.LoadPixelData(textureUpload.Data, textureUpload.Width, textureUpload.Height);
+            using var image = new RgbaImage(textureUpload.Width, textureUpload.Height, textureUpload.Data);
 
             // The original texture upload will no longer be returned or used.
             textureUpload.Dispose();
 
-            Size size = image.Size;
+            int width = image.Width;
+            int height = image.Height;
 
             // Assume that panel backgrounds are always displayed using `FillMode.Fill`.
             // Also assume that all backgrounds are wider than they are tall, so the
             // fill is always going to be based on width.
             //
             // We need to include enough height to make this work for all ratio panels are displayed at.
-            int usableHeight = (int)Math.Ceiling(size.Width * 1 / minimum_display_ratio);
+            int usableHeight = (int)Math.Ceiling(width / minimum_display_ratio);
 
-            usableHeight = Math.Min(size.Height, usableHeight);
+            usableHeight = Math.Min(height, usableHeight);
 
             // Crop the centre region of the background for now.
-            Rectangle cropRectangle = new Rectangle(
-                0,
-                (size.Height - usableHeight) / 2,
-                size.Width,
-                usableHeight
-            );
-
-            image.Mutate(i => i.Crop(cropRectangle));
-
-            return new TextureUpload(image);
+            RgbaImage cropped = image.Crop(0, (height - usableHeight) / 2, width, usableHeight);
+            return new TextureUpload(cropped);
         }
 
         public Stream? GetStream(string name) => textureStore?.GetStream(name);

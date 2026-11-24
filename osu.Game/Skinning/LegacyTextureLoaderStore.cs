@@ -8,10 +8,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using osu.Framework.Graphics.Sprites;
 using osu.Framework.Graphics.Textures;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.IO.Stores;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using osu.Game.Utils;
 
 namespace osu.Game.Skinning
 {
@@ -105,26 +104,29 @@ namespace osu.Game.Skinning
             if (left == null && middle == null && right == null)
                 return null;
 
-            var spliced = new Image<Rgba32>((left?.Width ?? 0) + (middle?.Width ?? 0) + (right?.Width ?? 0), Math.Max(Math.Max(left?.Height ?? 0, middle?.Height ?? 0), right?.Height ?? 0));
-            if (spliced.Width == 0 || spliced.Height == 0)
+            int width = (left?.Width ?? 0) + (middle?.Width ?? 0) + (right?.Width ?? 0);
+            int height = Math.Max(Math.Max(left?.Height ?? 0, middle?.Height ?? 0), right?.Height ?? 0);
+            if (width == 0 || height == 0)
                 return null;
+
+            var spliced = new RgbaImage(width, height);
 
             if (left != null)
             {
-                var leftPixels = Image.LoadPixelData(left.Data, left.Width, left.Height);
-                spliced.Mutate(t => t.DrawImage(leftPixels, new Point(), 1));
+                using var leftPixels = new RgbaImage(left.Width, left.Height, left.Data);
+                ImageProcessing.DrawImage(spliced, leftPixels, 0, 0);
             }
 
             if (middle != null)
             {
-                var middlePixels = Image.LoadPixelData(middle.Data, middle.Width, middle.Height);
-                spliced.Mutate(t => t.DrawImage(middlePixels, new Point(left?.Width ?? 0, 0), 1));
+                using var middlePixels = new RgbaImage(middle.Width, middle.Height, middle.Data);
+                ImageProcessing.DrawImage(spliced, middlePixels, left?.Width ?? 0, 0);
             }
 
             if (right != null)
             {
-                var rightPixels = Image.LoadPixelData(right.Data, right.Width, right.Height);
-                spliced.Mutate(t => t.DrawImage(rightPixels, new Point((left?.Width ?? 0) + (middle?.Width ?? 0), 0), 1));
+                using var rightPixels = new RgbaImage(right.Width, right.Height, right.Data);
+                ImageProcessing.DrawImage(spliced, rightPixels, (left?.Width ?? 0) + (middle?.Width ?? 0), 0);
             }
 
             return new TextureUpload(spliced);
@@ -132,14 +134,21 @@ namespace osu.Game.Skinning
 
         private TextureUpload convertToGrayscale(TextureUpload textureUpload)
         {
-            var image = Image.LoadPixelData(textureUpload.Data, textureUpload.Width, textureUpload.Height);
+            using var image = new RgbaImage(textureUpload.Width, textureUpload.Height, textureUpload.Data);
 
             // stable uses `0.299 * r + 0.587 * g + 0.114 * b`
             // (https://github.com/peppy/osu-stable-reference/blob/013c3010a9d495e3471a9c59518de17006f9ad89/osu!/Graphics/Textures/pTexture.cs#L138-L153)
             // which matches mode BT.601 (https://en.wikipedia.org/wiki/Grayscale#Luma_coding_in_video_systems)
-            image.Mutate(i => i.Grayscale(GrayscaleMode.Bt601));
+            foreach (ref Rgba32 pixel in image.PixelSpan)
+            {
+                byte grey = (byte)Math.Clamp((int)MathF.Round(pixel.R * 0.299f + pixel.G * 0.587f + pixel.B * 0.114f), 0, 255);
+                pixel.R = grey;
+                pixel.G = grey;
+                pixel.B = grey;
+            }
 
-            return new TextureUpload(image);
+            textureUpload.Dispose();
+            return new TextureUpload(image.Clone());
         }
 
         public Stream? GetStream(string name) => wrappedStore?.GetStream(name);

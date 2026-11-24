@@ -6,12 +6,11 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using NUnit.Framework;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Game.Skinning;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using SixLabors.ImageSharp.Processing;
+using osu.Game.Utils;
 
 namespace osu.Game.Tests.Skinning
 {
@@ -27,7 +26,7 @@ namespace osu.Game.Tests.Skinning
         [Test]
         public void TestDefaultModeClampsPerAxisAndKeepsWidth()
         {
-            using var loader = new MaxDimensionLimitedTextureLoaderStore(new StubTextureStore("tall", new Image<Rgba32>(40, 100_000)));
+            using var loader = new MaxDimensionLimitedTextureLoaderStore(new StubTextureStore("tall", new RgbaImage(40, 100_000)));
 
             using var result = loader.Get("tall");
 
@@ -42,7 +41,7 @@ namespace osu.Game.Tests.Skinning
 
             // 纵向渐变：R 通道随行号线性变化，用首末行的亮度区分「整段压缩」与「中心裁剪」。
             // 图像所有权交给 StubTextureStore（即 TextureUpload），此处不再重复释放。
-            var image = new Image<Rgba32>(2, 4096);
+            var image = new RgbaImage(2, 4096);
 
             for (int y = 0; y < image.Height; y++)
             {
@@ -65,7 +64,7 @@ namespace osu.Game.Tests.Skinning
         [Test]
         public void TestDefaultModeLeavesWithinLimitUntouched()
         {
-            var upload = new TextureUpload(new Image<Rgba32>(64, 64));
+            var upload = new TextureUpload(new RgbaImage(64, 64));
             using var loader = new MaxDimensionLimitedTextureLoaderStore(new StubTextureStore("small", upload));
 
             using var result = loader.Get("small");
@@ -76,7 +75,7 @@ namespace osu.Game.Tests.Skinning
         [Test]
         public void TestMaxModePreservesAspectForOversizedNonSquare()
         {
-            using var loader = new MaxDimensionLimitedTextureLoaderStore(new StubTextureStore("wide", new Image<Rgba32>(512, 256)), 128, ResizeMode.Max);
+            using var loader = new MaxDimensionLimitedTextureLoaderStore(new StubTextureStore("wide", new RgbaImage(512, 256)), 128, ResizeMode.Max);
 
             using var result = loader.Get("wide");
 
@@ -89,7 +88,7 @@ namespace osu.Game.Tests.Skinning
             private readonly string name;
             private readonly TextureUpload upload;
 
-            public StubTextureStore(string name, Image<Rgba32> image)
+            public StubTextureStore(string name, RgbaImage image)
                 : this(name, new TextureUpload(image))
             {
             }

@@ -1,17 +1,17 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.IO;
 using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics.Rendering;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Tests.Visual;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.Tests.EzOsuGame.Textures
 {
@@ -91,7 +91,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
 
             AddAssert("'-' 优先于 '_'", () => expect(new[] { 20, 21 }, "Grade/Dash"));
             AddAssert("只有 '_' 时取 '_'", () => expect(new[] { 40, 41 }, "Grade/Under"));
-            AddAssert("联接符只认 -/_：{name}{数值} 不算帧", () => expect(System.Array.Empty<int>(), "Grade/Bare"));
+            AddAssert("联接符只认 -/_：{name}{数值} 不算帧", () => expect(Array.Empty<int>(), "Grade/Bare"));
             AddAssert("资源名后紧跟字母数字的组被排除", () => expect(new[] { 70, 71 }, "Grade/Loose"));
         }
 
@@ -121,8 +121,8 @@ namespace osu.Game.Tests.EzOsuGame.Textures
             AddAssert("显式 {name}/{000} 命中同一组", () => expect(new[] { 10, 11 }, "Sub/Note", template: "{name}/{000}"));
             AddAssert("{name}/frame_0 成帧", () => expect(new[] { 20, 21 }, "Sub/Judge"));
             AddAssert("{name}/frame-0 成帧", () => expect(new[] { 30, 31 }, "Sub/Flat"));
-            AddAssert("子目录内无连接符不算帧", () => expect(System.Array.Empty<int>(), "Sub/Bad"));
-            AddAssert("子目录内 {name}{数值} 不算帧", () => expect(System.Array.Empty<int>(), "Sub/Ghost"));
+            AddAssert("子目录内无连接符不算帧", () => expect(Array.Empty<int>(), "Sub/Bad"));
+            AddAssert("子目录内 {name}{数值} 不算帧", () => expect(Array.Empty<int>(), "Sub/Ghost"));
         }
 
         [Test]
@@ -153,9 +153,9 @@ namespace osu.Game.Tests.EzOsuGame.Textures
                 writePng("EzResources/Bare/Name1.png", 951);
             });
 
-            AddAssert("默认三模板不加载", () => expect(System.Array.Empty<int>(), "Bare/Name"));
+            AddAssert("默认三模板不加载", () => expect(Array.Empty<int>(), "Bare/Name"));
 
-            AddAssert("显式模板 {name}{0} 没有连字符，不算帧", () => expect(System.Array.Empty<int>(), "Bare/Name", template: "{name}{0}"));
+            AddAssert("显式模板 {name}{0} 没有连字符，不算帧", () => expect(Array.Empty<int>(), "Bare/Name", template: "{name}{0}"));
         }
 
         [Test]
@@ -246,10 +246,10 @@ namespace osu.Game.Tests.EzOsuGame.Textures
             });
 
             AddAssert("单图回退为 1 帧", () => expect(new[] { 300 }, "Alone/Still"));
-            AddAssert("关闭单图回退后为 0 帧", () => expect(System.Array.Empty<int>(), "Alone/Still", allowSingleFallback: false));
+            AddAssert("关闭单图回退后为 0 帧", () => expect(Array.Empty<int>(), "Alone/Still", allowSingleFallback: false));
             AddAssert("显式 {name}/frame_{0} 命中子目录", () => expect(new[] { 400, 401 }, "Judge/Cool", template: "{name}/frame_{0}"));
             AddAssert("{name}_overlay 表达单图", () => expect(new[] { 500 }, "Judge/Single", template: "{name}_overlay"));
-            AddAssert("没有连字符的 {0} 不算帧", () => expect(System.Array.Empty<int>(), "Judge/Suffixed", template: "{0}"));
+            AddAssert("没有连字符的 {0} 不算帧", () => expect(Array.Empty<int>(), "Judge/Suffixed", template: "{0}"));
         }
 
         [Test]
@@ -260,7 +260,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
 
             AddAssert("大小写不同也能解析", () => expect(new[] { 700 }, "Theme/one/Kool"));
             AddAssert("磁盘上写了后缀就按后缀查", () => expect(new[] { 700 }, "Theme/one/KOOL.png"));
-            AddAssert("后缀不折叠：查 KOOL.jpg 取不到", () => expect(System.Array.Empty<int>(), "Theme/one/KOOL.jpg"));
+            AddAssert("后缀不折叠：查 KOOL.jpg 取不到", () => expect(Array.Empty<int>(), "Theme/one/KOOL.jpg"));
         }
 
         [Test]
@@ -288,7 +288,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
         {
             AddStep("准备资源", createResourceStore);
 
-            AddAssert("尚无该目录时为空", () => expect(System.Array.Empty<int>(), "Late/Entry"));
+            AddAssert("尚无该目录时为空", () => expect(Array.Empty<int>(), "Late/Entry"));
 
             AddStep("事后放入帧", () =>
             {
@@ -296,7 +296,7 @@ namespace osu.Game.Tests.EzOsuGame.Textures
                 writePng("EzResources/Late/Entry-1.png", 801);
             });
 
-            AddAssert("不失效则仍被解析缓存挡住", () => expect(System.Array.Empty<int>(), "Late/Entry"));
+            AddAssert("不失效则仍被解析缓存挡住", () => expect(Array.Empty<int>(), "Late/Entry"));
 
             AddStep("显式失效", () => resources!.InvalidateResourceCaches());
 
@@ -340,16 +340,63 @@ namespace osu.Game.Tests.EzOsuGame.Textures
 
         private void writePng(string path, int size)
         {
-            using var image = new Image<Rgba32>(size, size);
+            using var image = new RgbaImage(size, size);
             using var stream = LocalStorage.GetStream(path, FileAccess.Write);
             image.SaveAsPng(stream);
         }
 
         private void writeGif(string path, int size)
         {
-            using var image = new Image<Rgba32>(size, size);
             using var stream = LocalStorage.GetStream(path, FileAccess.Write);
-            image.SaveAsGif(stream);
+
+            stream.Write(new byte[]
+            {
+                0x47, 0x49, 0x46, 0x38, 0x39, 0x61,
+                (byte)size, (byte)(size >> 8), (byte)size, (byte)(size >> 8), 0x80, 0, 0,
+                0, 0, 0, 255, 255, 255,
+                0x2c, 0, 0, 0, 0, (byte)size, (byte)(size >> 8), (byte)size, (byte)(size >> 8), 0,
+                2
+            });
+
+            using var compressed = new MemoryStream();
+            int bitBuffer = 0;
+            int bitCount = 0;
+
+            void writeCode(int code)
+            {
+                bitBuffer |= code << bitCount;
+                bitCount += 3;
+
+                while (bitCount >= 8)
+                {
+                    compressed.WriteByte((byte)bitBuffer);
+                    bitBuffer >>= 8;
+                    bitCount -= 8;
+                }
+            }
+
+            for (int i = 0; i < size * size; i++)
+            {
+                writeCode(4);
+                writeCode(0);
+            }
+
+            writeCode(5);
+
+            if (bitCount > 0)
+                compressed.WriteByte((byte)bitBuffer);
+
+            byte[] imageData = compressed.ToArray();
+
+            for (int offset = 0; offset < imageData.Length; offset += byte.MaxValue)
+            {
+                int length = Math.Min(byte.MaxValue, imageData.Length - offset);
+                stream.WriteByte((byte)length);
+                stream.Write(imageData, offset, length);
+            }
+
+            stream.WriteByte(0);
+            stream.WriteByte(0x3b);
         }
 
         protected override void Dispose(bool isDisposing)

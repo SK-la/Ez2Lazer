@@ -4,9 +4,9 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using osu.Framework.Graphics.Imaging;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Localization;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace osu.Game.EzOsuGame.Camera
 {
