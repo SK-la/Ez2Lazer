@@ -111,14 +111,14 @@ namespace osu.Game.EzOsuGame.Audio
         {
             if (!EnabledBindable.Value && !ignoreEnabled)
             {
-                beatmap.PrepareTrackForPreview(true);
+                prepareTrackLoop(beatmap);
                 return false;
             }
 
             StopPreview();
             currentBeatmap = beatmap;
             currentTrack = prepareTrack(beatmap);
-            beatmap.PrepareTrackForPreview(true);
+            prepareTrackLoop(beatmap);
             previewStoryboardCarriesMusic = StoryboardSampleInfoExtensions.CarriesBackgroundMusicIn(beatmap);
             previewStoryboardIsNoteAudio = StoryboardSampleInfoExtensions.IsNoteAudioIn(beatmap.BeatmapInfo.Ruleset);
             previewMainAudioAvailable = currentTrack is not null and not TrackVirtual;
@@ -141,6 +141,19 @@ namespace osu.Game.EzOsuGame.Audio
 
             startEnhancedPreview(beatmap, playableBeatmap);
             return true;
+        }
+
+        private void prepareTrackLoop(IWorkingBeatmap beatmap)
+        {
+            beatmap.PrepareTrackForPreview(true);
+            var track = beatmap.Track;
+            if (track is TrackVirtual || track.Length - track.RestartPoint > minimum_track_loop_length_ms)
+                return;
+
+            double start = track.Length * 0.4;
+            track.RestartPoint = track.Length - start <= minimum_track_loop_length_ms ? 0 : start;
+
+        
         }
 
         public void StopPreview() => stopPreviewInternal();
