@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using osu.Game.Beatmaps;
 using osu.Game.Collections;
 using osu.Game.EzOsuGame.Analysis;
+using osu.Game.Overlays;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Filter;
 using osu.Game.Rulesets.Mods;
@@ -20,6 +21,7 @@ namespace osu.Game.Screens.Select
     {
         public GroupMode Group;
         public SortMode Sort;
+        public SortDirection SortDirection;
 
         /// <summary>System owning <see cref="SkillAxisSortId"/> when <see cref="Sort"/> is <see cref="SortMode.SkillAxis"/>.</summary>
         public EzAnalysisSystem SkillAxisSortSystem;
@@ -304,7 +306,7 @@ namespace osu.Game.Screens.Select
         /// <returns></returns>
         public bool RequiresSorting(FilterCriteria newCriteria)
         {
-            if (Sort != newCriteria.Sort)
+            if (Sort != newCriteria.Sort || SortDirection != newCriteria.SortDirection)
                 return true;
 
             // Axis identity is part of the sort key; a change must re-order even when SortMode stays SkillAxis.

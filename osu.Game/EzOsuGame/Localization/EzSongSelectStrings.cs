@@ -41,6 +41,12 @@ namespace osu.Game.EzOsuGame.Localization
             "移除交集",
             "Remove intersection");
 
+        public static readonly LocalisableString SORT_DIRECTION = new EzLocalizationManager.EzLocalisableString("排序方向", "Sort direction");
+
+        public static readonly LocalisableString SORT_DIRECTION_ASCENDING = new EzLocalizationManager.EzLocalisableString("升序", "Ascending");
+
+        public static readonly LocalisableString SORT_DIRECTION_DESCENDING = new EzLocalizationManager.EzLocalisableString("降序", "Descending");
+
         public static readonly LocalisableString SKILL_AXIS = new EzLocalizationManager.EzLocalisableString(
             "技能轴",
             "Skill axis");

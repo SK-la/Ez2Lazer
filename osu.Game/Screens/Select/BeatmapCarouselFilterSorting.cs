@@ -10,6 +10,7 @@ using osu.Game.Beatmaps;
 using osu.Game.EzOsuGame.Analysis;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.Carousel;
+using osu.Game.Overlays;
 using osu.Game.Screens.Select.Filter;
 
 namespace osu.Game.Screens.Select
@@ -104,107 +105,189 @@ namespace osu.Game.Screens.Select
                         return compareDifficulty(ab, bb, criteria.Sort, getSortValue);
 
                     // If we're grouping by sets, all fallback sorts need to be aggregates for the set.
-                    return compare(ab, bb, criteria.Sort, aggregate: true, getSortValue, stringComparer);
+                    return compare(ab, bb, criteria.Sort, criteria.SortDirection, aggregate: true, getSortValue, stringComparer);
                 }
 
-                return compare(ab, bb, criteria.Sort, aggregate: false, getSortValue, stringComparer);
+                return compare(ab, bb, criteria.Sort, criteria.SortDirection, aggregate: false, getSortValue, stringComparer);
             })).ToList();
         }
 
-        private static int compare(BeatmapInfo a, BeatmapInfo b, SortMode sort, bool aggregate, Func<BeatmapInfo, double> getSortValue, IComparer<string> stringComparer)
+        private static int compare(BeatmapInfo a, BeatmapInfo b, SortMode sort, SortDirection direction, bool aggregate, Func<BeatmapInfo, double> getSortValue, IComparer<string> stringComparer)
         {
             int comparison;
 
             switch (sort)
             {
                 case SortMode.Artist:
-                    comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Artist, b.BeatmapSet!.Metadata.Artist);
-                    if (comparison == 0)
-                        goto case SortMode.Title;
+                    comparison = compareDirected(stringComparer.Compare(a.BeatmapSet!.Metadata.Artist, b.BeatmapSet!.Metadata.Artist), direction);
                     break;
 
                 case SortMode.Title:
-                    comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Title, b.BeatmapSet!.Metadata.Title);
+                    comparison = compareDirected(stringComparer.Compare(a.BeatmapSet!.Metadata.Title, b.BeatmapSet!.Metadata.Title), direction);
                     break;
 
                 case SortMode.Author:
-                    comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Author.Username, b.BeatmapSet!.Metadata.Author.Username);
+                    comparison = compareDirected(stringComparer.Compare(a.BeatmapSet!.Metadata.Author.Username, b.BeatmapSet!.Metadata.Author.Username), direction);
                     break;
 
                 case SortMode.Source:
-                    comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Source, b.BeatmapSet!.Metadata.Source);
+                    comparison = compareDirected(stringComparer.Compare(a.BeatmapSet!.Metadata.Source, b.BeatmapSet!.Metadata.Source), direction);
                     break;
 
                 case SortMode.Difficulty:
-                    comparison = getSortValue(a).CompareTo(getSortValue(b));
+                    comparison = aggregate
+                        ? compareUsingAggregateMax(a, b, getSortValue, direction)
+                        : compareDirected(getSortValue(a).CompareTo(getSortValue(b)), direction);
                     break;
 
                 case SortMode.PP:
-                    if (aggregate)
-                        comparison = compareUsingAggregateMax(a, b, getSortValue);
-                    else
-                        comparison = getSortValue(a).CompareTo(getSortValue(b));
+                {
+                    static bool isMissingPp(double value) => value < 0 || !double.IsFinite(value);
+
+                    comparison = aggregate
+                        ? compareUsingAggregateMax(a, b, getSortValue, direction, isMissingPp)
+                        : compareNumericSortValues(getSortValue(a), getSortValue(b), direction, isMissingPp);
                     break;
+                }
 
                 case SortMode.SkillAxis:
-                    // Higher axis value first; missing charts (NegativeInfinity) sink to the end.
-                    if (aggregate)
-                        comparison = compareUsingAggregateMax(b, a, getSortValue);
-                    else
-                        comparison = getSortValue(b).CompareTo(getSortValue(a));
+                {
+                    static bool isMissingAxis(double value) => !double.IsFinite(value);
+
+                    comparison = aggregate
+                        ? compareUsingAggregateMax(a, b, getSortValue, direction, isMissingAxis)
+                        : compareNumericSortValues(getSortValue(a), getSortValue(b), direction, isMissingAxis);
                     break;
+                }
 
                 case SortMode.DateAdded:
-                    comparison = b.BeatmapSet!.DateAdded.CompareTo(a.BeatmapSet!.DateAdded);
+                    comparison = compareDirected(a.BeatmapSet!.DateAdded.CompareTo(b.BeatmapSet!.DateAdded), reverseDateDirection(direction));
                     break;
 
                 case SortMode.DateRanked:
-                    comparison = Nullable.Compare(b.BeatmapSet!.DateRanked, a.BeatmapSet!.DateRanked);
+                    comparison = compareNullable(a.BeatmapSet!.DateRanked, b.BeatmapSet!.DateRanked, reverseDateDirection(direction));
                     break;
 
                 case SortMode.DateSubmitted:
-                    comparison = Nullable.Compare(b.BeatmapSet!.DateSubmitted, a.BeatmapSet!.DateSubmitted);
+                    comparison = compareNullable(a.BeatmapSet!.DateSubmitted, b.BeatmapSet!.DateSubmitted, reverseDateDirection(direction));
                     break;
 
                 case SortMode.LastPlayed:
                     if (aggregate)
-                        comparison = compareUsingAggregateMax(b, a, static b => (b.LastPlayed ?? DateTimeOffset.MinValue).ToUnixTimeSeconds());
+                    {
+                        static double getLastPlayed(BeatmapInfo beatmap) => beatmap.LastPlayed?.ToUnixTimeMilliseconds() ?? double.NegativeInfinity;
+                        static bool isMissingLastPlayed(double value) => double.IsNegativeInfinity(value);
+
+                        comparison = compareUsingAggregateMax(a, b, getLastPlayed, reverseDateDirection(direction), isMissingLastPlayed);
+                    }
                     else
-                        comparison = Nullable.Compare(b.LastPlayed, a.LastPlayed);
+                        comparison = compareNullable(a.LastPlayed, b.LastPlayed, reverseDateDirection(direction));
                     break;
 
                 case SortMode.BPM:
-                    if (aggregate)
-                        comparison = compareUsingAggregateMax(a, b, static b => b.BPM);
-                    else
-                        comparison = a.BPM.CompareTo(b.BPM);
+                    comparison = aggregate
+                        ? compareUsingAggregateMax(a, b, static beatmap => beatmap.BPM, direction)
+                        : compareDirected(a.BPM.CompareTo(b.BPM), direction);
                     break;
 
                 case SortMode.Length:
-                    if (aggregate)
-                        comparison = compareUsingAggregateMax(a, b, static b => b.Length);
-                    else
-                        comparison = a.Length.CompareTo(b.Length);
+                    comparison = aggregate
+                        ? compareUsingAggregateMax(a, b, static beatmap => beatmap.Length, direction)
+                        : compareDirected(a.Length.CompareTo(b.Length), direction);
                     break;
 
                 default:
                     throw new ArgumentOutOfRangeException();
             }
 
-            // If the initial sort could not differentiate, attempt to use Title then DateAdded to order sets in a stable fashion.
-            if (comparison == 0)
-                comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Title, b.BeatmapSet!.Metadata.Title);
+            if (comparison != 0)
+                return comparison;
 
-            // The directionality of this matches the current SortMode.DateAdded, but we may want to reconsider if that becomes a user decision (ie. asc / desc).
+            // Tie-breakers keep their existing direction so changing the primary sort does not destabilise equal items.
+            comparison = stringComparer.Compare(a.BeatmapSet!.Metadata.Title, b.BeatmapSet!.Metadata.Title);
+
             if (comparison == 0)
                 comparison = b.BeatmapSet!.DateAdded.CompareTo(a.BeatmapSet!.DateAdded);
 
-            // If both failed to break the tie, fallback to our internal GUID for stability.
-            // This basically means it's a stable random sort.
             if (comparison == 0)
                 comparison = b.BeatmapSet!.ID.CompareTo(a.BeatmapSet!.ID);
 
             return comparison;
+        }
+
+        private static SortDirection reverseDateDirection(SortDirection direction) =>
+            direction == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending;
+
+        private static int compareDirected(int comparison, SortDirection direction) =>
+            direction == SortDirection.Ascending ? comparison : -comparison;
+
+        private static int compareNullable<T>(T? a, T? b, SortDirection direction)
+            where T : struct, IComparable<T>
+        {
+            if (!a.HasValue || !b.HasValue)
+            {
+                if (a.HasValue == b.HasValue)
+                    return 0;
+
+                return a.HasValue ? -1 : 1;
+            }
+
+            return compareDirected(a.Value.CompareTo(b.Value), direction);
+        }
+
+        private static int compareNumericSortValues(double a, double b, SortDirection direction, Func<double, bool> isMissing)
+        {
+            bool aMissing = isMissing(a);
+            bool bMissing = isMissing(b);
+
+            if (aMissing || bMissing)
+            {
+                if (aMissing == bMissing)
+                    return 0;
+
+                return aMissing ? 1 : -1;
+            }
+
+            return compareDirected(a.CompareTo(b), direction);
+        }
+
+        private static int compareUsingAggregateMax(BeatmapInfo a, BeatmapInfo b, Func<BeatmapInfo, double> func, SortDirection direction, Func<double, bool>? isMissing = null)
+        {
+            static double? getMax(BeatmapInfo beatmap, Func<BeatmapInfo, double> selector, Func<double, bool>? isMissingValue)
+            {
+                bool hasVisibleBeatmap = false;
+                bool hasValue = false;
+                double max = double.NegativeInfinity;
+
+                foreach (var matchedBeatmap in beatmap.BeatmapSet!.Beatmaps.Where(bb => !bb.Hidden))
+                {
+                    hasVisibleBeatmap = true;
+                    double value = selector(matchedBeatmap);
+
+                    if (isMissingValue?.Invoke(value) == true)
+                        continue;
+
+                    if (!hasValue || value > max)
+                        max = value;
+
+                    hasValue = true;
+                }
+
+                return hasVisibleBeatmap && hasValue ? max : null;
+            }
+
+            double? aMax = getMax(a, func, isMissing);
+            double? bMax = getMax(b, func, isMissing);
+
+            if (!aMax.HasValue || !bMax.HasValue)
+            {
+                if (aMax.HasValue == bMax.HasValue)
+                    return 0;
+
+                return aMax.HasValue ? -1 : 1;
+            }
+
+            return compareDirected(aMax.Value.CompareTo(bMax.Value), direction);
         }
 
         private static int compareDifficulty(BeatmapInfo a, BeatmapInfo b, SortMode sort, Func<BeatmapInfo, double> getSortValue)
