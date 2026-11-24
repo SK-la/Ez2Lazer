@@ -129,7 +129,7 @@ namespace osu.Game.Tests.Visual.SongSelect
         }
 
         [Test]
-        public async Task TestGroupingByDateAddedFollowsAscendingSortDirection()
+        public async Task TestGroupingByDateAddedAscendingPreservesCurrentOrder()
         {
             var beatmapSets = new List<BeatmapSetInfo>();
             addBeatmapSet(set => set.DateAdded = DateTimeOffset.Now.AddHours(-5), beatmapSets, out _);
@@ -141,8 +141,8 @@ namespace osu.Game.Tests.Visual.SongSelect
             var results = await runGrouping(GroupMode.DateAdded, beatmapSets, sort: SortMode.DateAdded, sortDirection: SortDirection.Ascending);
             var groups = results.Select(item => item.Model).OfType<GroupDefinition>().Select(group => group.Title).ToArray();
 
-            Assert.That(groups.First(), Is.EqualTo(BeatmapCarouselFilterGroupingStrings.MonthsAgo(2)));
-            Assert.That(groups.Last(), Is.EqualTo(BeatmapCarouselFilterGroupingStrings.Today));
+            Assert.That(groups.First(), Is.EqualTo(BeatmapCarouselFilterGroupingStrings.Today));
+            Assert.That(groups.Last(), Is.EqualTo(BeatmapCarouselFilterGroupingStrings.MonthsAgo(2)));
         }
 
         [Test]

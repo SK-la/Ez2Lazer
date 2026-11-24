@@ -71,7 +71,7 @@ namespace osu.Game.Tests.Visual.SongSelect
             var results = await runSorting(SortMode.DateAdded, beatmapSets, direction: direction);
             var dates = results.Select(beatmap => beatmap.BeatmapSet!.DateAdded);
 
-            Assert.That(dates, direction == SortDirection.Ascending ? Is.Ordered.Ascending : Is.Ordered.Descending);
+            Assert.That(dates, direction == SortDirection.Ascending ? Is.Ordered.Descending : Is.Ordered.Ascending);
         }
 
         [TestCase(SortDirection.Ascending)]

@@ -161,15 +161,15 @@ namespace osu.Game.Screens.Select
                 }
 
                 case SortMode.DateAdded:
-                    comparison = compareDirected(a.BeatmapSet!.DateAdded.CompareTo(b.BeatmapSet!.DateAdded), direction);
+                    comparison = compareDirected(a.BeatmapSet!.DateAdded.CompareTo(b.BeatmapSet!.DateAdded), reverseDateDirection(direction));
                     break;
 
                 case SortMode.DateRanked:
-                    comparison = compareNullable(a.BeatmapSet!.DateRanked, b.BeatmapSet!.DateRanked, direction);
+                    comparison = compareNullable(a.BeatmapSet!.DateRanked, b.BeatmapSet!.DateRanked, reverseDateDirection(direction));
                     break;
 
                 case SortMode.DateSubmitted:
-                    comparison = compareNullable(a.BeatmapSet!.DateSubmitted, b.BeatmapSet!.DateSubmitted, direction);
+                    comparison = compareNullable(a.BeatmapSet!.DateSubmitted, b.BeatmapSet!.DateSubmitted, reverseDateDirection(direction));
                     break;
 
                 case SortMode.LastPlayed:
@@ -178,10 +178,10 @@ namespace osu.Game.Screens.Select
                         static double getLastPlayed(BeatmapInfo beatmap) => beatmap.LastPlayed?.ToUnixTimeMilliseconds() ?? double.NegativeInfinity;
                         static bool isMissingLastPlayed(double value) => double.IsNegativeInfinity(value);
 
-                        comparison = compareUsingAggregateMax(a, b, getLastPlayed, direction, isMissingLastPlayed);
+                        comparison = compareUsingAggregateMax(a, b, getLastPlayed, reverseDateDirection(direction), isMissingLastPlayed);
                     }
                     else
-                        comparison = compareNullable(a.LastPlayed, b.LastPlayed, direction);
+                        comparison = compareNullable(a.LastPlayed, b.LastPlayed, reverseDateDirection(direction));
                     break;
 
                 case SortMode.BPM:
@@ -214,6 +214,9 @@ namespace osu.Game.Screens.Select
 
             return comparison;
         }
+
+        private static SortDirection reverseDateDirection(SortDirection direction) =>
+            direction == SortDirection.Ascending ? SortDirection.Descending : SortDirection.Ascending;
 
         private static int compareDirected(int comparison, SortDirection direction) =>
             direction == SortDirection.Ascending ? comparison : -comparison;

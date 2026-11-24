@@ -262,6 +262,9 @@ namespace osu.Game.Screens.Select
                 case GroupMode.DateAdded when criteria.Sort == SortMode.DateAdded:
                 case GroupMode.DateRanked when criteria.Sort == SortMode.DateRanked:
                 case GroupMode.LastPlayed when criteria.Sort == SortMode.LastPlayed:
+                    naturallyDescending = false;
+                    break;
+
                 case GroupMode.SkillAxis when criteria.Sort == SortMode.SkillAxis:
                     naturallyDescending = true;
                     break;

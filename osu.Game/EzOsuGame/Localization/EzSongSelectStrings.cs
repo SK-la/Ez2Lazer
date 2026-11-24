@@ -52,12 +52,12 @@ namespace osu.Game.EzOsuGame.Localization
             "Applies to all song selection sort modes. Missing values always remain at the end.");
 
         public static readonly LocalisableString SORT_DIRECTION_ASCENDING_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "升序：文字 A 到 Z、日期从旧到新、数值从低到高；缺失值仍排在末尾。",
-            "Ascending: text A to Z, dates oldest to newest, and numbers low to high. Missing values stay at the end.");
+            "升序：文字 A 到 Z、日期从新到旧、数值从低到高；缺失值仍排在末尾。",
+            "Ascending: text A to Z, dates newest to oldest, and numbers low to high. Missing values stay at the end.");
 
         public static readonly LocalisableString SORT_DIRECTION_DESCENDING_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "降序：文字 Z 到 A、日期从新到旧、数值从高到低；缺失值仍排在末尾。",
-            "Descending: text Z to A, dates newest to oldest, and numbers high to low. Missing values stay at the end.");
+            "降序：文字 Z 到 A、日期从旧到新、数值从高到低；缺失值仍排在末尾。",
+            "Descending: text Z to A, dates oldest to newest, and numbers high to low. Missing values stay at the end.");
 
         public static readonly LocalisableString SKILL_AXIS = new EzLocalizationManager.EzLocalisableString(
             "技能轴",
