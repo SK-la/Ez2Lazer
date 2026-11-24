@@ -44,7 +44,7 @@
 
 - 改了 schema 或迁移之后，不要 `dotnet run`，不要打开用户库。
 - 版本号、`ScoreInfo` / `BeatmapInfo`、sqlite 和 `DELETE` 的细则在 `.cursor/skills/ez-realm-schema/SKILL.md`。改这些之前先读它。
-- 撰写或更新发行版发布说明、Wiki `changelog-releases.json`、游戏内更新日志前，读 `.cursor/skills/ez-release-notes/SKILL.md`。
+- 撰写或更新发行版发布说明、Wiki `changelog-releases.json`、游戏内更新日志前，读账号同步 skill **发布说明**（`~/.cursor/skills/发布说明/SKILL.md`；仓库副本 `.cursor/skills/发布说明/SKILL.md`）。
 - 涉及 Realm schema 的改动，不考虑本地Realm文件状态。
 
 ## 验证与回复

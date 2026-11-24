@@ -34,4 +34,4 @@ Release 网页上的 Description 仍可作为对外说明；**以 Wiki 清单为
 - 拉取失败且本地有缓存时继续展示缓存，并提示 manifest 不可用。
 - 可选：`EZ2LAZER_GITHUB_TOKEN` / `GITHUB_TOKEN` 与游戏内 Wiki 相同，用于 raw 请求头（公开 Wiki 一般不必配置）。
 
-维护流程与 Agent 约定见 `.cursor/skills/ez-release-notes/SKILL.md`。
+维护流程与 Agent 约定见账号同步 skill **发布说明**（`~/.cursor/skills/发布说明/SKILL.md`）。
