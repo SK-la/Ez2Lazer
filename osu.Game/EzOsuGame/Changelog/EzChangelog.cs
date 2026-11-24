@@ -26,7 +26,7 @@ using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Containers.Markdown;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation;
-using osu.Game.Online.API;
+using osu.Game.EzOsuGame.Wiki;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Changelog;
@@ -145,7 +145,6 @@ namespace osu.Game.EzOsuGame.Changelog
     internal static class EzGitHubChangelogReleaseCache
     {
         private const string cache_relative_path = "EzData/github-changelog-releases.json";
-        private static readonly TimeSpan fresh_ttl = TimeSpan.FromHours(6);
 
         internal sealed class CachedFile
         {
@@ -156,10 +155,9 @@ namespace osu.Game.EzOsuGame.Changelog
             public List<GitHubRelease> Releases { get; set; } = new List<GitHubRelease>();
         }
 
-        public static bool TryRead(Storage storage, out GitHubRelease[] releases, out bool fresh)
+        public static bool TryRead(Storage storage, out GitHubRelease[] releases)
         {
             releases = Array.Empty<GitHubRelease>();
-            fresh = false;
 
             try
             {
@@ -172,7 +170,6 @@ namespace osu.Game.EzOsuGame.Changelog
                     return false;
 
                 releases = cached.Releases.ToArray();
-                fresh = DateTimeOffset.UtcNow - cached.FetchedAt < fresh_ttl;
                 return true;
             }
             catch (Exception ex)
@@ -180,6 +177,30 @@ namespace osu.Game.EzOsuGame.Changelog
                 Logger.Log($"Ez changelog cache read failed: {ex.Message}", level: LogLevel.Debug);
                 return false;
             }
+        }
+
+        public static bool TryParseManifest(string? json, out IReadOnlyList<GitHubRelease> releases)
+        {
+            releases = Array.Empty<GitHubRelease>();
+
+            if (string.IsNullOrWhiteSpace(json))
+                return false;
+
+            try
+            {
+                var cached = JsonConvert.DeserializeObject<CachedFile>(json);
+                if (cached?.Releases != null && cached.Releases.Count > 0)
+                {
+                    releases = cached.Releases;
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Log($"Ez changelog manifest parse failed: {ex.Message}", level: LogLevel.Debug);
+            }
+
+            return false;
         }
 
         public static void Write(Storage storage, IReadOnlyList<GitHubRelease> releases)
@@ -204,12 +225,8 @@ namespace osu.Game.EzOsuGame.Changelog
 
     public sealed class EzGitHubChangelogCatalogue
     {
-        private const string releases_api_base = "https://api.github.com/repos/SK-la/Ez2Lazer/releases";
-        /// <summary>Release asset published by CI; not subject to GitHub REST core rate limits.</summary>
-        public const string RELEASE_CHANGELOG_BUNDLE_URL = "https://github.com/SK-la/Ez2Lazer/releases/latest/download/changelog-releases.json";
-        private const int releases_per_page = 10;
-        /// <summary>Only the newest pages are refreshed live; older tags stay in <see cref="EzGitHubChangelogReleaseCache"/>.</summary>
-        private const int dynamic_head_page_count = 2;
+        /// <summary>Wiki manifest file; game reads via <see cref="EzWikiPaths.RAW_WIKI_BASE"/> (same transport as in-game Wiki).</summary>
+        public const string WIKI_CHANGELOG_MANIFEST_FILE = "changelog-releases.json";
 
         private static readonly APIUpdateStream ez2lazer_stream = new APIUpdateStream
         {
@@ -224,140 +241,32 @@ namespace osu.Game.EzOsuGame.Changelog
         public async Task<IReadOnlyList<APIChangelogBuild>> FetchBuildsAsync(Storage? storage, CancellationToken cancellationToken = default)
         {
             GitHubRelease[] cached = Array.Empty<GitHubRelease>();
-            bool fresh = false;
             bool hasCache = storage != null
-                            && EzGitHubChangelogReleaseCache.TryRead(storage, out cached, out fresh)
+                            && EzGitHubChangelogReleaseCache.TryRead(storage, out cached)
                             && cached.Length > 0;
 
-            if (hasCache && fresh)
-                return materialise(cached);
+            string? remoteJson = await EzWikiGitHubClient.FetchTextAsync(WIKI_CHANGELOG_MANIFEST_FILE, cancellationToken).ConfigureAwait(false);
 
-            IReadOnlyList<GitHubRelease> working = cached;
-
-            if (storage != null)
+            if (EzGitHubChangelogReleaseCache.TryParseManifest(remoteJson, out var fromWiki))
             {
-                GitHubRelease[]? fromBundle = await tryFetchReleaseChangelogBundleAsync(cancellationToken).ConfigureAwait(false);
-
-                if (fromBundle != null && fromBundle.Length > 0)
-                    working = mergeByTag(working, fromBundle);
-            }
-
-            try
-            {
-                GitHubRelease[] head = await fetchHeadPagesFromGitHubAsync(cancellationToken).ConfigureAwait(false);
-                var merged = mergeByTag(working, head);
-
                 if (storage != null)
-                    EzGitHubChangelogReleaseCache.Write(storage, merged);
+                    EzGitHubChangelogReleaseCache.Write(storage, fromWiki);
 
-                return materialise(merged);
+                return materialise(fromWiki);
             }
-            catch (Exception ex) when (hasCache || working.Count > 0)
+
+            if (hasCache)
             {
-                Logger.Log($"GitHub releases API failed ({ex.Message}); using cached changelog.", level: LogLevel.Important);
-                return materialise(working.Count > 0 ? working : cached);
-            }
-        }
+                if (string.IsNullOrWhiteSpace(remoteJson))
+                    Logger.Log("Ez changelog wiki manifest unavailable; using cached changelog.", level: LogLevel.Important);
 
-        internal static IReadOnlyList<GitHubRelease> MergeReleasesByTagForTesting(IReadOnlyList<GitHubRelease>? cached, IReadOnlyList<GitHubRelease> head) =>
-            mergeByTag(cached, head);
-
-        private static async Task<GitHubRelease[]?> tryFetchReleaseChangelogBundleAsync(CancellationToken cancellationToken)
-        {
-            var request = new OsuWebRequest(RELEASE_CHANGELOG_BUNDLE_URL);
-
-            try
-            {
-                await request.PerformAsync(cancellationToken).ConfigureAwait(false);
-                string? json = request.GetResponseString();
-
-                if (string.IsNullOrWhiteSpace(json))
-                    return null;
-
-                var file = JsonConvert.DeserializeObject<EzGitHubChangelogReleaseCache.CachedFile>(json);
-
-                if (file?.Releases == null || file.Releases.Count == 0)
-                    return null;
-
-                return file.Releases.ToArray();
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Ez changelog release bundle failed: {ex.Message}", level: LogLevel.Debug);
-                return null;
-            }
-        }
-
-        private static IReadOnlyList<GitHubRelease> mergeByTag(IReadOnlyList<GitHubRelease>? cached, IReadOnlyList<GitHubRelease> head)
-        {
-            var byTag = new Dictionary<string, GitHubRelease>(StringComparer.OrdinalIgnoreCase);
-
-            if (cached != null)
-            {
-                foreach (var release in cached)
-                {
-                    if (!string.IsNullOrEmpty(release.TagName))
-                        byTag[release.TagName] = release;
-                }
+                return materialise(cached);
             }
 
-            foreach (var release in head)
-                addOrMergeRelease(byTag, release);
+            if (string.IsNullOrWhiteSpace(remoteJson))
+                Logger.Log("Ez changelog wiki manifest unavailable (no cache).", level: LogLevel.Important);
 
-            return byTag.Values.OrderByDescending(r => r.PublishedAt ?? DateTime.MinValue).ToList();
-        }
-
-        private static void addOrMergeRelease(Dictionary<string, GitHubRelease> byTag, GitHubRelease release)
-        {
-            if (string.IsNullOrEmpty(release.TagName))
-                return;
-
-            if (byTag.TryGetValue(release.TagName, out var existing)
-                && string.IsNullOrWhiteSpace(release.Body)
-                && !string.IsNullOrWhiteSpace(existing.Body))
-                return;
-
-            byTag[release.TagName] = release;
-        }
-
-        private static void configureGitHubRequest(OsuJsonWebRequest<GitHubRelease[]> request)
-        {
-            request.AddHeader("Accept", "application/vnd.github+json");
-
-            string? token = Environment.GetEnvironmentVariable("EZ2LAZER_GITHUB_TOKEN")
-                            ?? Environment.GetEnvironmentVariable("GITHUB_TOKEN");
-
-            if (!string.IsNullOrWhiteSpace(token))
-                request.AddHeader("Authorization", $"Bearer {token.Trim()}");
-        }
-
-        private static async Task<GitHubRelease[]> fetchHeadPagesFromGitHubAsync(CancellationToken cancellationToken)
-        {
-            var byTag = new Dictionary<string, GitHubRelease>(StringComparer.OrdinalIgnoreCase);
-
-            for (int page = 1; page <= dynamic_head_page_count; page++)
-            {
-                string uri = $"{releases_api_base}?per_page={releases_per_page}&page={page}";
-                var request = new OsuJsonWebRequest<GitHubRelease[]>(uri);
-                configureGitHubRequest(request);
-                await request.PerformAsync(cancellationToken).ConfigureAwait(false);
-
-                GitHubRelease[] batch = request.ResponseObject ?? Array.Empty<GitHubRelease>();
-
-                if (batch.Length == 0)
-                    break;
-
-                foreach (var release in batch)
-                {
-                    if (!string.IsNullOrEmpty(release.TagName))
-                        byTag[release.TagName] = release;
-                }
-
-                if (batch.Length < releases_per_page)
-                    break;
-            }
-
-            return byTag.Values.ToArray();
+            return materialise(Array.Empty<GitHubRelease>());
         }
 
         private IReadOnlyList<APIChangelogBuild> materialise(IReadOnlyList<GitHubRelease> releases)

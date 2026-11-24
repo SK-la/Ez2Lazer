@@ -511,40 +511,6 @@ jobs:
           pattern: release-*
           merge-multiple: true
 
-      - name: Build changelog bundle asset
-        shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $repo = '${{ github.repository }}'
-          $out = Join-Path $env:GITHUB_WORKSPACE 'release-assets/changelog-releases.json'
-          New-Item -ItemType Directory -Force -Path (Split-Path $out) | Out-Null
-          $headers = @{
-            Accept = 'application/vnd.github+json'
-            'X-GitHub-Api-Version' = '2022-11-28'
-            Authorization = "Bearer $env:GITHUB_TOKEN"
-          }
-          $all = [System.Collections.Generic.List[object]]::new()
-          for ($page = 1; $page -le 20; $page++) {
-            $batch = @(Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases?per_page=100&page=$page" -Headers $headers)
-            if ($batch.Count -eq 0) { break }
-            foreach ($release in $batch) {
-              if ($release.draft) { continue }
-              $all.Add([ordered]@{
-                tag_name     = $release.tag_name
-                body         = $release.body
-                published_at = $release.published_at
-                prerelease   = [bool]$release.prerelease
-                html_url     = $release.html_url
-              })
-            }
-            if ($batch.Count -lt 100) { break }
-          }
-          [ordered]@{
-            fetchedAt = (Get-Date).ToUniversalTime().ToString('o')
-            releases  = $all
-          } | ConvertTo-Json -Depth 20 | Set-Content -Path $out -Encoding utf8
-
       - name: Create GitHub Release
         id: create_release
         uses: softprops/action-gh-release@v2

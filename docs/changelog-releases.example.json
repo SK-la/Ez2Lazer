@@ -1,0 +1,11 @@
+{
+  "releases": [
+    {
+      "tag_name": "2026.1122.0-ez2lazer",
+      "body": "## zh\n\n### 新增\n\n- 示例条目\n\n## en\n\n### Added\n\n- Example entry\n",
+      "published_at": "2026-11-22T12:00:00Z",
+      "prerelease": false,
+      "html_url": "https://github.com/SK-la/Ez2Lazer/releases/tag/2026.1122.0-ez2lazer"
+    }
+  ]
+}
