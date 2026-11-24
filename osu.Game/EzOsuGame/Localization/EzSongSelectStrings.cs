@@ -41,7 +41,16 @@ namespace osu.Game.EzOsuGame.Localization
             "移除交集",
             "Remove intersection");
 
+        public static readonly EzLocalizationManager.EzLocalisableString SORT_REVERSED = new EzLocalizationManager.EzLocalisableString(
+            "反转排序",
+            "Reverse sort order");
+
+        public static readonly LocalisableString SORT_REVERSED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "反转当前排序模式的自然顺序。",
+            "Reverses the natural direction of the current sort mode.");
+
         public static readonly LocalisableString SORT_DIRECTION = new EzLocalizationManager.EzLocalisableString("排序方向", "Sort direction");
+
 
         public static readonly LocalisableString SORT_DIRECTION_ASCENDING = new EzLocalizationManager.EzLocalisableString("升序", "Ascending");
 

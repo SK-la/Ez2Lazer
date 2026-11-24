@@ -107,12 +107,14 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.SongSelectSkillSortAxis, string.Empty);
             SetDefault(Ez2Setting.SongSelectSkillGroupAxis, string.Empty);
             SetDefault(Ez2Setting.SongSelectSortDirection, SortDirection.Ascending);
+            SetDefault(Ez2Setting.SongSelectSortReversed, false);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
             SetDefault(Ez2Setting.MenuLogoText, "(´・ω・｀),120");
             SetDefault(Ez2Setting.MenuLogoVisualisationStyle, EzLogoVisualisationStyle.RadialBars);
             SetDefault(Ez2Setting.MenuLogoBackdropStyle, EzLogoBackdropStyle.Acrylic);
             SetDefault(Ez2Setting.MenuLogoBackdropColour, Colour4.FromHex("ff66ab"));
+
             SetDefault(Ez2Setting.MenuLogoBackdropBlur, 10.0, 0.0, 40.0, 1.0);
             SetDefault(Ez2Setting.MenuLogoBackdropOpacity, 1.0, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.SongSelectUseEzBackground, false);
@@ -1066,11 +1068,13 @@ namespace osu.Game.EzOsuGame.Configuration
         /// 与当前设置不一致即视为该系统的算法已变，下次启动全库重算。
         /// </summary>
         /// <remarks>
-        /// 记录「已应用的参数」而不是一个脏标记：用户把参数改回原值后两者重新相等，一次放弃的试验不会排队重算。
-        /// </remarks>
-        SsrAppliedRescaleThreshold,
+        /// 记录「已应用的参数」而不是一个脏标记：用户把参数改回原值后两        /// <summary>选歌界面排序方向；分组与排序字段相同时也同步调整分组顺序。</summary>
+        SongSelectSortDirection,
 
-        /// <summary>落库的 SunnySR 所用的 <see cref="SsrLnMultiplier"/>，规则同 <see cref="SsrAppliedRescaleThreshold"/>。</summary>
+        /// <summary>是否相对于当前排序模式的自然顺序反转选歌排序。</summary>
+        SongSelectSortReversed,
+
+        HideMainMenuOnlineBanner,srLnMultiplier"/>，规则同 <see cref="SsrAppliedRescaleThreshold"/>。</summary>
         SsrAppliedLnMultiplier,
 
         /// <summary>

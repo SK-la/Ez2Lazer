@@ -19,9 +19,10 @@ namespace osu.Game.Screens.Select
 {
     public class FilterCriteria
     {
-        public GroupMode Group;
         public SortMode Sort;
         public SortDirection SortDirection;
+        public bool SortReversed;
+
 
         /// <summary>System owning <see cref="SkillAxisSortId"/> when <see cref="Sort"/> is <see cref="SortMode.SkillAxis"/>.</summary>
         public EzAnalysisSystem SkillAxisSortSystem;
