@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using osu.Framework.Allocation;
 using osu.Framework.Audio;
 using osu.Framework.Audio.Sample;
 using osu.Framework.Audio.Track;
@@ -13,18 +14,19 @@ using osu.Framework.Logging;
 using osu.Framework.Threading;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Beatmaps;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets.Edit.Checks.Components;
 using osu.Game.Rulesets.Objects;
+using osu.Game.Rulesets.Objects.Drawables;
 using osu.Game.Storyboards;
 
 namespace osu.Game.EzOsuGame.Audio
 {
     /// <summary>
     /// Song Select 增强预览：在 <see cref="osu.Game.Screens.Select.SongSelect"/> 中于 BGM（<c>MusicController</c>）之上
-    /// 调度谱面 note 音效与 storyboard 样本。BGM 循环与预览起点由 SongSelect 调用
-    /// <see cref="IWorkingBeatmap.PrepareTrackForPreview"/> 配置；本类不负责主音乐轨。
+    /// 调度谱面 note 音效与 storyboard 样本。主音乐轨仍由 MusicController 播放。
     /// </summary>
     /// <remarks>
     /// note 音效只播谱面自身的键音：皮肤兜底的默认命中音与 whistle / clap / finish 附加层都不属于 note 音，预览里不发声。
@@ -36,6 +38,8 @@ namespace osu.Game.EzOsuGame.Audio
         // 预览时，谱面包内 hitsound 音效文件达到阈值才启用 note 预览，避免把少量固定音效误判成 keysound。
         private const int hitsound_threshold = 10;
         private const double tick_ms = 8; // 调度间隔与事件触发容差（~120fps）
+        private const double loop_detection_threshold_ms = 200;
+        private const double minimum_track_loop_length_ms = loop_detection_threshold_ms + tick_ms * 2;
         private const double preload_lookahead_ms = 2000;
         private const int max_cached_beatmaps = 3; // LRU 缓存：最多保留最近 3 首谱面的调度表
 
@@ -46,6 +50,10 @@ namespace osu.Game.EzOsuGame.Audio
 
         private Track? currentTrack;
         private IWorkingBeatmap? currentBeatmap;
+        private IBindable<double> hitsoundVolume = null!;
+        private IBindable<double> musicVolume = null!;
+        private bool previewStoryboardCarriesMusic;
+        private bool previewStoryboardIsNoteAudio;
         private ScheduledDelegate? updateDelegate;
         private readonly Queue<Action> pendingPreloadActions = new Queue<Action>();
         private int prepareGeneration;
@@ -69,6 +77,13 @@ namespace osu.Game.EzOsuGame.Audio
         private bool previewMainAudioAvailable;
         private bool previewHitSoundsEnabled;
         private bool previewStoryboardEnabled;
+
+        [BackgroundDependencyLoader]
+        private void load(OsuConfigManager configManager, AudioManager audioManager)
+        {
+            hitsoundVolume = configManager.GetBindable<double>(OsuSetting.HitsoundVolume);
+            musicVolume = audioManager.VolumeTrack;
+        }
 
         protected override void Dispose(bool isDisposing)
         {
@@ -95,11 +110,17 @@ namespace osu.Game.EzOsuGame.Audio
         public bool StartPreview(IWorkingBeatmap beatmap, bool ignoreEnabled = false)
         {
             if (!EnabledBindable.Value && !ignoreEnabled)
+            {
+                prepareTrackLoop(beatmap);
                 return false;
+            }
 
             StopPreview();
             currentBeatmap = beatmap;
             currentTrack = prepareTrack(beatmap);
+            prepareTrackLoop(beatmap);
+            previewStoryboardCarriesMusic = StoryboardSampleInfoExtensions.CarriesBackgroundMusicIn(beatmap);
+            previewStoryboardIsNoteAudio = StoryboardSampleInfoExtensions.IsNoteAudioIn(beatmap.BeatmapInfo.Ruleset);
             previewMainAudioAvailable = currentTrack is not null and not TrackVirtual;
 
             if (currentTrack == null)
@@ -122,6 +143,17 @@ namespace osu.Game.EzOsuGame.Audio
             return true;
         }
 
+        private void prepareTrackLoop(IWorkingBeatmap beatmap)
+        {
+            beatmap.PrepareTrackForPreview(true);
+            var track = beatmap.Track;
+            if (track is TrackVirtual || track.Length - track.RestartPoint > minimum_track_loop_length_ms)
+                return;
+
+            double start = track.Length * 0.4;
+            track.RestartPoint = track.Length - start <= minimum_track_loop_length_ms ? 0 : start;
+        }
+
         public void StopPreview() => stopPreviewInternal();
 
         private void stopPreviewInternal()
@@ -138,6 +170,8 @@ namespace osu.Game.EzOsuGame.Audio
 
             currentBeatmap = null;
             currentTrack = null;
+            previewStoryboardCarriesMusic = false;
+            previewStoryboardIsNoteAudio = false;
             previewMainAudioAvailable = false;
             previewHitSoundsEnabled = false;
             previewStoryboardEnabled = false;
@@ -156,7 +190,7 @@ namespace osu.Game.EzOsuGame.Audio
             if (files == null)
                 return 0;
 
-            string? mainAudio = beatmap.BeatmapInfo.Metadata.AudioFile;
+            string mainAudio = beatmap.BeatmapInfo.Metadata.AudioFile;
             int count = 0;
 
             foreach (var file in files)
@@ -192,14 +226,26 @@ namespace osu.Game.EzOsuGame.Audio
             {
                 playback.PreviewStartTime = OverridePreviewStartTime ?? beatmap.BeatmapInfo.Metadata.PreviewTime;
 
-                if (playback.PreviewStartTime < 0 || playback.PreviewStartTime > (currentTrack?.Length ?? 0))
+                double trackTimelineEndTime = currentTrack?.Length ?? 0;
+
+                if (playback.PreviewStartTime < 0 || playback.PreviewStartTime > trackTimelineEndTime)
                 {
                     playback.PreviewStartTime = previewMainAudioAvailable
-                        ? (currentTrack?.Length ?? 0) * 0.4
+                        ? trackTimelineEndTime * 0.4
                         : 0;
                 }
 
-                double trackTimelineEndTime = currentTrack?.Length ?? 0;
+                if (previewMainAudioAvailable && currentTrack != null
+                                              && trackTimelineEndTime - currentTrack.RestartPoint <= minimum_track_loop_length_ms)
+                {
+                    playback.PreviewStartTime = trackTimelineEndTime * 0.4;
+
+                    if (trackTimelineEndTime - playback.PreviewStartTime <= minimum_track_loop_length_ms)
+                        playback.PreviewStartTime = 0;
+
+                    currentTrack.RestartPoint = playback.PreviewStartTime;
+                }
+
                 double trackLoopLength = Math.Max(1, trackTimelineEndTime - playback.PreviewStartTime);
                 double scheduleWindowStart = playback.PreviewStartTime - tick_ms;
                 double longestHitTimeEstimate = playableBeatmap.GetLastObjectTime();
@@ -249,7 +295,7 @@ namespace osu.Game.EzOsuGame.Audio
                 if (playback.PreviewEndTime <= playback.PreviewStartTime)
                     playback.PreviewEndTime = Math.Max(trackTimelineEndTime, playback.PreviewStartTime + 1);
 
-                playback.TrackLoopLength = Math.Max(1, trackTimelineEndTime - playback.PreviewStartTime);
+                playback.TrackLoopLength = Math.Max(1, trackTimelineEndTime - (currentTrack?.RestartPoint ?? playback.PreviewStartTime));
                 playback.ShortBgmOneShotMode = previewMainAudioAvailable && mainAudioEndTime + tick_ms < playback.PreviewEndTime;
                 playback.ResetPlaybackProgress();
                 playback.ResetLogicalClock(playback.PreviewStartTime, Time.Current);
@@ -268,7 +314,6 @@ namespace osu.Game.EzOsuGame.Audio
                 {
                     currentTrack.Volume.Value = 1f;
                     currentTrack.Looping = true;
-                    currentTrack.RestartPoint = playback.PreviewStartTime;
                 }
 
                 playback.IsPlaying = true;
@@ -492,7 +537,9 @@ namespace osu.Game.EzOsuGame.Audio
 
             if (previewMainAudioAvailable)
             {
-                if (playback.LastTrackTime != 0 && physicalTime + 200 < playback.LastTrackTime)
+                double loopDetectionThreshold = Math.Min(loop_detection_threshold_ms, playback.TrackLoopLength / 2);
+
+                if (playback.LastTrackTime != 0 && physicalTime + loopDetectionThreshold < playback.LastTrackTime)
                 {
                     playback.TrackLoopCount++;
 
@@ -664,11 +711,9 @@ namespace osu.Game.EzOsuGame.Audio
 
                     var channel = sample.GetChannel();
 
-                    if (info.Volume > 0)
-                    {
-                        double vol = Math.Clamp(info.Volume / 100.0, 0, 1);
-                        channel.Volume.Value = (float)vol;
-                    }
+                    double vol = Math.Clamp(Math.Max(info.Volume, DrawableHitObject.MINIMUM_SAMPLE_VOLUME) / 100.0, 0, 1);
+                    channel.Volume.Value = (float)vol;
+                    channel.AddAdjustment(AdjustableProperty.Volume, hitsoundVolume);
 
                     channel.Play();
                     sampleScheduler.ActiveChannels.Add(channel);
@@ -711,27 +756,7 @@ namespace osu.Game.EzOsuGame.Audio
         /// </summary>
         private static HitSampleInfo[] collectNoteSamples(IList<HitSampleInfo> samples)
         {
-            int count = 0;
-
-            for (int i = 0; i < samples.Count; i++)
-            {
-                if (isNoteSample(samples[i]))
-                    count++;
-            }
-
-            if (count == 0)
-                return Array.Empty<HitSampleInfo>();
-
-            var result = new HitSampleInfo[count];
-            int index = 0;
-
-            for (int i = 0; i < samples.Count; i++)
-            {
-                if (isNoteSample(samples[i]))
-                    result[index++] = samples[i];
-            }
-
-            return result;
+            return samples.Where(isNoteSample).ToArray();
         }
 
         private ISample? resolveHitSample(HitSampleInfo info)
@@ -767,11 +792,14 @@ namespace osu.Game.EzOsuGame.Audio
 
                 var channel = sample.GetChannel();
 
-                if (sampleInfo.Volume > 0)
-                {
-                    double vol = Math.Clamp(sampleInfo.Volume / 100.0, 0, 1);
-                    channel.Volume.Value = (float)vol;
-                }
+                channel.Volume.Value = (float)Math.Clamp(sampleInfo.Volume / 100.0, 0, 1);
+
+                bool noteAudio = previewStoryboardIsNoteAudio && !previewStoryboardCarriesMusic;
+
+                if (noteAudio || sampleInfo.IsHitsound)
+                    channel.AddAdjustment(AdjustableProperty.Volume, hitsoundVolume);
+                else if (previewStoryboardCarriesMusic)
+                    channel.AddAdjustment(AdjustableProperty.Volume, musicVolume);
 
                 channel.Play();
                 sampleScheduler.ActiveChannels.Add(channel);
@@ -795,9 +823,29 @@ namespace osu.Game.EzOsuGame.Audio
                     return cached;
             }
 
-            ISample? sample = currentBeatmap?.Skin.GetSample(info);
+            ISampleInfo sampleInfo = info.IsHitsound || !(previewStoryboardCarriesMusic || previewStoryboardIsNoteAudio)
+                ? info
+                : new HitsoundClassifiedStoryboardSampleInfo(info);
+            ISample? sample = currentBeatmap?.Skin.GetSample(sampleInfo);
             sampleScheduler.StoryboardSampleCache[normalizedPath] = sample;
             return sample;
+        }
+
+        private sealed class HitsoundClassifiedStoryboardSampleInfo : StoryboardSampleInfo
+        {
+            private readonly StoryboardSampleInfo inner;
+
+            public HitsoundClassifiedStoryboardSampleInfo(StoryboardSampleInfo inner)
+                : base(inner.Source, inner.Path, inner.StartTime, inner.Volume)
+            {
+                this.inner = inner;
+            }
+
+            public override bool IsHitsound => true;
+
+            public override int Volume => inner.Volume;
+
+            public override IEnumerable<string> LookupNames => inner.LookupNames;
         }
 
         private void clearEnhancedElements()
@@ -826,6 +874,7 @@ namespace osu.Game.EzOsuGame.Audio
 
             cache.ScheduledHitSounds = sampleScheduler.ScheduledHitSounds.ToArray();
             cache.ScheduledStoryboardSamples = sampleScheduler.ScheduledStoryboardSamples.ToArray();
+            cache.PreviewStartTime = playback.PreviewStartTime;
             cache.LongestHitTime = sampleScheduler.LongestHitTime;
             cache.LongestStoryboardTime = sampleScheduler.LongestStoryboardTime;
 
@@ -851,7 +900,7 @@ namespace osu.Game.EzOsuGame.Audio
             if (string.IsNullOrEmpty(beatmapCacheKey))
                 return false;
 
-            if (!sampleCache.TryGetValue(beatmapCacheKey, out var cache))
+            if (!sampleCache.TryGetValue(beatmapCacheKey, out var cache) || cache.PreviewStartTime != playback.PreviewStartTime)
                 return false;
 
             sampleScheduler.ScheduledHitSounds.Clear();
@@ -1015,6 +1064,7 @@ namespace osu.Game.EzOsuGame.Audio
         {
             public ScheduledHitSound[] ScheduledHitSounds { get; set; } = Array.Empty<ScheduledHitSound>();
             public ScheduledStoryboardSample[] ScheduledStoryboardSamples { get; set; } = Array.Empty<ScheduledStoryboardSample>();
+            public double PreviewStartTime { get; set; }
             public double LongestHitTime { get; set; }
             public double LongestStoryboardTime { get; set; }
         }
