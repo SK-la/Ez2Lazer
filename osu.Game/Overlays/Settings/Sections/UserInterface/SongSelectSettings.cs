@@ -35,7 +35,6 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                 new SettingsItemV2(new SortDirectionDropdown
                 {
                     Caption = EzSongSelectStrings.SORT_DIRECTION,
-                    HintText = EzSongSelectStrings.SORT_DIRECTION_TOOLTIP,
                     Current = ezConfig.GetBindable<SortDirection>(Ez2Setting.SongSelectSortDirection),
                 })
                 {

@@ -926,7 +926,7 @@ namespace osu.Game.Screens.Select
                 directionGradient.TransformTo(nameof(Colour), gradient, 150, Easing.OutQuint);
                 ascendingIcon.FadeColour(ascending ? ColourProvider.Highlight1 : ColourProvider.Content2, 150, Easing.OutQuint);
                 descendingIcon.FadeColour(ascending ? ColourProvider.Content2 : ColourProvider.Highlight1, 150, Easing.OutQuint);
-                TooltipText = ascending ? EzSongSelectStrings.SORT_DIRECTION_ASCENDING_TOOLTIP : EzSongSelectStrings.SORT_DIRECTION_DESCENDING_TOOLTIP;
+                TooltipText = SongSelectStrings.Sort;
             }
 
             protected override void Dispose(bool isDisposing)
