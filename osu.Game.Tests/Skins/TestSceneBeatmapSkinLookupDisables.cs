@@ -14,7 +14,6 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.Testing;
 using osu.Game.Audio;
 using osu.Game.Rulesets.Osu;
-using osu.Game.Rulesets.Osu.Objects.Drawables;
 using osu.Game.Rulesets.Osu.Skinning;
 using osu.Game.Rulesets.Osu.Skinning.Legacy;
 using osu.Game.Skinning;

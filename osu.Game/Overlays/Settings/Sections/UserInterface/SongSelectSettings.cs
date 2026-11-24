@@ -10,7 +10,6 @@ using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
-using osu.Game.Overlays;
 using osu.Game.Overlays.Mods.Input;
 
 namespace osu.Game.Overlays.Settings.Sections.UserInterface
