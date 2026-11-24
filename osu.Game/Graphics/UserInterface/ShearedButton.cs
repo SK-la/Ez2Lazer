@@ -71,7 +71,7 @@ namespace osu.Game.Graphics.UserInterface
         private Colour4? lighterColour;
         private Colour4? textColour;
 
-        private readonly Container backgroundLayer;
+        protected readonly Container backgroundLayer;
         private readonly Box flashLayer;
 
         protected readonly Container ButtonContent;

@@ -863,7 +863,6 @@ namespace osu.Game.Screens.Select
                     RelativeSizeAxes = Axes.Both,
                     Children = new Drawable[]
                     {
-                        directionGradient = new Box { RelativeSizeAxes = Axes.Both },
                         new GridContainer
                         {
                             RelativeSizeAxes = Axes.Both,
@@ -899,6 +898,12 @@ namespace osu.Game.Screens.Select
                         },
                     },
                 };
+
+                backgroundLayer.Add(directionGradient = new Box
+                {
+                    RelativeSizeAxes = Axes.Both,
+                });
+
                 Action = toggleDirection;
             }
 
