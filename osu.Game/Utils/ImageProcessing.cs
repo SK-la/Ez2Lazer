@@ -47,11 +47,64 @@ namespace osu.Game.Utils
             int[] cachedSourceRows = new int[rowCapacity];
             Array.Fill(cachedSourceRows, -1);
 
+            int[] horizontalFirst = new int[width];
+            int[] horizontalWeightOffsets = new int[width + 1];
+            double[] horizontalWeightSums = new double[width];
+
+            for (int x = 0; x < width; x++)
+            {
+                double centre = (x + 0.5) * horizontalScale - 0.5;
+                int first = Math.Max(0, (int)Math.Ceiling(centre - horizontalRadius));
+                int last = Math.Min(source.Width - 1, (int)Math.Floor(centre + horizontalRadius));
+                horizontalFirst[x] = first;
+                horizontalWeightOffsets[x + 1] = checked(horizontalWeightOffsets[x] + last - first + 1);
+            }
+
+            double[] horizontalWeights = new double[horizontalWeightOffsets[width]];
+
+            for (int x = 0; x < width; x++)
+            {
+                double centre = (x + 0.5) * horizontalScale - 0.5;
+                int first = horizontalFirst[x];
+                int last = first + horizontalWeightOffsets[x + 1] - horizontalWeightOffsets[x] - 1;
+                int weightOffset = horizontalWeightOffsets[x];
+
+                for (int sourceX = first; sourceX <= last; sourceX++)
+                {
+                    double weight = lanczos((centre - sourceX) / horizontalFilterScale);
+                    horizontalWeights[weightOffset++] = weight;
+                    horizontalWeightSums[x] += weight;
+                }
+            }
+
+            double[] verticalWeights = new double[rowCapacity];
+
             for (int y = 0; y < height; y++)
             {
                 double centre = (y + 0.5) * verticalScale - 0.5;
                 int first = Math.Max(0, (int)Math.Ceiling(centre - verticalRadius));
                 int last = Math.Min(source.Height - 1, (int)Math.Floor(centre + verticalRadius));
+                int taps = last - first + 1;
+                double verticalWeightSum = 0;
+
+                for (int i = 0; i < taps; i++)
+                {
+                    double weight = lanczos((centre - (first + i)) / verticalFilterScale);
+                    verticalWeights[i] = weight;
+                    verticalWeightSum += weight;
+                }
+
+                for (int sourceY = first; sourceY <= last; sourceY++)
+                {
+                    int rowIndex = sourceY % rowCapacity;
+
+                    if (cachedSourceRows[rowIndex] != sourceY)
+                    {
+                        Span<float> row = horizontalRows.AsSpan(rowIndex * rowStride, rowStride);
+                        resizeHorizontalRow(source, sourceY, width, horizontalFirst, horizontalWeightOffsets, horizontalWeights, horizontalWeightSums, row);
+                        cachedSourceRows[rowIndex] = sourceY;
+                    }
+                }
 
                 for (int x = 0; x < width; x++)
                 {
@@ -59,32 +112,23 @@ namespace osu.Game.Utils
                     double green = 0;
                     double blue = 0;
                     double alpha = 0;
-                    double weightSum = 0;
 
-                    for (int sourceY = first; sourceY <= last; sourceY++)
+                    for (int i = 0; i < taps; i++)
                     {
-                        double weight = lanczos((centre - sourceY) / verticalFilterScale);
+                        int sourceY = first + i;
+                        double weight = verticalWeights[i];
                         int rowIndex = sourceY % rowCapacity;
-
-                        if (cachedSourceRows[rowIndex] != sourceY)
-                        {
-                            Span<float> row = horizontalRows.AsSpan(rowIndex * rowStride, rowStride);
-                            resizeHorizontalRow(source, sourceY, width, horizontalScale, horizontalFilterScale, horizontalRadius, row);
-                            cachedSourceRows[rowIndex] = sourceY;
-                        }
-
                         int index = rowIndex * rowStride + x * 4;
                         red += horizontalRows[index] * weight;
                         green += horizontalRows[index + 1] * weight;
                         blue += horizontalRows[index + 2] * weight;
                         alpha += horizontalRows[index + 3] * weight;
-                        weightSum += weight;
                     }
 
-                    red /= weightSum;
-                    green /= weightSum;
-                    blue /= weightSum;
-                    alpha /= weightSum;
+                    red /= verticalWeightSum;
+                    green /= verticalWeightSum;
+                    blue /= verticalWeightSum;
+                    alpha /= verticalWeightSum;
 
                     double alphaUnit = Math.Clamp(alpha / 255, 0, 1);
                     result[x, y] = alphaUnit == 0
@@ -96,37 +140,35 @@ namespace osu.Game.Utils
             return result;
         }
 
-        private static void resizeHorizontalRow(RgbaImage source, int sourceY, int width, double scale, double filterScale, double radius, Span<float> destination)
+        private static void resizeHorizontalRow(RgbaImage source, int sourceY, int width, int[] firstValues, int[] weightOffsets, double[] weights, double[] weightSums, Span<float> destination)
         {
             // Filter premultiplied channels to avoid colour fringes around transparent pixels.
             for (int x = 0; x < width; x++)
             {
-                double centre = (x + 0.5) * scale - 0.5;
-                int first = Math.Max(0, (int)Math.Ceiling(centre - radius));
-                int last = Math.Min(source.Width - 1, (int)Math.Floor(centre + radius));
+                int first = firstValues[x];
+                int last = first + weightOffsets[x + 1] - weightOffsets[x] - 1;
+                int weightOffset = weightOffsets[x];
                 double red = 0;
                 double green = 0;
                 double blue = 0;
                 double alpha = 0;
-                double weightSum = 0;
 
                 for (int sourceX = first; sourceX <= last; sourceX++)
                 {
-                    double weight = lanczos((centre - sourceX) / filterScale);
+                    double weight = weights[weightOffset++];
                     Rgba32 pixel = source[sourceX, sourceY];
                     double pixelAlpha = pixel.A / 255d;
                     red += pixel.R * pixelAlpha * weight;
                     green += pixel.G * pixelAlpha * weight;
                     blue += pixel.B * pixelAlpha * weight;
                     alpha += pixel.A * weight;
-                    weightSum += weight;
                 }
 
                 int index = x * 4;
-                destination[index] = (float)(red / weightSum);
-                destination[index + 1] = (float)(green / weightSum);
-                destination[index + 2] = (float)(blue / weightSum);
-                destination[index + 3] = (float)(alpha / weightSum);
+                destination[index] = (float)(red / weightSums[x]);
+                destination[index + 1] = (float)(green / weightSums[x]);
+                destination[index + 2] = (float)(blue / weightSums[x]);
+                destination[index + 3] = (float)(alpha / weightSums[x]);
             }
         }
 
