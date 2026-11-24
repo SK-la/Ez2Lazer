@@ -153,7 +153,6 @@ namespace osu.Game.EzOsuGame.Audio
             double start = track.Length * 0.4;
             track.RestartPoint = track.Length - start <= minimum_track_loop_length_ms ? 0 : start;
 
-        
         }
 
         public void StopPreview() => stopPreviewInternal();
@@ -758,27 +757,7 @@ namespace osu.Game.EzOsuGame.Audio
         /// </summary>
         private static HitSampleInfo[] collectNoteSamples(IList<HitSampleInfo> samples)
         {
-            int count = 0;
-
-            for (int i = 0; i < samples.Count; i++)
-            {
-                if (isNoteSample(samples[i]))
-                    count++;
-            }
-
-            if (count == 0)
-                return Array.Empty<HitSampleInfo>();
-
-            var result = new HitSampleInfo[count];
-            int index = 0;
-
-            for (int i = 0; i < samples.Count; i++)
-            {
-                if (isNoteSample(samples[i]))
-                    result[index++] = samples[i];
-            }
-
-            return result;
+            return samples.Where(isNoteSample).ToArray();
         }
 
         private ISample? resolveHitSample(HitSampleInfo info)
@@ -816,10 +795,12 @@ namespace osu.Game.EzOsuGame.Audio
 
                 channel.Volume.Value = (float)Math.Clamp(sampleInfo.Volume / 100.0, 0, 1);
 
-                if (previewStoryboardCarriesMusic)
-                    channel.AddAdjustment(AdjustableProperty.Volume, musicVolume);
-                else if (previewStoryboardIsNoteAudio || sampleInfo.IsHitsound)
+                bool noteAudio = previewStoryboardIsNoteAudio && !previewStoryboardCarriesMusic;
+
+                if (noteAudio || sampleInfo.IsHitsound)
                     channel.AddAdjustment(AdjustableProperty.Volume, hitsoundVolume);
+                else if (previewStoryboardCarriesMusic)
+                    channel.AddAdjustment(AdjustableProperty.Volume, musicVolume);
 
                 channel.Play();
                 sampleScheduler.ActiveChannels.Add(channel);
