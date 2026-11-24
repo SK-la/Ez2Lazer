@@ -18,5 +18,13 @@ namespace osu.Game.Tests.EzOsuGame.Changelog
 
             Assert.That(EzGitHubChangelogCatalogue.CreateUpdateStreams(builds), Is.Empty);
         }
+
+        [Test]
+        public void TestReleaseChangelogBundleUrlIsGitHubReleaseAsset()
+        {
+            Assert.That(
+                EzGitHubChangelogCatalogue.ReleaseChangelogBundleUrl,
+                Does.Contain("/releases/latest/download/changelog-releases.json"));
+        }
     }
 }

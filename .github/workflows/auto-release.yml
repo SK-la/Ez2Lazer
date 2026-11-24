@@ -520,3 +520,21 @@ jobs:
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload changelog bundle for in-game release notes
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = '${{ needs.prepare.outputs.release_tag }}'
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            Write-Error 'release tag is missing'
+            exit 1
+          }
+
+          $out = Join-Path $env:RUNNER_TEMP 'changelog-releases.json'
+          & "${{ github.workspace }}/osu/scripts/Export-ChangelogReleases.ps1" `
+            -Repository '${{ github.repository }}' `
+            -OutputPath $out
+
+          & gh release upload $tag $out --clobber
