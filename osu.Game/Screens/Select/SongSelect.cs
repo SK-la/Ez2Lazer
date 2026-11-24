@@ -667,8 +667,6 @@ namespace osu.Game.Screens.Select
             {
                 ezPreviewManager.StopPreview();
             }
-
-            beatmap.PrepareTrackForPreview(true);
         }
 
         #endregion
