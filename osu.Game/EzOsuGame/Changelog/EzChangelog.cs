@@ -21,12 +21,12 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Localisation;
 using osu.Framework.Logging;
 using osu.Framework.Platform;
+using osu.Game.EzOsuGame.Wiki;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.Containers.Markdown;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Localisation;
-using osu.Game.EzOsuGame.Wiki;
 using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Changelog;
@@ -235,8 +235,15 @@ namespace osu.Game.EzOsuGame.Changelog
             DisplayName = "Ez2Lazer",
         };
 
+        private readonly Func<CancellationToken, Task<string?>> fetchManifest;
         private readonly Dictionary<string, string> bodiesByTag = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private List<APIChangelogBuild> builds = new List<APIChangelogBuild>();
+
+        public EzGitHubChangelogCatalogue(Func<CancellationToken, Task<string?>>? fetchManifest = null)
+        {
+            this.fetchManifest = fetchManifest
+                                 ?? (ct => EzWikiGitHubClient.FetchTextAsync(WIKI_CHANGELOG_MANIFEST_FILE, ct));
+        }
 
         public async Task<IReadOnlyList<APIChangelogBuild>> FetchBuildsAsync(Storage? storage, CancellationToken cancellationToken = default)
         {
@@ -245,7 +252,7 @@ namespace osu.Game.EzOsuGame.Changelog
                             && EzGitHubChangelogReleaseCache.TryRead(storage, out cached)
                             && cached.Length > 0;
 
-            string? remoteJson = await EzWikiGitHubClient.FetchTextAsync(WIKI_CHANGELOG_MANIFEST_FILE, cancellationToken).ConfigureAwait(false);
+            string? remoteJson = await fetchManifest(cancellationToken).ConfigureAwait(false);
 
             if (EzGitHubChangelogReleaseCache.TryParseManifest(remoteJson, out var fromWiki))
             {
