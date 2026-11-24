@@ -128,7 +128,16 @@ namespace osu.Game.EzOsuGame.Wiki
 
     public static class EzWikiGitHubClient
     {
-        public static void ConfigureGitHubRequest(WebRequest request) => EzGitHubRequestHelper.ConfigureGitHubRequest(request);
+        public static void ConfigureGitHubRequest(WebRequest request)
+        {
+            request.AddHeader("Accept", "application/vnd.github+json");
+
+            string? token = Environment.GetEnvironmentVariable("EZ2LAZER_GITHUB_TOKEN")
+                            ?? Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+
+            if (!string.IsNullOrWhiteSpace(token))
+                request.AddHeader("Authorization", $"Bearer {token.Trim()}");
+        }
 
         public static async Task<string?> FetchTextAsync(string relativePath, CancellationToken cancellationToken)
         {

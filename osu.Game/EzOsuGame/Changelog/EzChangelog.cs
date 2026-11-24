@@ -31,7 +31,6 @@ using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Changelog;
 using osu.Game.Resources.Localisation.Web;
-using osu.Game.EzOsuGame;
 using osu.Game.Updater;
 
 namespace osu.Game.EzOsuGame.Changelog
@@ -237,6 +236,8 @@ namespace osu.Game.EzOsuGame.Changelog
         private const string releases_api_base = "https://api.github.com/repos/SK-la/Ez2Lazer/releases";
         /// <summary>Release asset published by CI; not subject to GitHub REST core rate limits.</summary>
         public const string ReleaseChangelogBundleUrl = "https://github.com/SK-la/Ez2Lazer/releases/latest/download/changelog-releases.json";
+
+        internal static string? ReleaseChangelogBundleUrlOverrideForTests;
         private const int releases_per_page = 10;
         /// <summary>Only the newest pages are refreshed live; older tags stay in <see cref="EzGitHubChangelogReleaseCache"/>.</summary>
         private const int dynamic_head_page_count = 2;
@@ -303,9 +304,13 @@ namespace osu.Game.EzOsuGame.Changelog
             }
         }
 
+        internal static IReadOnlyList<GitHubRelease> MergeReleasesByTagForTesting(IReadOnlyList<GitHubRelease>? cached, IReadOnlyList<GitHubRelease> head) =>
+            mergeByTag(cached, head);
+
         private static async Task<GitHubRelease[]?> tryFetchReleaseChangelogBundleAsync(CancellationToken cancellationToken)
         {
-            var request = new OsuWebRequest(ReleaseChangelogBundleUrl);
+            string bundleUrl = ReleaseChangelogBundleUrlOverrideForTests ?? ReleaseChangelogBundleUrl;
+            var request = new OsuWebRequest(bundleUrl);
 
             try
             {
@@ -351,8 +356,16 @@ namespace osu.Game.EzOsuGame.Changelog
             return byTag.Values.OrderByDescending(r => r.PublishedAt ?? DateTime.MinValue).ToList();
         }
 
-        private static void configureGitHubRequest(OsuJsonWebRequest<GitHubRelease[]> request) =>
-            EzGitHubRequestHelper.ConfigureGitHubRequest(request);
+        private static void configureGitHubRequest(OsuJsonWebRequest<GitHubRelease[]> request)
+        {
+            request.AddHeader("Accept", "application/vnd.github+json");
+
+            string? token = Environment.GetEnvironmentVariable("EZ2LAZER_GITHUB_TOKEN")
+                            ?? Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+
+            if (!string.IsNullOrWhiteSpace(token))
+                request.AddHeader("Authorization", $"Bearer {token.Trim()}");
+        }
 
         private static async Task<GitHubRelease[]> fetchHeadPagesFromGitHubAsync(CancellationToken cancellationToken)
         {
