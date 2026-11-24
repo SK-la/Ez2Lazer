@@ -22,6 +22,9 @@ namespace osu.Game.Rulesets.Osu.Skinning.Legacy
         private readonly ISkin skin;
 
         [Resolved(canBeNull: true)]
+        private ISkinSource? colourSource { get; set; }
+
+        [Resolved(canBeNull: true)]
         private DrawableHitObject? parentObject { get; set; }
 
         private Sprite layerNd = null!;
@@ -44,7 +47,13 @@ namespace osu.Game.Rulesets.Osu.Skinning.Legacy
         {
             Vector2 maxSize = OsuLegacySkinTransformer.MAX_FOLLOW_CIRCLE_AREA_SIZE;
 
-            var ballColour = skin.GetConfig<OsuSkinColour, Color4>(OsuSkinColour.SliderBall)?.Value ?? Color4.White;
+            var colourLookup = new SkinCustomColourLookup(OsuSkinColour.SliderBall);
+            IBindable<Color4>? ballColourConfig = colourSource?.GetConfig<SkinCustomColourLookup, Color4>(colourLookup);
+
+            if (colourSource == null)
+                ballColourConfig = skin.GetConfig<OsuSkinColour, Color4>(OsuSkinColour.SliderBall);
+
+            Color4 ballColour = ballColourConfig?.Value ?? Color4.White;
             ballTextures = skin.GetTextures("sliderb", default, default, true, "", maxSize, out _);
 
             InternalChildren = new Drawable[]

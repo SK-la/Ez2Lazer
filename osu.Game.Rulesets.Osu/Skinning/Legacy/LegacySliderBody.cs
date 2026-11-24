@@ -16,11 +16,11 @@ namespace osu.Game.Rulesets.Osu.Skinning.Legacy
         protected override DrawableSliderPath CreateSliderPath() => new LegacyDrawableSliderPath();
 
         protected override Color4 GetBorderColour(ISkinSource skin)
-            => skin.GetConfig<OsuSkinColour, Color4>(OsuSkinColour.SliderBorder)?.Value ?? Color4.White;
+            => skin.GetConfig<SkinCustomColourLookup, Color4>(new SkinCustomColourLookup(OsuSkinColour.SliderBorder))?.Value ?? Color4.White;
 
         protected override Color4 GetBodyAccentColour(ISkinSource skin, Color4 hitObjectAccentColour)
             // legacy skins use a constant value for slider track alpha, regardless of the source colour.
-            => (skin.GetConfig<OsuSkinColour, Color4>(OsuSkinColour.SliderTrackOverride)?.Value ?? hitObjectAccentColour).Opacity(0.7f);
+            => (skin.GetConfig<SkinCustomColourLookup, Color4>(new SkinCustomColourLookup(OsuSkinColour.SliderTrackOverride))?.Value ?? hitObjectAccentColour).Opacity(0.7f);
 
         private partial class LegacyDrawableSliderPath : DrawableSliderPath
         {
