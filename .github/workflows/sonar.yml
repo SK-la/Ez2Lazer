@@ -80,11 +80,17 @@ jobs:
             "/d:sonar.token=$env:SONAR_TOKEN",
             "/d:sonar.pullrequest.key=$env:PR_NUMBER",
             "/d:sonar.pullrequest.branch=$env:PR_HEAD_REF",
-            "/d:sonar.pullrequest.base=$env:PR_BASE_REF"
+            "/d:sonar.pullrequest.base=$env:PR_BASE_REF",
+            "/d:sonar.cs.opencover.reportsPaths=**/coverage.opencover.xml"
           )
           & "${{ runner.temp }}\scanner\dotnet-sonarscanner" @beginArgs
 
           dotnet build -c Release osu.Desktop.slnf
+
+          dotnet test osu.Desktop.slnf -c Release --no-build `
+            --filter "FullyQualifiedName~EzGitHubChangelog|FullyQualifiedName~EzGitHubRequestHelper" `
+            --collect:"XPlat Code Coverage" `
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
           & "${{ runner.temp }}\scanner\dotnet-sonarscanner" end "/d:sonar.token=$env:SONAR_TOKEN"
 
@@ -188,10 +194,16 @@ jobs:
             "/d:sonar.token=$env:SONAR_TOKEN",
             "/d:sonar.pullrequest.key=$env:PR_NUMBER",
             "/d:sonar.pullrequest.branch=$env:PR_HEAD_REF",
-            "/d:sonar.pullrequest.base=$env:PR_BASE_REF"
+            "/d:sonar.pullrequest.base=$env:PR_BASE_REF",
+            "/d:sonar.cs.opencover.reportsPaths=**/coverage.opencover.xml"
           )
           & "${{ runner.temp }}\scanner\dotnet-sonarscanner" @beginArgs
 
           dotnet build -c Release osu.Desktop.slnf
+
+          dotnet test osu.Desktop.slnf -c Release --no-build `
+            --filter "FullyQualifiedName~EzGitHubChangelog|FullyQualifiedName~EzGitHubRequestHelper" `
+            --collect:"XPlat Code Coverage" `
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
 
           & "${{ runner.temp }}\scanner\dotnet-sonarscanner" end "/d:sonar.token=$env:SONAR_TOKEN"

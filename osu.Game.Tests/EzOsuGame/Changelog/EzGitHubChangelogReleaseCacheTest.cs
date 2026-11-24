@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using NUnit.Framework;
-using osu.Framework.Platform;
+using osu.Framework.Testing;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Changelog;
 using osu.Game.Updater;
