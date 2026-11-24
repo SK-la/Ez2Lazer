@@ -24,5 +24,5 @@
 - 发行版优先拉取发布资源 **`changelog-releases.json`**（`releases/latest/download/…`，CI 每次发版上传），不走 REST `api.github.com` 匿名限额。
 - 资源不可用时回退 REST：只拉 **最新 2 页 × 每页 10 条**，按 `tag_name` **合并进本地缓存**。
 - 完整列表与旧版正文依赖缓存 `EzData/github-changelog-releases.json`；缓存约 6 小时内新鲜时不再联网刷新。
-- REST 失败且仍有旧缓存时继续展示旧数据，并 **1 小时内不再重试 REST**（避免反复 403）。
+- REST 失败且仍有旧缓存时继续展示旧数据；过期后仍会优先尝试发布资源。
 - 可选：`EZ2LAZER_GITHUB_TOKEN` / `GITHUB_TOKEN`（`public_repo` 读权限）提高 GitHub API 配额（回退路径）。

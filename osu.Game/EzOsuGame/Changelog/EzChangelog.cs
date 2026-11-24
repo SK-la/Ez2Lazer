@@ -146,25 +146,20 @@ namespace osu.Game.EzOsuGame.Changelog
     {
         private const string cache_relative_path = "EzData/github-changelog-releases.json";
         private static readonly TimeSpan fresh_ttl = TimeSpan.FromHours(6);
-        internal static readonly TimeSpan ApiFailureBackoff = TimeSpan.FromHours(1);
 
         internal sealed class CachedFile
         {
             [JsonProperty("fetchedAt")]
             public DateTimeOffset FetchedAt { get; set; }
 
-            [JsonProperty("apiBackoffUntil")]
-            public DateTimeOffset? ApiBackoffUntil { get; set; }
-
             [JsonProperty("releases")]
             public List<GitHubRelease> Releases { get; set; } = new List<GitHubRelease>();
         }
 
-        public static bool TryRead(Storage storage, out GitHubRelease[] releases, out bool fresh, out DateTimeOffset? apiBackoffUntil)
+        public static bool TryRead(Storage storage, out GitHubRelease[] releases, out bool fresh)
         {
             releases = Array.Empty<GitHubRelease>();
             fresh = false;
-            apiBackoffUntil = null;
 
             try
             {
@@ -178,7 +173,6 @@ namespace osu.Game.EzOsuGame.Changelog
 
                 releases = cached.Releases.ToArray();
                 fresh = DateTimeOffset.UtcNow - cached.FetchedAt < fresh_ttl;
-                apiBackoffUntil = cached.ApiBackoffUntil;
                 return true;
             }
             catch (Exception ex)
@@ -188,14 +182,13 @@ namespace osu.Game.EzOsuGame.Changelog
             }
         }
 
-        public static void Write(Storage storage, IReadOnlyList<GitHubRelease> releases, DateTimeOffset? apiBackoffUntil = null)
+        public static void Write(Storage storage, IReadOnlyList<GitHubRelease> releases)
         {
             try
             {
                 var cached = new CachedFile
                 {
                     FetchedAt = DateTimeOffset.UtcNow,
-                    ApiBackoffUntil = apiBackoffUntil,
                     Releases = releases.ToList(),
                 };
 
@@ -208,27 +201,6 @@ namespace osu.Game.EzOsuGame.Changelog
             }
         }
 
-        public static void ApplyApiBackoff(Storage storage, DateTimeOffset backoffUntil)
-        {
-            try
-            {
-                string path = storage.GetFullPath(cache_relative_path, createIfNotExisting: false);
-                if (!File.Exists(path))
-                    return;
-
-                var cached = JsonConvert.DeserializeObject<CachedFile>(File.ReadAllText(path));
-                if (cached?.Releases == null || cached.Releases.Count == 0)
-                    return;
-
-                cached.ApiBackoffUntil = backoffUntil;
-
-                File.WriteAllText(path, JsonConvert.SerializeObject(cached));
-            }
-            catch (Exception ex)
-            {
-                Logger.Log($"Ez changelog cache backoff write failed: {ex.Message}", level: LogLevel.Debug);
-            }
-        }
     }
 
     public sealed class EzGitHubChangelogCatalogue
@@ -236,8 +208,6 @@ namespace osu.Game.EzOsuGame.Changelog
         private const string releases_api_base = "https://api.github.com/repos/SK-la/Ez2Lazer/releases";
         /// <summary>Release asset published by CI; not subject to GitHub REST core rate limits.</summary>
         public const string ReleaseChangelogBundleUrl = "https://github.com/SK-la/Ez2Lazer/releases/latest/download/changelog-releases.json";
-
-        internal static string? ReleaseChangelogBundleUrlOverrideForTests;
         private const int releases_per_page = 10;
         /// <summary>Only the newest pages are refreshed live; older tags stay in <see cref="EzGitHubChangelogReleaseCache"/>.</summary>
         private const int dynamic_head_page_count = 2;
@@ -256,9 +226,8 @@ namespace osu.Game.EzOsuGame.Changelog
         {
             GitHubRelease[] cached = Array.Empty<GitHubRelease>();
             bool fresh = false;
-            DateTimeOffset? apiBackoffUntil = null;
             bool hasCache = storage != null
-                            && EzGitHubChangelogReleaseCache.TryRead(storage, out cached, out fresh, out apiBackoffUntil)
+                            && EzGitHubChangelogReleaseCache.TryRead(storage, out cached, out fresh)
                             && cached.Length > 0;
 
             if (hasCache && fresh)
@@ -277,12 +246,6 @@ namespace osu.Game.EzOsuGame.Changelog
                 }
             }
 
-            if (hasCache && apiBackoffUntil is DateTimeOffset until && until > DateTimeOffset.UtcNow)
-            {
-                Logger.Log("Ez changelog refresh deferred (GitHub API backoff); using cached listing.", level: LogLevel.Debug);
-                return materialise(cached);
-            }
-
             try
             {
                 GitHubRelease[] head = await fetchHeadPagesFromGitHubAsync(cancellationToken).ConfigureAwait(false);
@@ -296,21 +259,13 @@ namespace osu.Game.EzOsuGame.Changelog
             catch (Exception ex) when (hasCache)
             {
                 Logger.Log($"GitHub releases API failed ({ex.Message}); using cached changelog.", level: LogLevel.Important);
-
-                if (storage != null)
-                    EzGitHubChangelogReleaseCache.ApplyApiBackoff(storage, DateTimeOffset.UtcNow + EzGitHubChangelogReleaseCache.ApiFailureBackoff);
-
                 return materialise(cached);
             }
         }
 
-        internal static IReadOnlyList<GitHubRelease> MergeReleasesByTagForTesting(IReadOnlyList<GitHubRelease>? cached, IReadOnlyList<GitHubRelease> head) =>
-            mergeByTag(cached, head);
-
         private static async Task<GitHubRelease[]?> tryFetchReleaseChangelogBundleAsync(CancellationToken cancellationToken)
         {
-            string bundleUrl = ReleaseChangelogBundleUrlOverrideForTests ?? ReleaseChangelogBundleUrl;
-            var request = new OsuWebRequest(bundleUrl);
+            var request = new OsuWebRequest(ReleaseChangelogBundleUrl);
 
             try
             {

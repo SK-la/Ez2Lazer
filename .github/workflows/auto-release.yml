@@ -532,9 +532,31 @@ jobs:
             exit 1
           }
 
+          $repo = '${{ github.repository }}'
           $out = Join-Path $env:RUNNER_TEMP 'changelog-releases.json'
-          & "${{ github.workspace }}/osu/scripts/Export-ChangelogReleases.ps1" `
-            -Repository '${{ github.repository }}' `
-            -OutputPath $out
+          $headers = @{
+            Accept = 'application/vnd.github+json'
+            'X-GitHub-Api-Version' = '2022-11-28'
+            Authorization = "Bearer $env:GITHUB_TOKEN"
+          }
+          $all = [System.Collections.Generic.List[object]]::new()
+          for ($page = 1; $page -le 20; $page++) {
+            $batch = @(Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases?per_page=100&page=$page" -Headers $headers)
+            if ($batch.Count -eq 0) { break }
+            foreach ($release in $batch) {
+              $all.Add([ordered]@{
+                tag_name     = $release.tag_name
+                body         = $release.body
+                published_at = $release.published_at
+                prerelease   = [bool]$release.prerelease
+                html_url     = $release.html_url
+              })
+            }
+            if ($batch.Count -lt 100) { break }
+          }
+          [ordered]@{
+            fetchedAt = (Get-Date).ToUniversalTime().ToString('o')
+            releases  = $all
+          } | ConvertTo-Json -Depth 20 | Set-Content -Path $out -Encoding utf8
 
           & gh release upload $tag $out --clobber
