@@ -157,7 +157,10 @@ namespace osu.Game.Overlays.Mods
 
             latestLoadTask = LoadComponentsAsync(panels, loaded =>
             {
-                ItemsFlow.ChildrenEnumerable = loaded;
+                var loadedPanels = loaded.ToArray();
+                ItemsFlow.ChildrenEnumerable = loadedPanels;
+                foreach (var panel in loadedPanels)
+                    panel.ApplyEzDensityMode(EzCompactMode);
                 ItemsFlow.FilterImmediately();
                 RefreshEzLayoutShear();
                 updateState();
