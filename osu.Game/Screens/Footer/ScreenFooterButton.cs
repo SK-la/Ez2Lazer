@@ -58,6 +58,15 @@ namespace osu.Game.Screens.Footer
             }
         }
 
+        /// <summary>
+        /// 底部高亮装饰条的宽度
+        /// </summary>
+        public float AccentBarWidth
+        {
+            get => accentBarContainer.Width;
+            set => accentBarContainer.Width = value;
+        }
+
         public IconUsage Icon
         {
             set => icon.Icon = value;
@@ -93,6 +102,7 @@ namespace osu.Game.Screens.Footer
 
         protected Container TextContainer;
         private readonly Box bar;
+        private readonly Container accentBarContainer;
         private readonly Box backgroundBox;
         private readonly Box glowBox;
         private readonly Box flashLayer;
@@ -161,7 +171,7 @@ namespace osu.Game.Screens.Footer
                                 },
                             }
                         },
-                        new Container
+                        accentBarContainer = new Container
                         {
                             Shear = -OsuGame.SHEAR,
                             Anchor = Anchor.BottomCentre,

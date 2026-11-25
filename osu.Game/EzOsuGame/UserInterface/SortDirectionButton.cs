@@ -73,7 +73,7 @@ namespace osu.Game.EzOsuGame.UserInterface
                 },
             };
 
-            backgroundLayer.Add(directionGradient = new Box
+            BackgroundLayer.Add(directionGradient = new Box
             {
                 RelativeSizeAxes = Axes.Both,
             });

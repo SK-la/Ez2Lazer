@@ -26,6 +26,7 @@ namespace osu.Game.EzOsuGame.Overlays
     {
         private const float pool_height = 96;
         private const float column_padding_rest = 10;
+        private float bottomWidth => 110;
 
         private static readonly Key[][] hotkey_rows =
         {
@@ -132,23 +133,25 @@ namespace osu.Game.EzOsuGame.Overlays
 
         protected override void LoadComplete()
         {
-            pool = new EzModHiddenPool
-            {
-                DragStarted = beginModDrag,
-                Dragged = moveDrag,
-                DragEnded = endModDrag,
-            };
             MainAreaContent.Add(hiddenPoolArea = new Container
             {
                 RelativeSizeAxes = Axes.Both,
                 Depth = -1,
-                Child = pool,
+                Child = pool = new EzModHiddenPool
+                {
+                    DragStarted = beginModDrag,
+                    Dragged = moveDrag,
+                    DragEnded = endModDrag,
+                },
             });
 
-            dragGhost = new DragGhost();
-            MainAreaContent.Add(dragGhost);
-            insertionMarker = new Box { Alpha = 0, Depth = float.MinValue, Colour = Colour4.White };
-            MainAreaContent.Add(insertionMarker);
+            MainAreaContent.Add(dragGhost = new DragGhost());
+            MainAreaContent.Add(insertionMarker = new Box
+            {
+                Alpha = 0,
+                Depth = float.MinValue,
+                Colour = Colour4.White
+            });
             MainAreaContent.Add(emptyResults = new OsuSpriteText
             {
                 Text = EzModLayoutStrings.NO_RESULTS,
@@ -158,35 +161,40 @@ namespace osu.Game.EzOsuGame.Overlays
                 Alpha = 0,
             });
 
-            LayoutModeButton = new EzModLayoutModeButton { Alpha = 0 };
-            LayoutModeButton.Active.BindValueChanged(change => SetLayoutMode(change.NewValue ? EzModSelectLayoutMode.Vertical : EzModSelectLayoutMode.Horizontal));
-
-            editButton = new ShearedButton
-            {
-                Text = EzModLayoutStrings.EDIT,
-                Width = 110,
-                Height = 42,
-                TextSize = 16,
-                Action = toggleEditing,
-            };
-            newGroupButton = new ShearedButton
-            {
-                Text = EzModLayoutStrings.NEW_GROUP,
-                Width = 140,
-                Height = 42,
-                TextSize = 16,
-                Alpha = 0,
-                Action = addGroup,
-            };
-            shearControl = new EzModLayoutShearControl { Alpha = 0 };
-
             editToolbar = new FillFlowContainer
             {
                 Direction = FillDirection.Horizontal,
-                Spacing = new Vector2(10, 0),
-                AutoSizeAxes = Axes.Both,
+                Spacing = new Vector2(5, 0),
+                AutoSizeAxes = Axes.X,
+                Height = 42,
                 Position = new Vector2(312, 0),
-                Children = new Drawable[] { editButton, newGroupButton, LayoutModeButton, shearControl },
+                Children = matchToolbarHeight(new Drawable[]
+                {
+                    editButton = new ShearedButton
+                    {
+                        Text = EzModLayoutStrings.EDIT,
+                        Width = bottomWidth,
+                        TextSize = 16,
+                        Action = toggleEditing,
+                    },
+                    newGroupButton = new ShearedButton
+                    {
+                        Text = EzModLayoutStrings.NEW_GROUP,
+                        Width = bottomWidth,
+                        TextSize = 16,
+                        Alpha = 0,
+                        Action = addGroup,
+                    },
+                    LayoutModeButton = new EzModLayoutModeButton
+                    {
+                        Alpha = 0
+                    },
+                    shearControl = new EzModLayoutShearControl
+                    {
+                        Width = 200,
+                        Alpha = 0
+                    },
+                }),
             };
 
             AddAboveColumns(editToolbar);
@@ -198,6 +206,8 @@ namespace osu.Game.EzOsuGame.Overlays
             updateModeButton();
 
             base.LoadComplete();
+
+            LayoutModeButton.Active.BindValueChanged(change => SetLayoutMode(change.NewValue ? EzModSelectLayoutMode.Vertical : EzModSelectLayoutMode.Horizontal));
 
             shearControl.Current.BindValueChanged(change =>
             {
@@ -325,6 +335,17 @@ namespace osu.Game.EzOsuGame.Overlays
 
         private void updateModeButton() => LayoutModeButton.Active.Value = LayoutMode == EzModSelectLayoutMode.Vertical;
 
+        private static Drawable[] matchToolbarHeight(Drawable[] children)
+        {
+            foreach (var child in children)
+            {
+                child.RelativeSizeAxes |= Axes.Y;
+                child.Height = 1;
+            }
+
+            return children;
+        }
+
         protected override void Update()
         {
             base.Update();
@@ -353,8 +374,8 @@ namespace osu.Game.EzOsuGame.Overlays
             emptyResults.Alpha = !editing.Value && SearchTerm.Length > 0
                 && groupColumns.All(column => column.AvailableMods.All(state => !state.Visible))
                 && ContentView.Columns.OfType<ModPresetColumn>().All(column => !column.HasMatchingPresets)
-                    ? 1
-                    : 0;
+                ? 1
+                : 0;
 
             if (dragging)
             {
@@ -569,7 +590,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             bool vertical = LayoutMode == EzModSelectLayoutMode.Vertical;
             int to = EzModLayoutGeometry.GroupInsertionIndex(groupColumns.Where(other => other != column)
-                .Select(other => vertical ? other.ScreenSpaceDrawQuad.Centre.Y : other.ScreenSpaceDrawQuad.Centre.X), vertical ? position.Y : position.X);
+                                                                         .Select(other => vertical ? other.ScreenSpaceDrawQuad.Centre.Y : other.ScreenSpaceDrawQuad.Centre.X), vertical ? position.Y : position.X);
 
             EzModLayoutResolver.MoveGroup(working, from, to);
             scheduleApply();

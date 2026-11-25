@@ -19,7 +19,7 @@ namespace osu.Game.Graphics.UserInterface
     public partial class ShearedButton : OsuClickableContainer, IScreenFooterButton
     {
         public const float DEFAULT_HEIGHT = 50;
-        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_SHEARED;
+        public const float CORNER_RADIUS = EzUIStyleV1.CORNER_RADIUS_CHIP;
         public const float BORDER_THICKNESS = 2;
 
         public LocalisableString Text
@@ -71,7 +71,7 @@ namespace osu.Game.Graphics.UserInterface
         private Colour4? lighterColour;
         private Colour4? textColour;
 
-        protected readonly Container backgroundLayer;
+        protected readonly Container BackgroundLayer;
         private readonly Box flashLayer;
 
         protected readonly Container ButtonContent;
@@ -79,7 +79,7 @@ namespace osu.Game.Graphics.UserInterface
         protected void ApplyCornerRadius(float radius)
         {
             Content.CornerRadius = radius;
-            backgroundLayer.CornerRadius = radius;
+            BackgroundLayer.CornerRadius = radius;
         }
 
         /// <summary>
@@ -101,7 +101,7 @@ namespace osu.Game.Graphics.UserInterface
 
             Children = new Drawable[]
             {
-                backgroundLayer = new Container
+                BackgroundLayer = new Container
                 {
                     RelativeSizeAxes = Axes.Both,
                     CornerRadius = CORNER_RADIUS,
@@ -196,7 +196,7 @@ namespace osu.Game.Graphics.UserInterface
             }
 
             background.FadeColour(colourDark, 150, Easing.OutQuint);
-            backgroundLayer.TransformTo(nameof(BorderColour), ColourInfo.GradientVertical(colourDark, colourLight), 150, Easing.OutQuint);
+            BackgroundLayer.TransformTo(nameof(BorderColour), ColourInfo.GradientVertical(colourDark, colourLight), 150, Easing.OutQuint);
 
             if (!Enabled.Value)
                 colourContent = colourContent.Opacity(0.6f);

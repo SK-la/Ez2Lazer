@@ -11,25 +11,32 @@ namespace osu.Game.EzOsuGame.Overlays
 {
     internal partial class EzModLayoutModeButton : ShearedToggleButton
     {
+        protected override bool PlayToggleSamples => false;
+
         private readonly SpriteIcon icon;
 
         public EzModLayoutModeButton()
         {
-            Width = 156;
-            Height = 42;
+            RelativeSizeAxes = Axes.Y;
+            AutoSizeAxes = Axes.X;
             TextSize = 16;
-            ButtonContent.Padding = new MarginPadding { Left = 20 };
+            // ButtonContent.Padding = new MarginPadding { Left = 20, Right = 10 };
             ButtonContent.Add(icon = new SpriteIcon
             {
                 Size = new Vector2(16),
                 Anchor = Anchor.CentreLeft,
                 Origin = Anchor.CentreLeft,
+                X = -10,
             });
         }
 
         protected override void UpdateActiveState()
         {
-            base.UpdateActiveState();
+            // DarkerColour = Active.Value ? ColourProvider.Highlight1 : ColourProvider.Background3;
+            // LighterColour = Active.Value ? ColourProvider.Colour0 : ColourProvider.Background1;
+            // TextColour = Active.Value ? ColourProvider.Background6 : ColourProvider.Content1;
+            // BackgroundLayer.TransformTo(nameof(BorderColour), ColourInfo.GradientVertical(DarkerColour, colourLight), 150, Easing.OutQuint);
+
             Text = Active.Value ? EzModLayoutStrings.VERTICAL : EzModLayoutStrings.HORIZONTAL;
             icon.Icon = Active.Value ? FontAwesome.Solid.Bars : FontAwesome.Solid.Columns;
         }

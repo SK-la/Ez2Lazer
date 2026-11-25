@@ -28,7 +28,10 @@ namespace osu.Game.EzOsuGame.UserInterface
         private const double fallback_min = -200;
         private const double fallback_max = 200;
 
-        private float nubWidth  { get; set; } = 100;
+        /// <summary>
+        /// 滑块宽度
+        /// </summary>
+        public float NubWidth { get; set; } = 80;
 
         /// <summary>
         /// 底板槽宽
@@ -38,7 +41,7 @@ namespace osu.Game.EzOsuGame.UserInterface
         /// <summary>
         /// 细轨槽两侧边距
         /// </summary>
-        public static float LayoutSideMargin { get; set; } = BUTTON_WIDTH * 0.25f;
+        public static float LayoutSideMargin { get; set; } = BUTTON_WIDTH * 0.5f;
 
         /// <summary>
         /// 被调整的数值
@@ -64,10 +67,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
         }
 
-        public EzRailDragSlider(
-            Bindable<double> current,
-            IconUsage? icon = null,
-            Func<double, string>? formatValue = null)
+        public EzRailDragSlider(Bindable<double> current, IconUsage? icon = null, Func<double, string>? formatValue = null)
         {
             Current = current;
             currentNumber = current as BindableNumber<double>;
@@ -78,7 +78,10 @@ namespace osu.Game.EzOsuGame.UserInterface
 
             nub = new ScreenFooterButton
             {
-                Size = new Vector2(nubWidth, HEIGHT),
+                RelativeSizeAxes = Axes.Y,
+                Height = 1,
+                Width = NubWidth,
+                AccentBarWidth = NubWidth,
                 Anchor = Anchor.CentreLeft,
                 Origin = Anchor.CentreLeft,
                 FlashLayerColour = Colour4.White.Opacity(0.15f),
@@ -225,7 +228,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             float padding = LayoutSideMargin;
 
             centreTravel = Math.Max(0, usableWidth);
-            nubHalfWidth = nub.DrawWidth > 0 ? nub.DrawWidth / 2f : nubWidth / 2f;
+            nubHalfWidth = nub.DrawWidth > 0 ? nub.DrawWidth / 2f : NubWidth / 2f;
 
             float shear = MathF.Abs(OsuGame.SHEAR.X) * DrawHeight;
             float railEnd = width - padding - shear;
