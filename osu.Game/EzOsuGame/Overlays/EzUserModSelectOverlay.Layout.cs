@@ -211,6 +211,7 @@ namespace osu.Game.EzOsuGame.Overlays
             if (LayoutMode == EzModSelectLayoutMode.Vertical)
                 ReplaceContentView(new EzModSelectVerticalContent(ShowPresets));
 
+            applyDensityModeToColumns();
             updateModeButton();
             updateDensityModeButton();
 
@@ -302,6 +303,7 @@ namespace osu.Game.EzOsuGame.Overlays
             ReplaceContentView(mode == EzModSelectLayoutMode.Vertical
                 ? new EzModSelectVerticalContent(ShowPresets)
                 : new HorizontalModSelectContent(CreateColumns()));
+            applyDensityModeToColumns();
 
             if (working == null)
                 AssignModsToColumns();
@@ -330,8 +332,7 @@ namespace osu.Game.EzOsuGame.Overlays
 
             DensityMode = mode;
 
-            foreach (var column in groupColumns)
-                column.SetCompactMode(mode == EzModSelectDensityMode.Compact);
+            applyDensityModeToColumns();
 
             updateDensityModeButton();
             configStore.SaveModSelectDensityMode(mode);
@@ -362,6 +363,19 @@ namespace osu.Game.EzOsuGame.Overlays
         private void updateModeButton() => LayoutModeButton.Active.Value = LayoutMode == EzModSelectLayoutMode.Vertical;
 
         private void updateDensityModeButton() => densityModeButton.Active.Value = DensityMode == EzModSelectDensityMode.Compact;
+
+        private void applyDensityModeToColumns()
+        {
+            bool compact = DensityMode == EzModSelectDensityMode.Compact;
+
+            foreach (var column in ContentView.Columns)
+            {
+                if (column is EzModGroupColumn groupColumn)
+                    groupColumn.SetCompactMode(compact);
+                else
+                    column.ApplyEzCompactMode(compact);
+            }
+        }
 
         private static Drawable[] matchToolbarHeight(Drawable[] children)
         {
@@ -523,6 +537,7 @@ namespace osu.Game.EzOsuGame.Overlays
             }
 
             ReplaceModColumns(next);
+            applyDensityModeToColumns();
             pool.SetMods(hiddenStates);
             applyWorkingColumnShear();
         }
