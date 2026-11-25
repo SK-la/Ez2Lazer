@@ -204,7 +204,7 @@ namespace osu.Game.Overlays.Mods
                 return;
 
             float width = ItemsFlow.DrawWidth - ItemsFlow.Padding.TotalHorizontal;
-            float cardWidth = EzModLayoutGeometry.CardWidth(width, (ezLayoutShear ?? 0) * ModSelectPanel.HEIGHT);
+            float cardWidth = EzModLayoutGeometry.CardWidth(width, (ezLayoutShear ?? 0) * ModSelectPanel.HEIGHT, EzCompactMode ? EzModLayoutGeometry.COMPACT_CARD_WIDTH : EzModLayoutGeometry.DEFAULT_CARD_WIDTH);
 
             foreach (var item in ItemsFlow)
             {

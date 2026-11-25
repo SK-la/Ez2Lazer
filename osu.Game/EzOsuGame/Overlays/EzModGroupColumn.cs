@@ -51,6 +51,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private readonly Bindable<bool> editing;
         private readonly Key[]? hotkeys;
         private readonly ModType? seedType;
+        private bool compactMode;
 
         private OsuTextBox renameBox = null!;
         private OsuClickableContainer deleteButton = null!;
@@ -150,6 +151,12 @@ namespace osu.Game.EzOsuGame.Overlays
             groupTitle.Shear = counter;
         }
 
+        internal void SetCompactMode(bool compact)
+        {
+            compactMode = compact;
+            ApplyEzCompactMode(compact);
+        }
+
         protected override void Update()
         {
             base.Update();
@@ -189,6 +196,7 @@ namespace osu.Game.EzOsuGame.Overlays
         protected override ModPanel CreateModPanel(ModState mod)
         {
             var panel = new EzModLayoutPanel(mod);
+            panel.ApplyEzDensityMode(compactMode);
             panel.Editing.BindTo(editing);
             panel.DragStarted = position => PanelDragStarted?.Invoke(panel, position);
             panel.Dragged = position => PanelDragged?.Invoke(position);

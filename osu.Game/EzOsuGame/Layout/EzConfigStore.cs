@@ -87,11 +87,22 @@ namespace osu.Game.EzOsuGame.Layout
 
         public EzModSelectLayoutMode ModSelectLayoutMode => GetModLayoutDocument().LayoutMode;
 
+        public EzModSelectDensityMode ModSelectDensityMode => GetModLayoutDocument().DensityMode;
+
         public void SaveModSelectLayoutMode(EzModSelectLayoutMode mode)
         {
             lock (saveLock)
             {
                 modLayout.LayoutMode = mode;
+                writeText(EzModLayoutDocument.FILENAME, JsonConvert.SerializeObject(modLayout, json_settings));
+            }
+        }
+
+        public void SaveModSelectDensityMode(EzModSelectDensityMode mode)
+        {
+            lock (saveLock)
+            {
+                modLayout.DensityMode = mode;
                 writeText(EzModLayoutDocument.FILENAME, JsonConvert.SerializeObject(modLayout, json_settings));
             }
         }
@@ -156,6 +167,7 @@ namespace osu.Game.EzOsuGame.Layout
 
                     modLayout.ColumnShear = loaded.ColumnShear;
                     modLayout.LayoutMode = loaded.LayoutMode == EzModSelectLayoutMode.Vertical ? EzModSelectLayoutMode.Vertical : EzModSelectLayoutMode.Horizontal;
+                    modLayout.DensityMode = loaded.DensityMode == EzModSelectDensityMode.Compact ? EzModSelectDensityMode.Compact : EzModSelectDensityMode.Expanded;
                     modLayout.Rulesets = loaded.Rulesets;
                 }
                 catch (Exception ex)

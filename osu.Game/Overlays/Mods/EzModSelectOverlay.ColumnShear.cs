@@ -28,6 +28,19 @@ namespace osu.Game.Overlays.Mods
     {
         private float? ezLayoutShear;
 
+        internal bool EzCompactMode { get; private set; }
+
+        internal void ApplyEzCompactMode(bool compact)
+        {
+            EzCompactMode = compact;
+
+            if (!WrapItems)
+                Width = compact ? 240 : WIDTH;
+
+            foreach (var panel in ItemsFlow.Children.OfType<ModSelectPanel>())
+                panel.ApplyEzDensityMode(compact);
+        }
+
         internal void ApplyEzLayoutShear(float shearX)
         {
             ezLayoutShear = shearX;
@@ -67,6 +80,15 @@ namespace osu.Game.Overlays.Mods
     public abstract partial class ModSelectPanel
     {
         private bool usesShearMargin;
+
+        internal void ApplyEzDensityMode(bool compact)
+        {
+            if (this is not ModPanel modPanel)
+                return;
+
+            Title = compact ? modPanel.Mod.Acronym : modPanel.Mod.Name;
+            Description = compact ? modPanel.Mod.Name : modPanel.Mod.Description;
+        }
 
         internal void ApplyEzLayoutShear(float shearX)
         {

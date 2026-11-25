@@ -16,6 +16,12 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString VERTICAL =
             new EzLocalizationManager.EzLocalisableString("纵向", "Vertical");
 
+        public static readonly EzLocalizationManager.EzLocalisableString EXPANDED =
+            new EzLocalizationManager.EzLocalisableString("展开", "Expanded");
+
+        public static readonly EzLocalizationManager.EzLocalisableString COMPACT =
+            new EzLocalizationManager.EzLocalisableString("压缩", "Compact");
+
         public static readonly EzLocalizationManager.EzLocalisableString EDIT =
             new EzLocalizationManager.EzLocalisableString("编辑", "Edit");
 

@@ -46,6 +46,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private ShearedButton editButton = null!;
         private ShearedButton newGroupButton = null!;
         private EzLayoutShearControl shearControl = null!;
+        private EzModDensityModeButton densityModeButton = null!;
         private FillFlowContainer editToolbar = null!;
         private DragGhost dragGhost = null!;
         private Box insertionMarker = null!;
@@ -53,6 +54,7 @@ namespace osu.Game.EzOsuGame.Overlays
         internal EzModLayoutModeButton LayoutModeButton { get; private set; } = null!;
 
         public EzModSelectLayoutMode LayoutMode { get; private set; }
+        public EzModSelectDensityMode DensityMode { get; private set; }
         private readonly double[] scrollPositions = new double[2];
         private ModSelectContent? restoreScrollView;
         private double restoreScrollAt;
@@ -190,6 +192,10 @@ namespace osu.Game.EzOsuGame.Overlays
                     {
                         Alpha = 0
                     },
+                    densityModeButton = new EzModDensityModeButton
+                    {
+                        Alpha = 0
+                    },
                     shearControl = new EzLayoutShearControl
                     {
                         Width = 200,
@@ -201,14 +207,17 @@ namespace osu.Game.EzOsuGame.Overlays
             AddAboveColumns(editToolbar);
 
             LayoutMode = configStore.ModSelectLayoutMode;
+            DensityMode = configStore.ModSelectDensityMode;
             if (LayoutMode == EzModSelectLayoutMode.Vertical)
                 ReplaceContentView(new EzModSelectVerticalContent(ShowPresets));
 
             updateModeButton();
+            updateDensityModeButton();
 
             base.LoadComplete();
 
             LayoutModeButton.Active.BindValueChanged(change => SetLayoutMode(change.NewValue ? EzModSelectLayoutMode.Vertical : EzModSelectLayoutMode.Horizontal));
+            densityModeButton.Active.BindValueChanged(change => SetDensityMode(change.NewValue ? EzModSelectDensityMode.Compact : EzModSelectDensityMode.Expanded));
 
             shearControl.Current.BindValueChanged(change =>
             {
@@ -224,7 +233,9 @@ namespace osu.Game.EzOsuGame.Overlays
                 editButton.Text = change.NewValue ? EzModLayoutStrings.DONE : EzModLayoutStrings.EDIT;
                 newGroupButton.Alpha = change.NewValue ? 1 : 0;
                 LayoutModeButton.Alpha = change.NewValue ? 1 : 0;
+                densityModeButton.Alpha = change.NewValue ? 1 : 0;
                 LayoutModeButton.Enabled.Value = change.NewValue && !dragging;
+                densityModeButton.Enabled.Value = change.NewValue && !dragging;
                 shearControl.Alpha = change.NewValue ? 1 : 0;
                 SetColumnFlowBottomPadding(column_padding_rest);
 
@@ -312,6 +323,20 @@ namespace osu.Game.EzOsuGame.Overlays
             restoreScrollFrames = 0;
         }
 
+        internal void SetDensityMode(EzModSelectDensityMode mode)
+        {
+            if (mode == DensityMode || dragging)
+                return;
+
+            DensityMode = mode;
+
+            foreach (var column in groupColumns)
+                column.SetCompactMode(mode == EzModSelectDensityMode.Compact);
+
+            updateDensityModeButton();
+            configStore.SaveModSelectDensityMode(mode);
+        }
+
         protected override void UpdateAfterChildren()
         {
             base.UpdateAfterChildren();
@@ -335,6 +360,8 @@ namespace osu.Game.EzOsuGame.Overlays
         }
 
         private void updateModeButton() => LayoutModeButton.Active.Value = LayoutMode == EzModSelectLayoutMode.Vertical;
+
+        private void updateDensityModeButton() => densityModeButton.Active.Value = DensityMode == EzModSelectDensityMode.Compact;
 
         private static Drawable[] matchToolbarHeight(Drawable[] children)
         {
@@ -372,6 +399,7 @@ namespace osu.Game.EzOsuGame.Overlays
             float contentTop = Math.Max(SearchTextBox.DrawHeight, editToolbar.DrawHeight) * headerScale + 36;
             SetContentAreaPadding(new MarginPadding { Top = contentTop, Bottom = contentBottom });
             LayoutModeButton.Enabled.Value = editing.Value && !dragging;
+            densityModeButton.Enabled.Value = editing.Value && !dragging;
             emptyResults.Alpha = !editing.Value && SearchTerm.Length > 0
                 && groupColumns.All(column => column.AvailableMods.All(state => !state.Visible))
                 && ContentView.Columns.OfType<ModPresetColumn>().All(column => !column.HasMatchingPresets)
@@ -488,6 +516,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     RenameRequested = renameGroup,
                 };
 
+                column.SetCompactMode(DensityMode == EzModSelectDensityMode.Compact);
                 column.AvailableMods = mods;
                 groupColumns.Add(column);
                 next.Add(column);
