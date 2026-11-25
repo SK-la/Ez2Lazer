@@ -23,6 +23,16 @@ namespace osu.Game.Tests.NonVisual
         public void TestCardWidthReservesShear(float available, float shearWidth, float expected) =>
             Assert.That(EzModLayoutGeometry.CardWidth(available, shearWidth), Is.EqualTo(expected).Within(0.001f));
 
+        [Test]
+        public void TestCompactCardWidthIncreasesDensity()
+        {
+            float expanded = EzModLayoutGeometry.CardWidth(800);
+            float compact = EzModLayoutGeometry.CardWidth(800, targetCardWidth: EzModLayoutGeometry.COMPACT_CARD_WIDTH);
+
+            Assert.That(expanded, Is.EqualTo(394));
+            Assert.That(compact, Is.EqualTo(258.6667f).Within(0.001f));
+        }
+
         [TestCase(-10, -10, 0)]
         [TestCase(200, 20, 1)]
         [TestCase(700, 20, 2)]

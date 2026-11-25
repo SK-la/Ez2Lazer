@@ -20,9 +20,16 @@ namespace osu.Game.EzOsuGame.Mods
         Vertical,
     }
 
+    [JsonConverter(typeof(StringEnumConverter))]
+    public enum EzModSelectDensityMode
+    {
+        Expanded,
+        Compact,
+    }
+
     /// <summary>
     /// Client mod-select layout at <c>EzResources/Config/ModLayout.json</c>. Not part of a theme layout set.
-    /// <see cref="ColumnShear"/> and <see cref="LayoutMode"/> are global; <see cref="Rulesets"/> holds per-ruleset group/hidden lists keyed by <see cref="RulesetInfo.ShortName"/>.
+    /// <see cref="ColumnShear"/>, <see cref="LayoutMode"/>, and <see cref="DensityMode"/> are global; <see cref="Rulesets"/> holds per-ruleset group/hidden lists keyed by <see cref="RulesetInfo.ShortName"/>.
     /// </summary>
     public sealed class EzModLayoutDocument
     {
@@ -32,6 +39,8 @@ namespace osu.Game.EzOsuGame.Mods
         public float? ColumnShear { get; set; }
 
         public EzModSelectLayoutMode LayoutMode { get; set; }
+
+        public EzModSelectDensityMode DensityMode { get; set; }
 
         public Dictionary<string, EzModRulesetListLayout>? Rulesets { get; set; }
 
