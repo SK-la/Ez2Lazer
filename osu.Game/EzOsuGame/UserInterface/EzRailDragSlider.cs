@@ -28,25 +28,25 @@ namespace osu.Game.EzOsuGame.UserInterface
         private const double fallback_min = -200;
         private const double fallback_max = 200;
 
+        public IconUsage NubIcon
+        {
+            set => nub.Icon = value;
+        }
+
         /// <summary>
         /// 滑块宽度
         /// </summary>
-        public float NubWidth { get; set; } = 80;
-
-        /// <summary>
-        /// 底板槽宽
-        /// </summary>
-        public static float LayoutSlotWidth { get; set; } = 260f;
+        public float NubWidth { get; }
 
         /// <summary>
         /// 细轨槽两侧边距
         /// </summary>
-        public static float LayoutSideMargin { get; set; } = BUTTON_WIDTH * 0.5f;
+        private float layoutSideMargin => NubWidth * 0.5f;
 
         /// <summary>
         /// 被调整的数值
         /// </summary>
-        public readonly Bindable<double> Current;
+        public Bindable<double> Current { get; }
 
         private readonly Container rail;
         private readonly ScreenFooterButton nub;
@@ -56,7 +56,6 @@ namespace osu.Game.EzOsuGame.UserInterface
         private readonly BindableNumber<double>? currentNumber;
 
         private float centreTravel;
-        private float nubHalfWidth;
 
         public LocalisableString Tooltip
         {
@@ -67,14 +66,25 @@ namespace osu.Game.EzOsuGame.UserInterface
             }
         }
 
-        public EzRailDragSlider(Bindable<double> current, IconUsage? icon = null, Func<double, string>? formatValue = null)
+        /// <summary>
+        /// Creates a slider that adjusts the supplied bindable value.
+        /// </summary>
+        /// <param name="current">The value to adjust.</param>
+        /// <param name="formatValue">Formats the value displayed by the nub.</param>
+        /// <param name="nubWidth">The width of the nub in screen space.</param>
+        public EzRailDragSlider(Bindable<double> current, Func<double, string>? formatValue = null, float nubWidth = 80)
         {
+            if (!float.IsFinite(nubWidth) || nubWidth <= 0)
+                throw new ArgumentOutOfRangeException(nameof(nubWidth));
+
             Current = current;
+            NubWidth = nubWidth;
             currentNumber = current as BindableNumber<double>;
             this.formatValue = formatValue ?? (v => v.ToString(@"+#;-#;0"));
 
             Enabled.Value = true;
-            Size = new Vector2(LayoutSlotWidth, HEIGHT);
+            Height = HEIGHT;
+            Width = 260;
 
             nub = new ScreenFooterButton
             {
@@ -114,9 +124,6 @@ namespace osu.Game.EzOsuGame.UserInterface
             Content.Add(rail);
             Content.Add(tick);
             Content.Add(nub);
-
-            if (icon.HasValue)
-                nub.Icon = icon.Value;
         }
 
         [BackgroundDependencyLoader]
@@ -133,6 +140,12 @@ namespace osu.Game.EzOsuGame.UserInterface
             Current.BindValueChanged(applyNubPosition, true);
         }
 
+        private void applyNubPosition(ValueChangedEvent<double> c)
+        {
+            nub.X = normalizedValue * centreTravel;
+            nub.Text = formatValue(c.NewValue);
+        }
+
         public override void UpdateDisplay()
         {
             base.UpdateDisplay();
@@ -140,7 +153,7 @@ namespace osu.Game.EzOsuGame.UserInterface
             nub.UpdateDisplay();
         }
 
-        private float usableWidth => DrawWidth - 2 * LayoutSideMargin;
+        private float usableWidth => DrawWidth - 2 * layoutSideMargin;
 
         protected override bool OnDragStart(DragStartEvent e)
         {
@@ -225,25 +238,15 @@ namespace osu.Game.EzOsuGame.UserInterface
         private void buildLayout()
         {
             float width = DrawWidth;
-            float padding = LayoutSideMargin;
+            float padding = layoutSideMargin;
 
             centreTravel = Math.Max(0, usableWidth);
-            nubHalfWidth = nub.DrawWidth > 0 ? nub.DrawWidth / 2f : NubWidth / 2f;
 
             float shear = MathF.Abs(OsuGame.SHEAR.X) * DrawHeight;
             float railEnd = width - padding - shear;
 
             rail.X = padding;
             rail.Width = Math.Max(0, railEnd - padding);
-        }
-
-        private void applyNubPosition(ValueChangedEvent<double> _)
-        {
-            float progress = normalizedValue;
-            float nubCentre = LayoutSideMargin + progress * centreTravel;
-
-            nub.X = nubCentre - nubHalfWidth;
-            nub.Text = formatValue(Current.Value);
         }
     }
 }

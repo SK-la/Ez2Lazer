@@ -13,8 +13,9 @@ namespace osu.Game.EzOsuGame.UserInterface
     public partial class FooterButtonHitResultOffset : EzRailDragSlider
     {
         public FooterButtonHitResultOffset(Bindable<double> current)
-            : base(current, FontAwesome.Solid.ArrowsAltH)
+            : base(current)
         {
+            NubIcon = FontAwesome.Solid.ArrowsAltH;
             Tooltip = new EzLocalizationManager.EzLocalisableString(
                 "左右拖动调整 HitResult Offset，单击重置",
                 "Drag left/right to adjust the hit result offset, click to reset");

@@ -12,6 +12,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
@@ -26,7 +27,7 @@ namespace osu.Game.EzOsuGame.Overlays
     {
         private const float pool_height = 96;
         private const float column_padding_rest = 10;
-        private float bottomWidth => 110;
+        private float bottomWidth => 100;
 
         private static readonly Key[][] hotkey_rows =
         {
@@ -44,7 +45,7 @@ namespace osu.Game.EzOsuGame.Overlays
         private Container hiddenPoolArea = null!;
         private ShearedButton editButton = null!;
         private ShearedButton newGroupButton = null!;
-        private EzModLayoutShearControl shearControl = null!;
+        private EzLayoutShearControl shearControl = null!;
         private FillFlowContainer editToolbar = null!;
         private DragGhost dragGhost = null!;
         private Box insertionMarker = null!;
@@ -189,7 +190,7 @@ namespace osu.Game.EzOsuGame.Overlays
                     {
                         Alpha = 0
                     },
-                    shearControl = new EzModLayoutShearControl
+                    shearControl = new EzLayoutShearControl
                     {
                         Width = 200,
                         Alpha = 0

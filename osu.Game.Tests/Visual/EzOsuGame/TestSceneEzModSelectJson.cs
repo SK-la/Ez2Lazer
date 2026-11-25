@@ -7,6 +7,7 @@ using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays.Mods;
 using osu.Game.Tests.Visual.SongSelect;
@@ -51,7 +52,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
 
         private EzUserModSelectOverlay modOverlay => this.ChildrenOfType<EzUserModSelectOverlay>().Single();
 
-        private EzModLayoutShearControl shearControl => modOverlay.ChildrenOfType<EzModLayoutShearControl>().Single();
+        private EzLayoutShearControl shearControl => modOverlay.ChildrenOfType<EzLayoutShearControl>().Single();
 
         private EzModHiddenPool hiddenPool => modOverlay.ChildrenOfType<EzModHiddenPool>().Single();
 
@@ -59,7 +60,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
                                                           .First(b => b.Text.ToString() == EzModLayoutStrings.NEW_GROUP.ToString());
 
         private ShearedButton editToggleButton => modOverlay.ChildrenOfType<FillFlowContainer>()
-                                                            .Single(flow => flow.ChildrenOfType<EzModLayoutShearControl>().Any())
+                                                            .Single(flow => flow.ChildrenOfType<EzLayoutShearControl>().Any())
                                                             .ChildrenOfType<ShearedButton>().First();
 
         private void enterEditMode() => AddStep("enter edit mode", clickEditToggle);

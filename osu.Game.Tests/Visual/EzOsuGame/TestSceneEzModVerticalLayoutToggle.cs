@@ -12,6 +12,7 @@ using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Overlays;
+using osu.Game.EzOsuGame.UserInterface;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays.Mods;
@@ -43,11 +44,11 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             AddStep("select a mod", () => SelectedMods.Value = new Mod[] { new OsuModHidden() });
             enterEditing();
             AddUntilStep("preset button loaded", () => addPresetButton.IsLoaded && addPresetLabel.DrawHeight > 0);
-            AddStep("start with default shear", () => overlay.ChildrenOfType<EzModLayoutShearControl>().Single().Current.Value = 0.2);
+            AddStep("start with default shear", () => overlay.ChildrenOfType<EzLayoutShearControl>().Single().Current.Value = 0.2);
 
             foreach (float shear in new[] { 0f, 0.1f, 0.2f, 0f })
             {
-                AddStep($"set shear to {shear}", () => overlay.ChildrenOfType<EzModLayoutShearControl>().Single().Current.Value = shear);
+                AddStep($"set shear to {shear}", () => overlay.ChildrenOfType<EzLayoutShearControl>().Single().Current.Value = shear);
                 AddWaitStep("settle preset layout", 3);
                 AddAssert("plus remains upright", () => screenShear(addPresetLabel), () => Is.EqualTo(0).Within(0.001f));
                 AddAssert("button follows layout shear", () => screenShear(addPresetButton), () => Is.EqualTo(shear).Within(0.001f));
@@ -183,7 +184,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             });
             switchTo(EzModSelectLayoutMode.Vertical);
             enterEditing();
-            AddStep("set shear", () => overlay.ChildrenOfType<EzModLayoutShearControl>().Single().Current.Value = shear);
+            AddStep("set shear", () => overlay.ChildrenOfType<EzLayoutShearControl>().Single().Current.Value = shear);
             AddWaitStep("settle layout", 5);
             AddAssert("visible cards remain inside sections", visibleBounds, () => Is.Empty);
             AddAssert("visible cards do not overlap", visibleOverlap, () => Is.Empty);
@@ -248,7 +249,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             AddStep("add group", () => click(overlay.ChildrenOfType<ShearedButton>().Single(button => button.Text.ToString() == EzModLayoutStrings.NEW_GROUP.ToString())));
             AddUntilStep("group added", () => groups.Length == count + 1);
             switchTo(EzModSelectLayoutMode.Vertical);
-            AddAssert("still editing", () => overlay.ChildrenOfType<EzModLayoutShearControl>().Single().Alpha > 0);
+            AddAssert("still editing", () => overlay.ChildrenOfType<EzLayoutShearControl>().Single().Alpha > 0);
             AddAssert("draft preserved", () => groups.Length == count + 1);
             AddAssert("draft not saved by switch", () => (store.GetModLayout(Ruleset.Value.ShortName)?.Groups?.Count ?? count) == count);
             switchTo(EzModSelectLayoutMode.Horizontal);
@@ -398,7 +399,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
             waitForContent();
             AddAssert("original ruleset draft saved", () => store.GetModLayout("osu")!.Groups!.Count == count + 1);
             AddAssert("original mod membership retained", () => store.GetModLayout("osu")!.Groups!.SelectMany(group => group.Acronyms!).Order().ToArray(), () => Is.EqualTo(acronyms));
-            AddAssert("new ruleset not editing", () => overlay.ChildrenOfType<EzModLayoutShearControl>().Single().Alpha == 0);
+            AddAssert("new ruleset not editing", () => overlay.ChildrenOfType<EzLayoutShearControl>().Single().Alpha == 0);
             AddAssert("global mode retained", () => overlay.LayoutMode == EzModSelectLayoutMode.Vertical);
         }
 
@@ -667,7 +668,7 @@ namespace osu.Game.Tests.Visual.EzOsuGame
         }
 
         private void clickEditToggle() => click(overlay.ChildrenOfType<FillFlowContainer>()
-            .Single(flow => flow.ChildrenOfType<EzModLayoutShearControl>().Any()).ChildrenOfType<ShearedButton>().First());
+            .Single(flow => flow.ChildrenOfType<EzLayoutShearControl>().Any()).ChildrenOfType<ShearedButton>().First());
 
         private void click(Drawable drawable)
         {

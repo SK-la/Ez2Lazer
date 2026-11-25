@@ -31,9 +31,6 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString COLUMN_SHEAR =
             new EzLocalizationManager.EzLocalisableString("倾斜角度", "Column shear");
 
-        public static readonly EzLocalizationManager.EzLocalisableString COLUMN_SHEAR_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "左右拖动调整列倾斜，单击重置", "Drag left/right to adjust column shear, click to reset");
-
         public static readonly EzLocalizationManager.EzLocalisableString DELETE_GROUP =
             new EzLocalizationManager.EzLocalisableString("删除分组", "Delete group");
 

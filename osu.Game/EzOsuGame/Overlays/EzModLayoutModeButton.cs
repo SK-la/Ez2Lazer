@@ -20,7 +20,8 @@ namespace osu.Game.EzOsuGame.Overlays
             RelativeSizeAxes = Axes.Y;
             AutoSizeAxes = Axes.X;
             TextSize = 16;
-            // ButtonContent.Padding = new MarginPadding { Left = 20, Right = 10 };
+            // Padding = new MarginPadding { Left = 20, Right = 10 };
+            ButtonContent.Padding = new MarginPadding { Left = 34, Right = 10 };
             ButtonContent.Add(icon = new SpriteIcon
             {
                 Size = new Vector2(16),
