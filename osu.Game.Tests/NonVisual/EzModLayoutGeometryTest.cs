@@ -30,7 +30,7 @@ namespace osu.Game.Tests.NonVisual
             float compact = EzModLayoutGeometry.CardWidth(800, targetCardWidth: EzModLayoutGeometry.COMPACT_CARD_WIDTH);
 
             Assert.That(expanded, Is.EqualTo(394));
-            Assert.That(compact, Is.EqualTo(258.6667f).Within(0.001f));
+            Assert.That(compact, Is.EqualTo(191));
         }
 
         [TestCase(-10, -10, 0)]

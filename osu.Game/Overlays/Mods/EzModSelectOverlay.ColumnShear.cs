@@ -30,12 +30,12 @@ namespace osu.Game.Overlays.Mods
 
         internal bool EzCompactMode { get; private set; }
 
-        internal void ApplyEzCompactMode(bool compact)
+        internal virtual void ApplyEzCompactMode(bool compact)
         {
             EzCompactMode = compact;
 
             if (!WrapItems)
-                Width = compact ? 240 : WIDTH;
+                Width = compact ? EzModLayoutGeometry.COMPACT_COLUMN_WIDTH : WIDTH;
 
             foreach (var panel in ItemsFlow.Children.OfType<ModSelectPanel>())
                 panel.ApplyEzDensityMode(compact);

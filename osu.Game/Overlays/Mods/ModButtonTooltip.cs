@@ -14,6 +14,7 @@ namespace osu.Game.Overlays.Mods
 {
     public partial class ModButtonTooltip : VisibilityContainer, ITooltip<Mod>
     {
+        private readonly OsuSpriteText modNameText;
         private readonly OsuSpriteText descriptionText;
 
         protected override Container<Drawable> Content { get; }
@@ -38,6 +39,11 @@ namespace osu.Game.Overlays.Mods
                     Padding = new MarginPadding { Left = 10, Right = 10, Top = 5, Bottom = 5 },
                     Children = new Drawable[]
                     {
+                        modNameText = new OsuSpriteText
+                        {
+                            Colour = colourProvider.Content1,
+                            Font = OsuFont.GetFont(weight: FontWeight.SemiBold),
+                        },
                         descriptionText = new OsuSpriteText
                         {
                             Colour = colourProvider.Content1,
@@ -65,6 +71,7 @@ namespace osu.Game.Overlays.Mods
 
         protected virtual void UpdateDisplay(Mod mod)
         {
+            modNameText.Text = mod.Name;
             descriptionText.Text = mod.Description;
         }
 

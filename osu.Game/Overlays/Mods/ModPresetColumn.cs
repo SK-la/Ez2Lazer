@@ -11,6 +11,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Graphics;
 using osu.Framework.Input.Events;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Mods;
 using osu.Game.Graphics;
 using osu.Game.Localisation;
 using osu.Game.Rulesets;
@@ -80,6 +81,14 @@ namespace osu.Game.Overlays.Mods
         {
         }
 
+        internal override void ApplyEzCompactMode(bool compact)
+        {
+            base.ApplyEzCompactMode(compact);
+
+            if (!WrapItems && initialPresetsReceived && !ItemsFlow.OfType<ModPresetPanel>().Any())
+                Width = contracted_width;
+        }
+
         private void asyncLoadPanels(IRealmCollection<ModPreset> presets, ChangeSet? changes)
         {
             cancellationTokenSource?.Cancel();
@@ -88,7 +97,11 @@ namespace osu.Game.Overlays.Mods
 
             if (!WrapItems)
             {
-                float width = hasPresets ? WIDTH : contracted_width;
+                float width = contracted_width;
+
+                if (hasPresets)
+                    width = EzCompactMode ? EzModLayoutGeometry.COMPACT_COLUMN_WIDTH : WIDTH;
+
                 if (initialPresetsReceived)
                     this.ResizeWidthTo(width, 200, Easing.OutQuint);
                 else

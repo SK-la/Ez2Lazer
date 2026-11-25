@@ -10,6 +10,7 @@ namespace osu.Game.EzOsuGame.Mods
     internal static class EzModLayoutGeometry
     {
         public const float CARD_SPACING = 12;
+        public const float COMPACT_COLUMN_WIDTH = 240;
         public const float DEFAULT_CARD_WIDTH = 280;
         public const float COMPACT_CARD_WIDTH = 180;
 
