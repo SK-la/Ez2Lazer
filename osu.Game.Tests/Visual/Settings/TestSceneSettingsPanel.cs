@@ -3,11 +3,16 @@
 
 #nullable disable
 
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using NUnit.Framework;
 using osu.Framework.Allocation;
+using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
 using osu.Framework.Testing;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.Graphics.UserInterface;
 using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
@@ -23,6 +28,26 @@ namespace osu.Game.Tests.Visual.Settings
         private SettingsPanel settings;
         private DialogOverlay dialogOverlay;
 
+        private readonly List<SettingsOpenMeasurement> settingsOpenMeasurements = new List<SettingsOpenMeasurement>();
+        private bool measuringSettingsOpen;
+        private bool settingsOpenMeasurementComplete;
+        private string activeMeasurementName;
+        private long measurementStartTimestamp;
+        private long allocatedBytesAtMeasurementStart;
+        private TimeSpan gcPauseAtMeasurementStart;
+        private int gen0AtMeasurementStart;
+        private int gen1AtMeasurementStart;
+        private int gen2AtMeasurementStart;
+        private int measurementFrameCount;
+        private long lastUpdateTimestamp;
+        private double maximumUpdateFrameMs;
+        private double maximumUpdateGapAtMs;
+        private int sectionsMountedAtMaximumUpdateGap;
+        private int subsectionsLoadedAtMaximumUpdateGap;
+        private int weatherItemsLoadedAtMaximumUpdateGap;
+        private TimeSpan lastGcPauseDuration;
+        private double maximumGcPauseBetweenUpdatesMs;
+
         [SetUpSteps]
         public void SetUpSteps()
         {
@@ -32,14 +57,70 @@ namespace osu.Game.Tests.Visual.Settings
 
                 Add(settings = new SettingsOverlay
                 {
-                    State = { Value = Visibility.Visible }
+                    State = { Value = Visibility.Hidden }
                 });
             });
+        }
+
+        protected override void Update()
+        {
+            base.Update();
+
+            if (!measuringSettingsOpen)
+                return;
+
+            long updateTimestamp = Stopwatch.GetTimestamp();
+
+            if (lastUpdateTimestamp != 0)
+            {
+                double updateGap = Stopwatch.GetElapsedTime(lastUpdateTimestamp, updateTimestamp).TotalMilliseconds;
+
+                if (updateGap > maximumUpdateFrameMs)
+                {
+                    maximumUpdateFrameMs = updateGap;
+                    maximumUpdateGapAtMs = Stopwatch.GetElapsedTime(measurementStartTimestamp, updateTimestamp).TotalMilliseconds;
+                    sectionsMountedAtMaximumUpdateGap = settings.SectionsContainer.Count;
+                    EzGameSection ezGameSection = settings.SectionsContainer.ChildrenOfType<EzGameSection>().FirstOrDefault();
+                    subsectionsLoadedAtMaximumUpdateGap = ezGameSection?.ChildrenOfType<SettingsSubsection>().Count(section => section.IsLoaded) ?? 0;
+                    EzWeatherSettings weatherSettings = ezGameSection?.ChildrenOfType<EzWeatherSettings>().FirstOrDefault();
+                    weatherItemsLoadedAtMaximumUpdateGap = weatherSettings?.ChildrenOfType<SettingsItemV2>().Count() ?? 0;
+                }
+
+                TimeSpan gcPauseDuration = GC.GetTotalPauseDuration();
+                maximumGcPauseBetweenUpdatesMs = Math.Max(maximumGcPauseBetweenUpdatesMs, (gcPauseDuration - lastGcPauseDuration).TotalMilliseconds);
+                lastGcPauseDuration = gcPauseDuration;
+            }
+
+            lastUpdateTimestamp = updateTimestamp;
+            measurementFrameCount++;
+
+            if (settings.State.Value != Visibility.Visible || !settings.AreSectionsReadyForDisplay)
+                return;
+
+            measuringSettingsOpen = false;
+            settingsOpenMeasurementComplete = true;
+
+            settingsOpenMeasurements.Add(new SettingsOpenMeasurement(
+                activeMeasurementName,
+                Stopwatch.GetElapsedTime(measurementStartTimestamp).TotalMilliseconds,
+                measurementFrameCount,
+                GC.GetTotalAllocatedBytes(false) - allocatedBytesAtMeasurementStart,
+                GC.CollectionCount(0) - gen0AtMeasurementStart,
+                GC.CollectionCount(1) - gen1AtMeasurementStart,
+                GC.CollectionCount(2) - gen2AtMeasurementStart,
+                (GC.GetTotalPauseDuration() - gcPauseAtMeasurementStart).TotalMilliseconds,
+                maximumGcPauseBetweenUpdatesMs,
+                maximumUpdateFrameMs,
+                maximumUpdateGapAtMs,
+                sectionsMountedAtMaximumUpdateGap,
+                subsectionsLoadedAtMaximumUpdateGap,
+                weatherItemsLoadedAtMaximumUpdateGap));
         }
 
         [Test]
         public void TestBasic()
         {
+            AddStep("show settings", () => settings.Show());
             AddStep("do nothing", () => { });
             AddToggleStep("toggle visibility", visible => settings.State.Value = visible ? Visibility.Visible : Visibility.Hidden);
         }
@@ -47,12 +128,13 @@ namespace osu.Game.Tests.Visual.Settings
         [Test]
         public void TestFiltering([Values] bool beforeLoad)
         {
+            AddStep("show settings", () => settings.Show());
             AddStep("reset mouse", () => InputManager.MoveMouseTo(settings));
 
             if (beforeLoad)
                 AddStep("set filter", () => settings.SectionsContainer.ChildrenOfType<SettingsSearchTextBox>().First().Current.Value = "scaling");
 
-            AddUntilStep("wait for items to load", () => settings.SectionsContainer.ChildrenOfType<IFilterable>().Any());
+            AddUntilStep("wait for all settings sections to mount", () => settings.AreSectionsReadyForDisplay);
 
             if (!beforeLoad)
                 AddStep("set filter", () => settings.SectionsContainer.ChildrenOfType<SettingsSearchTextBox>().First().Current.Value = "scaling");
@@ -73,9 +155,10 @@ namespace osu.Game.Tests.Visual.Settings
         [Test]
         public void TestFilterAfterLoad()
         {
+            AddStep("show settings", () => settings.Show());
             AddStep("reset mouse", () => InputManager.MoveMouseTo(settings));
 
-            AddUntilStep("wait for items to load", () => settings.SectionsContainer.ChildrenOfType<IFilterable>().Any());
+            AddUntilStep("wait for all settings sections to mount", () => settings.AreSectionsReadyForDisplay);
 
             AddStep("set filter", () => settings.SectionsContainer.ChildrenOfType<SettingsSearchTextBox>().First().Current.Value = "scaling");
         }
@@ -83,6 +166,7 @@ namespace osu.Game.Tests.Visual.Settings
         [Test]
         public void ToggleVisibility()
         {
+            AddStep("show settings", () => settings.Show());
             AddStep("reset mouse", () => InputManager.MoveMouseTo(settings));
 
             AddWaitStep("wait some", 5);
@@ -92,9 +176,10 @@ namespace osu.Game.Tests.Visual.Settings
         [Test]
         public void TestTextboxFocusAfterNestedPanelBackButton()
         {
+            AddStep("show settings", () => settings.Show());
             AddStep("reset mouse", () => InputManager.MoveMouseTo(settings));
 
-            AddUntilStep("sections loaded", () => settings.SectionsContainer.Children.Count > 0);
+            AddUntilStep("sections loaded", () => settings.AreSectionsReadyForDisplay);
             AddUntilStep("top-level textbox focused", () => settings.SectionsContainer.ChildrenOfType<SettingsSearchTextBox>().FirstOrDefault()?.HasFocus == true);
 
             AddStep("open key binding subpanel", () =>
@@ -119,9 +204,10 @@ namespace osu.Game.Tests.Visual.Settings
         [Test]
         public void TestTextboxFocusAfterNestedPanelEscape()
         {
+            AddStep("show settings", () => settings.Show());
             AddStep("reset mouse", () => InputManager.MoveMouseTo(settings));
 
-            AddUntilStep("sections loaded", () => settings.SectionsContainer.Children.Count > 0);
+            AddUntilStep("sections loaded", () => settings.AreSectionsReadyForDisplay);
             AddUntilStep("top-level textbox focused", () => settings.SectionsContainer.ChildrenOfType<SettingsSearchTextBox>().FirstOrDefault()?.HasFocus == true);
 
             AddStep("open key binding subpanel", () =>
@@ -146,11 +232,127 @@ namespace osu.Game.Tests.Visual.Settings
         {
             SettingsSearchTextBox searchTextBox = null!;
 
+            AddStep("show settings", () => settings.Show());
+            AddUntilStep("search textbox loaded", () => settings.SectionsContainer.ChildrenOfType<SettingsSearchTextBox>().Any());
             AddStep("set text", () => (searchTextBox = settings.SectionsContainer.ChildrenOfType<SettingsSearchTextBox>().First()).Current.Value = "some text");
             AddAssert("no text selected", () => searchTextBox.SelectedText == string.Empty);
             AddRepeatStep("toggle visibility", () => settings.ToggleVisibility(), 2);
             AddAssert("search text selected", () => searchTextBox.SelectedText == searchTextBox.Current.Value);
         }
+
+        [Test]
+        public void TestColdAndRepeatedOpenPerformance()
+        {
+            long settleStarted = 0;
+            AddStep("start test host settle interval", () => settleStarted = Stopwatch.GetTimestamp());
+            AddUntilStep("wait for idle test host", () => Stopwatch.GetElapsedTime(settleStarted).TotalSeconds >= 5);
+
+            AddStep("start cold settings open", () => startSettingsOpenMeasurement("cold"));
+            AddUntilStep("cold settings open ready", () => settingsOpenMeasurementComplete);
+            AddAssert("all settings sections and sidebar buttons are complete", settingsMenuIsComplete);
+            AddStep("report cold settings open", () => reportSettingsOpenMeasurement(0));
+
+            for (int repeat = 0; repeat < 2; repeat++)
+            {
+                int measurementIndex = repeat + 1;
+
+                AddStep($"close settings before repeat {measurementIndex}", () => settings.Hide());
+                AddUntilStep($"finish close animation {measurementIndex}", () => settings.Alpha <= 0.01f);
+                AddStep($"start repeated settings open {measurementIndex}", () => startSettingsOpenMeasurement($"repeat-{measurementIndex}"));
+                AddUntilStep($"repeated settings open {measurementIndex} ready", () => settingsOpenMeasurementComplete);
+                AddStep($"report repeated settings open {measurementIndex}", () => reportSettingsOpenMeasurement(measurementIndex));
+            }
+
+            AddAssert("reopening is faster than the cold load", () => settingsOpenMeasurements[0].ElapsedMilliseconds
+                                                                        > settingsOpenMeasurements.Skip(1).Max(m => m.ElapsedMilliseconds));
+            AddAssert("cold settings loading caused less than 200 ms of cumulative GC pause", () => settingsOpenMeasurements[0].GcPauseMilliseconds < 200);
+            AddAssert("settings loading had no 33 ms GC pause in one update", () => settingsOpenMeasurements.All(m => m.MaximumGcPauseBetweenUpdatesMs < 33));
+            AddAssert("reopening caused no GC collections", () => settingsOpenMeasurements.Skip(1).All(m => m.Gen0 == 0 && m.Gen1 == 0 && m.Gen2 == 0));
+            AddAssert("settings update had no 50 ms frame gap", () => settingsOpenMeasurements.All(m => m.MaximumUpdateFrameMs < 50));
+        }
+
+        private void startSettingsOpenMeasurement(string name)
+        {
+            activeMeasurementName = name;
+            settingsOpenMeasurementComplete = false;
+            measurementStartTimestamp = Stopwatch.GetTimestamp();
+            allocatedBytesAtMeasurementStart = GC.GetTotalAllocatedBytes(false);
+            gcPauseAtMeasurementStart = GC.GetTotalPauseDuration();
+            gen0AtMeasurementStart = GC.CollectionCount(0);
+            gen1AtMeasurementStart = GC.CollectionCount(1);
+            gen2AtMeasurementStart = GC.CollectionCount(2);
+            measurementFrameCount = 0;
+            lastUpdateTimestamp = 0;
+            lastGcPauseDuration = gcPauseAtMeasurementStart;
+            maximumGcPauseBetweenUpdatesMs = 0;
+            maximumUpdateGapAtMs = 0;
+            sectionsMountedAtMaximumUpdateGap = 0;
+            subsectionsLoadedAtMaximumUpdateGap = 0;
+            weatherItemsLoadedAtMaximumUpdateGap = 0;
+            maximumUpdateFrameMs = 0;
+            measuringSettingsOpen = true;
+            settings.Show();
+        }
+
+        private bool settingsMenuIsComplete()
+        {
+            SettingsSection[] sections = settings.SectionsContainer.ChildrenOfType<SettingsSection>().ToArray();
+            SidebarIconButton[] buttons = settings.ChildrenOfType<SidebarIconButton>().ToArray();
+            SettingsSubsection[] subsections = sections.SelectMany(section => section.ChildrenOfType<SettingsSubsection>()).ToArray();
+            int optionalSections = sections.Count(section => section is RulesetSection or AfToggleSection);
+            int unloadedSections = sections.Count(section => !section.IsLoaded);
+            int subsectionsWithNoItems = subsections.Count(subsection => !subsection.ChildrenOfType<IFilterable>().Any());
+            Drawable[] settingsItems = subsections.SelectMany(subsection => subsection.ChildrenOfType<ISettingsItem>().OfType<Drawable>()).ToArray();
+            int unreadyVisibleItems = settingsItems.Count(item => item.LoadState < LoadState.Ready && item.IsPresent);
+            int unloadedSettingsItems = settingsItems.Count(item => !item.IsLoaded);
+            int ezSubsections = sections.OfType<EzGameSection>().Single().ChildrenOfType<SettingsSubsection>().Count();
+            int weatherItems = sections.OfType<EzGameSection>().Single().ChildrenOfType<EzWeatherSettings>().Single().ChildrenOfType<SettingsItemV2>().Count();
+            bool sectionOrderMatchesSidebar = sections.SequenceEqual(buttons.Select(button => button.Section));
+
+            TestContext.Progress.WriteLine($"[SETTINGS-COMPLETE] sections={sections.Length}/expected:{11 + optionalSections} unloadedSections={unloadedSections} "
+                                           + $"buttons={buttons.Length} subsections={subsections.Length} noItems={subsectionsWithNoItems} settingRows={settingsItems.Length} unreadyVisibleRows={unreadyVisibleItems} unloadedRows={unloadedSettingsItems} "
+                                           + $"ezSubsections={ezSubsections}/11 weatherItems={weatherItems}/33 order={sectionOrderMatchesSidebar}");
+            return sections.Length == 11 + optionalSections
+                   && buttons.Length == sections.Length
+                   && unloadedSections == 0
+                   && sections.All(section => section.ChildrenOfType<IFilterable>().Any())
+                   && subsections.All(subsection => subsection.LoadState >= LoadState.Ready || !subsection.IsPresent)
+                   && subsectionsWithNoItems == 0
+                   && settingsItems.Length > 0
+                   && unreadyVisibleItems == 0
+                   && ezSubsections == 11
+                   && weatherItems == 33
+                   && sections.OfType<EzGameSection>().Single().ChildrenOfType<EzWeatherSettings>().Single().ChildrenOfType<SettingsItemV2>().All(item => item.LoadState >= LoadState.Ready || !item.IsPresent)
+                   && sectionOrderMatchesSidebar;
+        }
+
+        private void reportSettingsOpenMeasurement(int index)
+        {
+            SettingsOpenMeasurement measurement = settingsOpenMeasurements[index];
+
+            TestContext.Progress.WriteLine(
+                $"[SETTINGS-PERF] stage={measurement.Name} elapsed={measurement.ElapsedMilliseconds:F1}ms "
+                + $"frames={measurement.Frames} allocated={measurement.AllocatedBytes / 1024.0:F1}KB "
+                + $"gc={measurement.Gen0}/{measurement.Gen1}/{measurement.Gen2} gcPause={measurement.GcPauseMilliseconds:F1}ms maxGcPause={measurement.MaximumGcPauseBetweenUpdatesMs:F1}ms "
+                + $"maxUpdate={measurement.MaximumUpdateFrameMs:F1}ms@{measurement.MaximumUpdateGapAtMs:F1}ms sections={measurement.SectionsMountedAtMaximumUpdateGap} "
+                + $"ezSubsections={measurement.SubsectionsLoadedAtMaximumUpdateGap} weatherItems={measurement.WeatherItemsLoadedAtMaximumUpdateGap}");
+        }
+
+        private readonly record struct SettingsOpenMeasurement(
+            string Name,
+            double ElapsedMilliseconds,
+            int Frames,
+            long AllocatedBytes,
+            int Gen0,
+            int Gen1,
+            int Gen2,
+            double GcPauseMilliseconds,
+            double MaximumGcPauseBetweenUpdatesMs,
+            double MaximumUpdateFrameMs,
+            double MaximumUpdateGapAtMs,
+            int SectionsMountedAtMaximumUpdateGap,
+            int SubsectionsLoadedAtMaximumUpdateGap,
+            int WeatherItemsLoadedAtMaximumUpdateGap);
 
         [BackgroundDependencyLoader]
         private void load()

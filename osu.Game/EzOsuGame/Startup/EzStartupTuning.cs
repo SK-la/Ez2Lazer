@@ -60,10 +60,9 @@ namespace osu.Game.EzOsuGame.Startup
         public static bool EnableStartupFrameSampling { get; set; }
 
         /// <summary>
-        /// Diagnostic: skip the settings-section async preload entirely.
-        /// Used to A/B whether the startup frame-rate dip is caused by settings preload or by other
-        /// startup work (BDSP backfill, song-select preload). Sections then load on first PopIn instead.
+        /// Keep settings sections out of the startup workload. They are loaded after the settings panel is first opened.
+        /// Set false only for startup-load A/B measurements.
         /// </summary>
-        public static bool SkipSettingsPreload { get; set; }
+        public static bool SkipSettingsPreload { get; set; } = true;
     }
 }
