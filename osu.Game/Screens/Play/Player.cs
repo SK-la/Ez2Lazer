@@ -44,6 +44,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
@@ -102,6 +103,9 @@ namespace osu.Game.Screens.Play
         private readonly IBindable<bool> gameActive = new Bindable<bool>(true);
 
         private readonly Bindable<bool> samplePlaybackDisabled = new Bindable<bool>();
+
+        private WeatherEffectContainer playfieldWeatherContainer;
+        private WeatherEffectSettingsBinding playfieldWeatherSettings;
 
         /// <summary>
         /// Whether gameplay should pause when the game window focus is lost.
@@ -424,6 +428,13 @@ namespace osu.Game.Screens.Play
                 },
             });
 
+            playfieldWeatherSettings = new WeatherEffectSettingsBinding(
+                playfieldWeatherContainer,
+                ez2Config,
+                Ez2Setting.PlayfieldWeatherEffect,
+                Ez2Setting.PlayfieldWeatherIntensity,
+                Ez2Setting.PlayfieldWeatherAnimationSpeed);
+
             if (cancellationToken.IsCancellationRequested)
                 return;
 
@@ -569,14 +580,20 @@ namespace osu.Game.Screens.Play
         {
             Children = new Drawable[]
             {
-                DrawableRuleset.With(r =>
-                    r.FrameStableComponents.Children = new Drawable[]
-                    {
-                        ScoreProcessor,
-                        HealthProcessor,
-                        new ComboEffects(ScoreProcessor),
-                        breakTracker,
-                    }),
+                playfieldWeatherContainer = new WeatherEffectContainer
+                {
+                    RelativeSizeAxes = Axes.Both,
+                    Scope = WeatherEffectScope.Gameplay,
+                    IsGameplay = true,
+                    Child = DrawableRuleset.With(r =>
+                        r.FrameStableComponents.Children = new Drawable[]
+                        {
+                            ScoreProcessor,
+                            HealthProcessor,
+                            new ComboEffects(ScoreProcessor),
+                            breakTracker,
+                        }),
+                },
             }
         };
 
@@ -878,6 +895,8 @@ namespace osu.Game.Screens.Play
         {
             if (isDisposing)
             {
+                playfieldWeatherSettings?.Dispose();
+
                 LatencyTracker?.Dispose();
                 LatencyTracker = null;
 

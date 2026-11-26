@@ -47,6 +47,12 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString EZ_GAMEPLAY_SETTINGS_HEADER = new EzLocalizationManager.EzLocalisableString("Ez Gameplay", "Ez Gameplay");
 
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_ENVIRONMENT_HEADER = new EzLocalizationManager.EzLocalisableString("天气环境", "Weather environment");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BACKGROUND_WEATHER_SCOPE = new EzLocalizationManager.EzLocalisableString("背景", "Background");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PLAYFIELD_WEATHER_SCOPE = new EzLocalizationManager.EzLocalisableString("Playfield", "Playfield");
+
         public static readonly EzLocalizationManager.EzLocalisableString FRAME_LIMITER_BASE =
             new EzLocalizationManager.EzLocalisableString("帧率基数", "Frame limiter");
 
@@ -104,6 +110,93 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString SONG_SELECT_EZ_BACKGROUND_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
             "开启后，选歌界面沿用主页背景，不再单独铺当前谱面的背景。主页来源是图片、视频或 Pixiv 时，选歌看到的是同一套。",
             "When enabled, song select keeps the main menu background instead of loading the current beatmap background. Picture, video and Pixiv sources match the menu.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BACKGROUND_WEATHER_EFFECT =
+            new EzLocalizationManager.EzLocalisableString("背景天气效果", "Background weather effect");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BACKGROUND_WEATHER_EFFECT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "手动选择应用于选歌背景的视觉效果。微调参数与 Playfield 共用。",
+            "Manually selects a visual effect for the song select background. Fine-tuning values are shared with the playfield.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BACKGROUND_WEATHER_INTENSITY =
+            new EzLocalizationManager.EzLocalisableString("背景天气强度", "Background weather intensity");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MAIN_MENU_WEATHER_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("主界面也使用背景天气", "Also use background weather on the main menu");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MAIN_MENU_WEATHER_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "关闭后，天气效果仍应用于选歌背景。",
+            "When disabled, the weather effect remains active on the song select background.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BACKGROUND_WEATHER_ANIMATION_SPEED =
+            new EzLocalizationManager.EzLocalisableString("背景天气动画速度", "Background weather animation speed");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_NONE =
+            new EzLocalizationManager.EzLocalisableString("关闭", "Off");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_DESERT_HEAT =
+            new EzLocalizationManager.EzLocalisableString("沙漠热浪", "Desert heat");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_UNDERWATER =
+            new EzLocalizationManager.EzLocalisableString("水下", "Underwater");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_OVERCAST_RAIN =
+            new EzLocalizationManager.EzLocalisableString("阴雨", "Overcast rain");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_LIGHT_CURTAIN =
+            new EzLocalizationManager.EzLocalisableString("深海光幕", "Underwater light curtain");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PLAYFIELD_WEATHER_EFFECT =
+            new EzLocalizationManager.EzLocalisableString("Playfield 天气效果", "Playfield weather effect");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PLAYFIELD_WEATHER_EFFECT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "只改变 Playfield 的画面，不影响判定、分数或 HUD。微调参数与背景共用。",
+            "Changes playfield visuals without affecting judgement, score or HUD. Fine-tuning values are shared with backgrounds.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PLAYFIELD_WEATHER_INTENSITY =
+            new EzLocalizationManager.EzLocalisableString("Playfield 天气强度", "Playfield weather intensity");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PLAYFIELD_WEATHER_ANIMATION_SPEED =
+            new EzLocalizationManager.EzLocalisableString("Playfield 天气动画速度", "Playfield weather animation speed");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_DESERT_HEAT_AMPLITUDE =
+            new EzLocalizationManager.EzLocalisableString("沙漠热浪振幅", "Desert heat amplitude");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_DESERT_HEAT_SCALE =
+            new EzLocalizationManager.EzLocalisableString("沙漠热浪尺度", "Desert heat scale");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_DESERT_HEAT_TINT =
+            new EzLocalizationManager.EzLocalisableString("沙漠热浪色调", "Desert heat tint");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_UNDERWATER_SCALE =
+            new EzLocalizationManager.EzLocalisableString("水下焦散尺度", "Underwater scale");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_UNDERWATER_BRIGHTNESS =
+            new EzLocalizationManager.EzLocalisableString("水下亮度", "Underwater brightness");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_UNDERWATER_TINT =
+            new EzLocalizationManager.EzLocalisableString("水下色调", "Underwater tint");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_OVERCAST_RAIN_DENSITY =
+            new EzLocalizationManager.EzLocalisableString("阴雨密度", "Rain density");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_OVERCAST_RAIN_WIND =
+            new EzLocalizationManager.EzLocalisableString("阴雨风向", "Rain wind");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_OVERCAST_RAIN_CLOUDINESS =
+            new EzLocalizationManager.EzLocalisableString("阴雨阴云程度", "Rain cloudiness");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_LIGHT_CURTAIN_SCALE =
+            new EzLocalizationManager.EzLocalisableString("深海光幕尺度", "Light curtain scale");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_LIGHT_CURTAIN_BRIGHTNESS =
+            new EzLocalizationManager.EzLocalisableString("深海光幕亮度", "Light curtain brightness");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_LIGHT_CURTAIN_FALLOFF =
+            new EzLocalizationManager.EzLocalisableString("深海光幕衰减", "Light curtain falloff");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_LIGHT_CURTAIN_SWAY =
+            new EzLocalizationManager.EzLocalisableString("深海光幕摆动", "Light curtain sway");
 
         public static readonly EzLocalizationManager.EzLocalisableString HIDE_MAIN_MENU_ONLINE_BANNER =
             new EzLocalizationManager.EzLocalisableString("屏蔽主界面底部新闻广告", "Hide main menu bottom news banner");

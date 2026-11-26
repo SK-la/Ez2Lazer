@@ -93,7 +93,7 @@ namespace osu.Game.Screens.Menu
         IBindable<bool> ISamplePlaybackDisabler.SamplePlaybackDisabled => samplePlaybackDisabled;
         private readonly Bindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
-        protected override BackgroundScreen CreateBackground() => new BackgroundScreenDefault();
+        protected override BackgroundScreen CreateBackground() => new BackgroundScreenDefault(isMainMenu: true);
 
         protected override bool PlayExitSound => false;
 
@@ -277,6 +277,7 @@ namespace osu.Game.Screens.Menu
             double enterBegin = Clock.CurrentTime;
 
             base.OnEntering(e);
+            setBackgroundWeatherContext(isMainMenu: true);
 
             NotifyMainMenuEnteredForStartup();
             startupWorkCoordinator?.OnMainMenuEntered(this);
@@ -409,6 +410,7 @@ namespace osu.Game.Screens.Menu
 
         public override void OnSuspending(ScreenTransitionEvent e)
         {
+            setBackgroundWeatherContext(isMainMenu: false);
             base.OnSuspending(e);
 
             Buttons.State = ButtonSystemState.EnteringMode;
@@ -429,6 +431,7 @@ namespace osu.Game.Screens.Menu
         public override void OnResuming(ScreenTransitionEvent e)
         {
             base.OnResuming(e);
+            setBackgroundWeatherContext(isMainMenu: true);
 
             // Ensures any playing `ButtonSystem` samples are stopped when returning to MainMenu (as to not overlap with the 'back' sample)
             Buttons.StopSamplePlayback();
@@ -564,6 +567,12 @@ namespace osu.Game.Screens.Menu
                 this.Push(screen!);
             else
                 this.Push(new SoloSongSelect());
+        }
+
+        private void setBackgroundWeatherContext(bool isMainMenu)
+        {
+            if (CurrentBackgroundScreen is BackgroundScreenDefault background)
+                background.SetMainMenuContext(isMainMenu);
         }
 
         private void loadQuickPlay() => this.Push(new OnlinePlay.Matchmaking.Intro.ScreenIntro(MatchmakingPoolType.QuickPlay));
