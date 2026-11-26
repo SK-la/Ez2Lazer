@@ -10,6 +10,7 @@ using System.Threading;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Logging;
@@ -23,6 +24,7 @@ using osu.Game.EzOsuGame;
 using osu.Game.Graphics.Backgrounds;
 using osu.Game.EzOsuGame.Background;
 using osu.Game.EzOsuGame.Background.Pixiv;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -30,8 +32,18 @@ using osu.Game.Skinning;
 
 namespace osu.Game.Screens.Backgrounds
 {
+    internal enum BackgroundWeatherUsage
+    {
+        None,
+        SongSelect,
+    }
+
     public partial class BackgroundScreenDefault : BackgroundScreen
     {
+        private bool isMainMenu;
+        private WeatherEffectContainer weatherContainer;
+        private BackgroundWeatherSettingsBinding weatherSettings;
+
         private Background background;
         private PixivAttributionBadge pixivAttribution;
         private PixivIllustInfo pendingPixivAttribution;
@@ -44,6 +56,22 @@ namespace osu.Game.Screens.Backgrounds
         private Bindable<IntroSequence> introSequence;
         private readonly SeasonalBackgroundLoader seasonalBackgroundLoader = new SeasonalBackgroundLoader();
 
+        public BackgroundScreenDefault()
+            : this(false)
+        {
+        }
+
+        internal BackgroundScreenDefault(bool isMainMenu)
+        {
+            this.isMainMenu = isMainMenu;
+        }
+
+        internal void SetMainMenuContext(bool isMainMenu)
+        {
+            this.isMainMenu = isMainMenu;
+            weatherSettings?.SetMainMenuContext(isMainMenu);
+        }
+
         [Resolved]
         private IBindable<WorkingBeatmap> beatmap { get; set; }
 
@@ -53,12 +81,22 @@ namespace osu.Game.Screens.Backgrounds
         protected virtual bool AllowStoryboardBackground => true;
 
         [BackgroundDependencyLoader]
-        private void load(IAPIProvider api, SkinManager skinManager, OsuConfigManager config)
+        private void load(IAPIProvider api, SkinManager skinManager, OsuConfigManager config, Ez2ConfigManager ezConfig)
         {
             user = api.LocalUser.GetBoundCopy();
             skin = skinManager.CurrentSkin.GetBoundCopy();
             source = config.GetBindable<BackgroundSource>(OsuSetting.MenuBackgroundSource);
             introSequence = config.GetBindable<IntroSequence>(OsuSetting.IntroSequence);
+
+            AddInternal(weatherContainer = new WeatherEffectContainer
+            {
+                RelativeSizeAxes = Axes.Both,
+                Scope = WeatherEffectScope.NonGameplay,
+                IsGameplay = false,
+            });
+
+            weatherSettings = new BackgroundWeatherSettingsBinding(weatherContainer, ezConfig);
+            weatherSettings.SetMainMenuContext(isMainMenu);
 
             AddInternal(seasonalBackgroundLoader);
         }
@@ -143,7 +181,7 @@ namespace osu.Game.Screens.Backgrounds
 
             removePixivAttribution();
 
-            AddInternal(background = newBackground);
+            weatherContainer.Add(background = newBackground);
 
             if (pendingPixivAttribution.IllustId > 0)
                 showPixivAttribution(pendingPixivAttribution);
@@ -377,6 +415,63 @@ namespace osu.Game.Screens.Backgrounds
                 default:
                     return $@"Menu/menu-background-{currentDisplay % background_count + 1}";
             }
+        }
+
+        protected override void Dispose(bool isDisposing)
+        {
+            weatherSettings?.Dispose();
+            base.Dispose(isDisposing);
+        }
+    }
+
+    internal sealed class BackgroundWeatherSettingsBinding : IDisposable
+    {
+        private readonly WeatherEffectContainer weatherContainer;
+        private readonly Bindable<WeatherEffect> effect;
+        private readonly Bindable<double> intensity;
+        private readonly Bindable<bool> mainMenuEnabled;
+        private bool isMainMenu;
+
+        public BackgroundWeatherSettingsBinding(WeatherEffectContainer weatherContainer, Ez2ConfigManager config)
+        {
+            this.weatherContainer = weatherContainer;
+
+            effect = config.GetBindable<WeatherEffect>(Ez2Setting.BackgroundWeatherEffect);
+            intensity = config.GetBindable<double>(Ez2Setting.BackgroundWeatherIntensity);
+            effect.ValueChanged += onEffectChanged;
+            intensity.ValueChanged += onIntensityChanged;
+
+            mainMenuEnabled = config.GetBindable<bool>(Ez2Setting.MainMenuWeatherEnabled);
+            mainMenuEnabled.ValueChanged += onMainMenuEnabledChanged;
+
+            updateWeather();
+        }
+
+        public void SetMainMenuContext(bool isMainMenu)
+        {
+            this.isMainMenu = isMainMenu;
+            updateWeather();
+        }
+
+        public void Dispose()
+        {
+            effect.ValueChanged -= onEffectChanged;
+            intensity.ValueChanged -= onIntensityChanged;
+
+            mainMenuEnabled.ValueChanged -= onMainMenuEnabledChanged;
+        }
+
+        private void onEffectChanged(ValueChangedEvent<WeatherEffect> _) => updateWeather();
+
+        private void onIntensityChanged(ValueChangedEvent<double> _) => updateWeather();
+
+        private void onMainMenuEnabledChanged(ValueChangedEvent<bool> _) => updateWeather();
+
+        private void updateWeather()
+        {
+            bool enabled = !isMainMenu || mainMenuEnabled.Value;
+            weatherContainer.Effect = enabled ? effect.Value : WeatherEffect.None;
+            weatherContainer.Intensity = (float)intensity.Value;
         }
     }
 }

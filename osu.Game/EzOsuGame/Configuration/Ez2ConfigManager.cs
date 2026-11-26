@@ -13,6 +13,7 @@ using osu.Framework.Bindables;
 using osu.Framework.Configuration;
 using osu.Framework.Development;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.HUD;
@@ -108,6 +109,9 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.SongSelectSkillGroupAxis, string.Empty);
             SetDefault(Ez2Setting.SongSelectSortDirection, SortDirection.Ascending);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
+            SetDefault(Ez2Setting.BackgroundWeatherEffect, WeatherEffect.None);
+            SetDefault(Ez2Setting.BackgroundWeatherIntensity, 1.0, 0.0, 1.0, 0.05);
+            SetDefault(Ez2Setting.MainMenuWeatherEnabled, true);
             SetDefault(Ez2Setting.MenuLogoPath, @"Menu/logo");
             SetDefault(Ez2Setting.MenuLogoText, "(´・ω・｀),120");
             SetDefault(Ez2Setting.MenuLogoVisualisationStyle, EzLogoVisualisationStyle.RadialBars);
@@ -1089,6 +1093,15 @@ namespace osu.Game.EzOsuGame.Configuration
         SongSelectSortDirection,
 
         HideMainMenuOnlineBanner,
+
+        /// <summary>选歌与主界面背景的视觉天气效果。</summary>
+        BackgroundWeatherEffect,
+
+        /// <summary>选歌与主界面背景天气效果强度。</summary>
+        BackgroundWeatherIntensity,
+
+        /// <summary>是否在主界面背景应用天气效果。</summary>
+        MainMenuWeatherEnabled,
 
         /// <summary>
         /// 主菜单 logo 贴图路径，默认 Menu/logo，可切换到 Menu/logo2 等同级资源。

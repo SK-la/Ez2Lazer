@@ -105,6 +105,38 @@ namespace osu.Game.EzOsuGame.Localization
             "开启后，选歌界面沿用主页背景，不再单独铺当前谱面的背景。主页来源是图片、视频或 Pixiv 时，选歌看到的是同一套。",
             "When enabled, song select keeps the main menu background instead of loading the current beatmap background. Picture, video and Pixiv sources match the menu.");
 
+        public static readonly EzLocalizationManager.EzLocalisableString BACKGROUND_WEATHER_EFFECT =
+            new EzLocalizationManager.EzLocalisableString("背景天气效果", "Background weather effect");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BACKGROUND_WEATHER_EFFECT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "手动选择应用于选歌和主界面背景的视觉效果。",
+            "Manually selects a visual effect for the song select and main menu backgrounds.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString BACKGROUND_WEATHER_INTENSITY =
+            new EzLocalizationManager.EzLocalisableString("背景天气强度", "Background weather intensity");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MAIN_MENU_WEATHER_ENABLED =
+            new EzLocalizationManager.EzLocalisableString("主界面使用天气效果", "Use weather effects on the main menu");
+
+        public static readonly EzLocalizationManager.EzLocalisableString MAIN_MENU_WEATHER_ENABLED_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "关闭后，背景天气效果仍可应用于选歌界面。",
+            "When disabled, the background weather effect remains available on song select.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_NONE =
+            new EzLocalizationManager.EzLocalisableString("关闭", "Off");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_DESERT_HEAT =
+            new EzLocalizationManager.EzLocalisableString("沙漠热浪", "Desert heat");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_UNDERWATER =
+            new EzLocalizationManager.EzLocalisableString("水下", "Underwater");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_OVERCAST_RAIN =
+            new EzLocalizationManager.EzLocalisableString("阴雨", "Overcast rain");
+
+        public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_LIGHT_CURTAIN =
+            new EzLocalizationManager.EzLocalisableString("深海光幕", "Underwater light curtain");
+
         public static readonly EzLocalizationManager.EzLocalisableString HIDE_MAIN_MENU_ONLINE_BANNER =
             new EzLocalizationManager.EzLocalisableString("屏蔽主界面底部新闻广告", "Hide main menu bottom news banner");
 

@@ -3,6 +3,7 @@
 
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
@@ -76,5 +77,18 @@ namespace osu.Game.EzOsuGame.Overlays
                 },
             });
         }
+    }
+
+    internal partial class EzWeatherEffectDropdown : FormEnumDropdown<WeatherEffect>
+    {
+        protected override LocalisableString GenerateItemText(WeatherEffect item) => item switch
+        {
+            WeatherEffect.None => EzSettingsStrings.WEATHER_EFFECT_NONE,
+            WeatherEffect.DesertHeat => EzSettingsStrings.WEATHER_EFFECT_DESERT_HEAT,
+            WeatherEffect.Underwater => EzSettingsStrings.WEATHER_EFFECT_UNDERWATER,
+            WeatherEffect.OvercastRain => EzSettingsStrings.WEATHER_EFFECT_OVERCAST_RAIN,
+            WeatherEffect.UnderwaterLightCurtain => EzSettingsStrings.WEATHER_EFFECT_LIGHT_CURTAIN,
+            _ => base.GenerateItemText(item),
+        };
     }
 }
