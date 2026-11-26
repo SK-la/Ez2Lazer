@@ -49,6 +49,10 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly EzLocalizationManager.EzLocalisableString WEATHER_ENVIRONMENT_HEADER = new EzLocalizationManager.EzLocalisableString("天气环境", "Weather environment");
 
+        public static readonly EzLocalizationManager.EzLocalisableString BACKGROUND_WEATHER_SCOPE = new EzLocalizationManager.EzLocalisableString("背景", "Background");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PLAYFIELD_WEATHER_SCOPE = new EzLocalizationManager.EzLocalisableString("Playfield", "Playfield");
+
         public static readonly EzLocalizationManager.EzLocalisableString FRAME_LIMITER_BASE =
             new EzLocalizationManager.EzLocalisableString("帧率基数", "Frame limiter");
 

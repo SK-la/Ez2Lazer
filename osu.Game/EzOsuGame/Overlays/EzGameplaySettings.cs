@@ -123,39 +123,13 @@ namespace osu.Game.EzOsuGame.Overlays
                 0.1f,
                 "playfield", "animation", "speed");
 
-            SettingsItemV2[] desertHeatItems =
-            {
-                createWeatherSlider(EzSettingsStrings.WEATHER_DESERT_HEAT_AMPLITUDE, ezConfig.GetBindable<double>(Ez2Setting.WeatherDesertHeatAmplitude), 0.1f, "desert heat", "amplitude"),
-                createWeatherSlider(EzSettingsStrings.WEATHER_DESERT_HEAT_SCALE, ezConfig.GetBindable<double>(Ez2Setting.WeatherDesertHeatScale), 0.1f, "desert heat", "scale"),
-                createWeatherSlider(EzSettingsStrings.WEATHER_DESERT_HEAT_TINT, ezConfig.GetBindable<double>(Ez2Setting.WeatherDesertHeatTint), 0.01f, "desert heat", "tint"),
-            };
-
-            SettingsItemV2[] underwaterItems =
-            {
-                createWeatherSlider(EzSettingsStrings.WEATHER_UNDERWATER_SCALE, ezConfig.GetBindable<double>(Ez2Setting.WeatherUnderwaterScale), 0.1f, "underwater", "scale"),
-                createWeatherSlider(EzSettingsStrings.WEATHER_UNDERWATER_BRIGHTNESS, ezConfig.GetBindable<double>(Ez2Setting.WeatherUnderwaterBrightness), 0.05f, "underwater", "brightness"),
-                createWeatherSlider(EzSettingsStrings.WEATHER_UNDERWATER_TINT, ezConfig.GetBindable<double>(Ez2Setting.WeatherUnderwaterTint), 0.01f, "underwater", "tint"),
-            };
-
-            SettingsItemV2[] overcastRainItems =
-            {
-                createWeatherSlider(EzSettingsStrings.WEATHER_OVERCAST_RAIN_DENSITY, ezConfig.GetBindable<double>(Ez2Setting.WeatherOvercastRainDensity), 0.01f, "rain", "density"),
-                createWeatherSlider(EzSettingsStrings.WEATHER_OVERCAST_RAIN_WIND, ezConfig.GetBindable<double>(Ez2Setting.WeatherOvercastRainWind), 0.05f, "rain", "wind"),
-                createWeatherSlider(EzSettingsStrings.WEATHER_OVERCAST_RAIN_CLOUDINESS, ezConfig.GetBindable<double>(Ez2Setting.WeatherOvercastRainCloudiness), 0.01f, "rain", "cloudiness"),
-            };
-
-            SettingsItemV2[] lightCurtainItems =
-            {
-                createWeatherSlider(EzSettingsStrings.WEATHER_LIGHT_CURTAIN_SCALE, ezConfig.GetBindable<double>(Ez2Setting.WeatherLightCurtainScale), 0.1f, "light curtain", "scale"),
-                createWeatherSlider(EzSettingsStrings.WEATHER_LIGHT_CURTAIN_BRIGHTNESS, ezConfig.GetBindable<double>(Ez2Setting.WeatherLightCurtainBrightness), 0.05f, "light curtain", "brightness"),
-                createWeatherSlider(EzSettingsStrings.WEATHER_LIGHT_CURTAIN_FALLOFF, ezConfig.GetBindable<double>(Ez2Setting.WeatherLightCurtainFalloff), 0.1f, "light curtain", "falloff"),
-                createWeatherSlider(EzSettingsStrings.WEATHER_LIGHT_CURTAIN_SWAY, ezConfig.GetBindable<double>(Ez2Setting.WeatherLightCurtainSway), 0.01f, "light curtain", "sway"),
-            };
+            var backgroundTuningItems = createWeatherTuningItems(ezConfig, EzSettingsStrings.BACKGROUND_WEATHER_SCOPE);
+            var playfieldTuningItems = createWeatherTuningItems(ezConfig, EzSettingsStrings.PLAYFIELD_WEATHER_SCOPE);
 
             backgroundEffect.BindValueChanged(_ => updateVisibility(), true);
             playfieldEffect.BindValueChanged(_ => updateVisibility(), true);
 
-            AddRange(new Drawable[]
+            var settingsItems = new List<Drawable>
             {
                 new SettingsItemV2(new EzWeatherEffectDropdown
                 {
@@ -169,6 +143,13 @@ namespace osu.Game.EzOsuGame.Overlays
                 backgroundIntensity,
                 mainMenuWeather,
                 backgroundAnimationSpeed,
+            };
+
+            foreach (var group in backgroundTuningItems)
+                settingsItems.AddRange(group.items);
+
+            settingsItems.AddRange(new Drawable[]
+            {
                 new SettingsItemV2(new EzWeatherEffectDropdown
                 {
                     Caption = EzSettingsStrings.PLAYFIELD_WEATHER_EFFECT,
@@ -182,10 +163,9 @@ namespace osu.Game.EzOsuGame.Overlays
                 playfieldAnimationSpeed,
             });
 
-            AddRange(desertHeatItems);
-            AddRange(underwaterItems);
-            AddRange(overcastRainItems);
-            AddRange(lightCurtainItems);
+            foreach (var group in playfieldTuningItems)
+                settingsItems.AddRange(group.items);
+            AddRange(settingsItems);
 
             void updateVisibility()
             {
@@ -198,19 +178,58 @@ namespace osu.Game.EzOsuGame.Overlays
                 playfieldIntensity.CanBeShown.Value = playfieldEnabled;
                 playfieldAnimationSpeed.CanBeShown.Value = playfieldEnabled;
 
-                updateEffectVisibility(desertHeatItems, WeatherEffect.DesertHeat);
-                updateEffectVisibility(underwaterItems, WeatherEffect.Underwater);
-                updateEffectVisibility(overcastRainItems, WeatherEffect.OvercastRain);
-                updateEffectVisibility(lightCurtainItems, WeatherEffect.UnderwaterLightCurtain);
+                updateWeatherTuningVisibility(backgroundTuningItems, backgroundEffect.Value, WeatherEffect.None);
+                updateWeatherTuningVisibility(playfieldTuningItems, playfieldEffect.Value, backgroundEffect.Value);
             }
+        }
 
-            void updateEffectVisibility(IEnumerable<SettingsItemV2> items, WeatherEffect effect)
+        private static (WeatherEffect effect, SettingsItemV2[] items)[] createWeatherTuningItems(Ez2ConfigManager ezConfig, LocalisableString scope)
+        {
+            return new (WeatherEffect effect, SettingsItemV2[] items)[]
             {
-                bool visible = backgroundEffect.Value == effect || playfieldEffect.Value == effect;
+                (WeatherEffect.DesertHeat, new SettingsItemV2[]
+                {
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_DESERT_HEAT_AMPLITUDE, ezConfig.GetBindable<double>(Ez2Setting.WeatherDesertHeatAmplitude), 0.1f, "desert heat", "amplitude"),
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_DESERT_HEAT_SCALE, ezConfig.GetBindable<double>(Ez2Setting.WeatherDesertHeatScale), 0.1f, "desert heat", "scale"),
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_DESERT_HEAT_TINT, ezConfig.GetBindable<double>(Ez2Setting.WeatherDesertHeatTint), 0.01f, "desert heat", "tint"),
+                }),
+                (WeatherEffect.Underwater, new SettingsItemV2[]
+                {
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_UNDERWATER_SCALE, ezConfig.GetBindable<double>(Ez2Setting.WeatherUnderwaterScale), 0.1f, "underwater", "scale"),
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_UNDERWATER_BRIGHTNESS, ezConfig.GetBindable<double>(Ez2Setting.WeatherUnderwaterBrightness), 0.05f, "underwater", "brightness"),
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_UNDERWATER_TINT, ezConfig.GetBindable<double>(Ez2Setting.WeatherUnderwaterTint), 0.01f, "underwater", "tint"),
+                }),
+                (WeatherEffect.OvercastRain, new SettingsItemV2[]
+                {
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_OVERCAST_RAIN_DENSITY, ezConfig.GetBindable<double>(Ez2Setting.WeatherOvercastRainDensity), 0.01f, "rain", "density"),
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_OVERCAST_RAIN_WIND, ezConfig.GetBindable<double>(Ez2Setting.WeatherOvercastRainWind), 0.05f, "rain", "wind"),
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_OVERCAST_RAIN_CLOUDINESS, ezConfig.GetBindable<double>(Ez2Setting.WeatherOvercastRainCloudiness), 0.01f, "rain", "cloudiness"),
+                }),
+                (WeatherEffect.UnderwaterLightCurtain, new SettingsItemV2[]
+                {
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_LIGHT_CURTAIN_SCALE, ezConfig.GetBindable<double>(Ez2Setting.WeatherLightCurtainScale), 0.1f, "light curtain", "scale"),
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_LIGHT_CURTAIN_BRIGHTNESS, ezConfig.GetBindable<double>(Ez2Setting.WeatherLightCurtainBrightness), 0.05f, "light curtain", "brightness"),
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_LIGHT_CURTAIN_FALLOFF, ezConfig.GetBindable<double>(Ez2Setting.WeatherLightCurtainFalloff), 0.1f, "light curtain", "falloff"),
+                    createScopedWeatherSlider(scope, EzSettingsStrings.WEATHER_LIGHT_CURTAIN_SWAY, ezConfig.GetBindable<double>(Ez2Setting.WeatherLightCurtainSway), 0.01f, "light curtain", "sway"),
+                }),
+            };
+        }
 
-                foreach (SettingsItemV2 item in items)
+        private static void updateWeatherTuningVisibility((WeatherEffect effect, SettingsItemV2[] items)[] groups, WeatherEffect selectedEffect, WeatherEffect effectToHide)
+        {
+            foreach (var group in groups)
+            {
+                bool visible = selectedEffect == group.effect && group.effect != effectToHide;
+
+                foreach (SettingsItemV2 item in group.items)
                     item.CanBeShown.Value = visible;
             }
+        }
+
+        private static SettingsItemV2 createScopedWeatherSlider(LocalisableString scope, LocalisableString caption, Bindable<double> current, float keyboardStep, params string[] keywords)
+        {
+            LocalisableString scopedCaption = LocalisableString.Interpolate($"{scope} · {caption}");
+            return createWeatherSlider(scopedCaption, current, keyboardStep, keywords);
         }
 
         private static SettingsItemV2 createWeatherSlider(LocalisableString caption, Bindable<double> current, float keyboardStep, params string[] keywords) => new SettingsItemV2(new FormSliderBar<double>
