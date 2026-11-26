@@ -69,6 +69,21 @@ namespace osu.Game.EzOsuGame.Scoring
         public static bool ModsMatch(Mod[] left, Mod[] right) => modsMatch(left, right);
 
         /// <summary>
+        /// 成绩列表「只看当前 Mod」的本地过滤口径：未选中 Mod 时只留无 Mod 成绩，否则 acronym 集合完全相等。
+        /// </summary>
+        /// <remarks>
+        /// 与 <c>LeaderboardManager</c> 的 Local 分支一致，也不套用 <see cref="GameplayModsMatch"/> 的 cosmetic 白名单
+        /// （那套是角逐 ghost 的候选口径，比成绩列表更宽松）。
+        /// </remarks>
+        public static bool MatchesExactMods(Mod[] scoreMods, IReadOnlyList<Mod> selectedMods)
+        {
+            if (selectedMods.Count == 0)
+                return scoreMods.Length == 0;
+
+            return selectedMods.Select(m => m.Acronym).ToHashSet().SetEquals(scoreMods.Select(m => m.Acronym));
+        }
+
+        /// <summary>
         /// 比较两侧 Mod 时忽略 <see cref="COSMETIC_GHOST_MOD_TYPES"/> 白名单项。
         /// 使非游玩 Mod 不影响 ghost 候选过滤与 beatmap 复用判定。
         /// </summary>
