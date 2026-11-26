@@ -201,8 +201,13 @@ namespace osu.Game.Screens.Select
             scoreSubscription?.Dispose();
             beatmap = null;
             entries.Clear();
-            filterBySelectedMods?.UnbindAll();
-            rankFollowsModFilter?.UnbindAll();
+
+            if (IsLoaded)
+            {
+                filterBySelectedMods.UnbindAll();
+                rankFollowsModFilter.UnbindAll();
+            }
+
             base.Dispose(isDisposing);
         }
 

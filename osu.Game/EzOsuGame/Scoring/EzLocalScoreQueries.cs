@@ -80,6 +80,10 @@ namespace osu.Game.EzOsuGame.Scoring
             if (selectedMods.Count == 0)
                 return scoreMods.Length == 0;
 
+            //TODO: 1. 排行版的「已选模组」，需要改进匹配逻辑，比如去SV之类不能被过滤。
+            //TODO: 2. 这个匹配Mod筛选，暂时使用开关。未来需要改成一个多选下拉菜单，用来控制，哪类Mod被视为高差异Mod，高差异Mod即联动「已选模组」，以及当前功能。
+            //届时，此开关将被移除，原本的开关功能完全交由「已选模组」。
+            //TODO: 3. 难度卡Panel上所展示的评级，关联排行榜中排序条件切换展示规则。
             return selectedMods.Select(m => m.Acronym).ToHashSet().SetEquals(scoreMods.Select(m => m.Acronym));
         }
 
@@ -162,6 +166,7 @@ namespace osu.Game.EzOsuGame.Scoring
         private static bool modsMatch(Mod[] left, Mod[] right)
         {
             static IEnumerable<string> acronyms(Mod[] mods) => mods.OrderBy(m => m.Acronym).Select(m => m.Acronym);
+
             return acronyms(left).SequenceEqual(acronyms(right));
         }
     }

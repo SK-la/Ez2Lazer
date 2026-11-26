@@ -110,7 +110,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.SongSelectSkillSortAxis, string.Empty);
             SetDefault(Ez2Setting.SongSelectSkillGroupAxis, string.Empty);
             SetDefault(Ez2Setting.SongSelectSortDirection, SortDirection.Ascending);
-            SetDefault(Ez2Setting.SongSelectPanelRankFollowsModFilter, false);
+            SetDefault(Ez2Setting.SongSelectPanelRankFollowsModFilter, true);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             SetDefault(Ez2Setting.BackgroundWeatherEffect, WeatherEffect.None);
             SetDefault(Ez2Setting.BackgroundWeatherIntensity, 1.0, 0.0, 1.0, 0.05);

@@ -52,10 +52,11 @@ namespace osu.Game.EzOsuGame.Localization
             "Panel rank follows mod filter");
 
         public static readonly LocalisableString PANEL_RANK_FOLLOWS_MOD_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "成绩列表勾选「只看当前 Mod」时，右侧谱面面板的评级改为取当前 Mod 筛出的本地成绩中的最高评级。"
-            + "\n关闭时始终显示最高分那条成绩的评级。",
-            "When the score list's selected-mods filter is on, song select panels show the highest rank among local scores matching the current mods."
-            + "\nWhen off, panels always show the rank of the highest-scoring play.");
+            "启用后，当排行版勾选「已选模组」时，选歌界面右侧难度卡所展示的评级，改为匹配当前活跃 Mod 的本地成绩中的最高评级。"
+            + "\n关闭时则为默认状态：始终显示最高分那条成绩的评级。",
+            "While enabled, difficulty panels show the highest rank among your local scores that exactly match the active mods, "
+            + "but only when the local leaderboard’s \"Selected mods\" filter is on."
+            + "\nWhen disabled, panels always show the rank from your highest-scoring local play (default).");
 
         public static readonly LocalisableString SKILL_AXIS = new EzLocalizationManager.EzLocalisableString(
             "技能轴",
