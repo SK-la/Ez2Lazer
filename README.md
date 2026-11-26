@@ -84,6 +84,8 @@ Set the matching switch back to `false` to return to the NuGet reference.
 
 Self-built copies hide in-game update settings and do not check SK-la/Ez2Lazer Releases for updates.
 
+---
+
 ## Special Thanks
 - [osu!](https://github.com/ppy/osu): The original game and framework.
 - [YuLiangSSS](https://osu.ppy.sh/users/15889644): Contributed many fun mods.
@@ -91,3 +93,18 @@ Self-built copies hide in-game update settings and do not check SK-la/Ez2Lazer R
 - [mania-hub](https://github.com/aleju03/mania-hub): Data display inspiration.
 - [MinaCalc](https://github.com/etternagame/etterna): Skill algorithm.
 - [Syriiin/osu](https://github.com/Syriiin/osu): PP Plus (PPP) difficulty formulas.
+
+---
+
+
+## Beyond the Event Horizon
+
+<img src="https://img.shields.io/badge/Beyond_the_Event_Horizon-Archive-4B0082?style=for-the-badge" />
+
+[//]: # (<img src="https://img.shields.io/badge/Ether_Record-001-8A2BE2?style=flat-square" />)
+
+- Thanks to the ether of [zhyzx35607](https://github.com/zhyzx35607), 
+the light of the EZ Worldline gained exceptionally abundant evolutionary momentum.
+
+
+

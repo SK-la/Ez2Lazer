@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="640" alt="osu! logo" src="assets/Ez2Lazer-previewr.png">
+  <img width="1280" alt="osu! logo" src="assets/Ez2Lazer-previewr.png">
 </p>
 
 <div align="center">
@@ -85,6 +85,8 @@ git clone https://github.com/SK-la/ez2lazer-resources
 
 自编译版本不会显示游戏内更新选项，也不会从 SK-la/Ez2Lazer Releases 拉取更新。
 
+---
+
 ## 特别感谢
 - [osu!](https://github.com/ppy/osu)：原版游戏与框架。
 - [YuLiangSSS](https://osu.ppy.sh/users/15889644)：贡献了许多有趣的 Mod。
@@ -92,3 +94,19 @@ git clone https://github.com/SK-la/ez2lazer-resources
 - [mania-hub](https://github.com/aleju03/mania-hub)：数据展示灵感。
 - [MinaCalc](https://github.com/etternagame/etterna)：技能算法。
 - [Syriiin/osu](https://github.com/Syriiin/osu)：PP Plus（PPP）难度公式参考。
+
+---
+
+## 观测之外
+
+<img src="https://img.shields.io/badge/Beyond_the_Event_Horizon-Archive-4B0082?style=for-the-badge"/>
+
+
+[//]: # (<img src="https://img.shields.io/badge/Ether_Record-001-8A2BE2?style=flat-square" />)
+
+
+- 感谢[zhyzx35607](https://github.com/zhyzx35607)的以太， 
+使Ez世界线中的光获得了异常充沛的演化动能。
+
+
+
