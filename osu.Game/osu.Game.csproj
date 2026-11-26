@@ -19,6 +19,12 @@
     <SentryProject>ez2lazer-desktop</SentryProject>
     <SentryUploadSymbols>true</SentryUploadSymbols>
   </PropertyGroup>
+  <ItemGroup Condition="'$(SENTRY_DSN)' != ''">
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>Ez2Lazer.SentryDsn</_Parameter1>
+      <_Parameter2>$(SENTRY_DSN)</_Parameter2>
+    </AssemblyAttribute>
+  </ItemGroup>
   <ItemGroup Label="Icon">
     <None Include="..\assets\lazer-nuget.png">
       <Pack>True</Pack>

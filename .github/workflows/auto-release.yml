@@ -271,7 +271,12 @@ jobs:
           PYTHONIOENCODING: 'utf-8'
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:SENTRY_DSN)) {
+            Write-Error 'Repository Actions variable SENTRY_DSN is required to build a reporting-enabled release.'
+            exit 1
+          }
           $tag = '${{ needs.prepare.outputs.publish_version_tag }}'
           if ([string]::IsNullOrWhiteSpace($tag)) {
             Write-Error 'publish version tag is missing'

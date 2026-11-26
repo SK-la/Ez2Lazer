@@ -10,6 +10,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Net.WebSockets;
+using System.Reflection;
 using System.Threading.Tasks;
 using osu.Framework;
 using osu.Framework.Allocation;
@@ -44,6 +45,8 @@ namespace osu.Game.Utils
 
         private readonly OsuGame game;
 
+        internal bool IsEnabled => sentrySession != null;
+
         public SentryLogger(OsuGame game, Storage? storage = null)
         {
             this.game = game;
@@ -57,7 +60,14 @@ namespace osu.Game.Utils
             string? dsn = Environment.GetEnvironmentVariable("SENTRY_DSN");
 
             if (string.IsNullOrWhiteSpace(dsn))
-                return;
+            {
+                dsn = typeof(SentryLogger).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                                          .FirstOrDefault(attribute => attribute.Key == "Ez2Lazer.SentryDsn")
+                                          ?.Value;
+
+                if (string.IsNullOrWhiteSpace(dsn))
+                    return;
+            }
 
             if (DebugUtils.IsNUnitRunning)
                 return;

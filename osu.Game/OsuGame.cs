@@ -1599,7 +1599,7 @@ namespace osu.Game
             {
                 LocalisableString message;
 
-                if (entry.Exception != null && SubmitErrorsToSentry)
+                if (entry.Exception != null && sentryLogger?.IsEnabled == true)
                     message = LocalisableString.Interpolate($"{entry.Message.Truncate(256)}\n\n{NotificationsStrings.ErrorAutomaticallyReported}");
                 else
                     message = entry.Message.Truncate(256);
