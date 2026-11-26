@@ -8,7 +8,7 @@
 决定何时启用效果、包裹哪个场景子树，并显式设置玩法范围。框架说明见本地相邻仓库的 [
 `weather-effects.md`](../../ez2lazer-framework/docs/weather-effects.md)。
 
-背景效果默认关闭，可在主菜单设置中选择效果和强度；关闭“主界面使用天气效果”后，选歌背景仍可应用效果。Playfield 使用独立的效果和强度设置，默认关闭，只影响 `DrawableRuleset` 子树。所有入口均为手动视觉效果，不会读取天气预报或影响判定、分数与回放。
+天气设置位于 Ez 设置的“天气环境”分组，背景与 Playfield 效果默认关闭，可分别选择效果、强度和动画速度。关闭“主界面也使用背景天气”后，选歌背景仍可应用效果。选择任一非关闭效果后，会显示对应参数微调项；天气类型参数由背景和 Playfield 共用，Playfield 效果只作用于 `DrawableRuleset` 子树。所有入口均为手动视觉效果，不会读取天气预报或影响判定、分数与回放。
 
 框架目前提供 `DesertHeat`、`Underwater`、`OvercastRain`、`UnderwaterLightCurtain` 等效果，以及 `Intensity`、`AnimationSpeed`、
 `PreviewTime`、`Scope` 等参数。它们是渲染效果，不是气象类别；例如水下效果不应自动解释为当地天气。接入时应确认所用 framework

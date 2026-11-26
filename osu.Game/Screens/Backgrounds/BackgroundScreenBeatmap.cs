@@ -59,7 +59,7 @@ namespace osu.Game.Screens.Backgrounds
         private readonly DimmableBackground dimmable;
         private readonly WeatherEffectContainer weatherContainer;
         private readonly BackgroundWeatherUsage weatherUsage;
-        private BackgroundWeatherSettingsBinding weatherSettings;
+        private WeatherEffectSettingsBinding weatherSettings;
 
         public Drawable CaptureSource => weatherContainer;
 
@@ -94,7 +94,14 @@ namespace osu.Game.Screens.Backgrounds
         private void load(Ez2ConfigManager ezConfig)
         {
             if (weatherUsage == BackgroundWeatherUsage.SongSelect)
-                weatherSettings = new BackgroundWeatherSettingsBinding(weatherContainer, ezConfig);
+            {
+                weatherSettings = new WeatherEffectSettingsBinding(
+                    weatherContainer,
+                    ezConfig,
+                    Ez2Setting.BackgroundWeatherEffect,
+                    Ez2Setting.BackgroundWeatherIntensity,
+                    Ez2Setting.BackgroundWeatherAnimationSpeed);
+            }
 
             var background = new BeatmapBackground(beatmap);
             LoadComponent(background);

@@ -4,6 +4,7 @@
 #nullable disable
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -42,7 +43,7 @@ namespace osu.Game.Screens.Backgrounds
     {
         private bool isMainMenu;
         private WeatherEffectContainer weatherContainer;
-        private BackgroundWeatherSettingsBinding weatherSettings;
+        private WeatherEffectSettingsBinding weatherSettings;
 
         private Background background;
         private PixivAttributionBadge pixivAttribution;
@@ -66,10 +67,10 @@ namespace osu.Game.Screens.Backgrounds
             this.isMainMenu = isMainMenu;
         }
 
-        internal void SetMainMenuContext(bool isMainMenu)
+        internal void SetMainMenuContext(bool mainMenuContext)
         {
-            this.isMainMenu = isMainMenu;
-            weatherSettings?.SetMainMenuContext(isMainMenu);
+            isMainMenu = mainMenuContext;
+            weatherSettings?.SetMainMenuContext(mainMenuContext);
         }
 
         [Resolved]
@@ -95,7 +96,13 @@ namespace osu.Game.Screens.Backgrounds
                 IsGameplay = false,
             });
 
-            weatherSettings = new BackgroundWeatherSettingsBinding(weatherContainer, ezConfig);
+                weatherSettings = new WeatherEffectSettingsBinding(
+                    weatherContainer,
+                    ezConfig,
+                    Ez2Setting.BackgroundWeatherEffect,
+                    Ez2Setting.BackgroundWeatherIntensity,
+                    Ez2Setting.BackgroundWeatherAnimationSpeed,
+                    observeMainMenuToggle: true);
             weatherSettings.SetMainMenuContext(isMainMenu);
 
             AddInternal(seasonalBackgroundLoader);
@@ -424,32 +431,74 @@ namespace osu.Game.Screens.Backgrounds
         }
     }
 
-    internal sealed class BackgroundWeatherSettingsBinding : IDisposable
+    internal sealed class WeatherEffectSettingsBinding : IDisposable
     {
         private readonly WeatherEffectContainer weatherContainer;
         private readonly Bindable<WeatherEffect> effect;
         private readonly Bindable<double> intensity;
+        private readonly Bindable<double> animationSpeed;
         private readonly Bindable<bool> mainMenuEnabled;
+        private readonly List<Bindable<double>> weatherTweakSettings = new List<Bindable<double>>();
+        private readonly Action<ValueChangedEvent<double>> onTweakSettingChanged;
+        private readonly Bindable<double> desertHeatAmplitude;
+        private readonly Bindable<double> desertHeatScale;
+        private readonly Bindable<double> desertHeatTint;
+        private readonly Bindable<double> underwaterScale;
+        private readonly Bindable<double> underwaterBrightness;
+        private readonly Bindable<double> underwaterTint;
+        private readonly Bindable<double> overcastRainDensity;
+        private readonly Bindable<double> overcastRainWind;
+        private readonly Bindable<double> overcastRainCloudiness;
+        private readonly Bindable<double> lightCurtainScale;
+        private readonly Bindable<double> lightCurtainBrightness;
+        private readonly Bindable<double> lightCurtainFalloff;
+        private readonly Bindable<double> lightCurtainSway;
         private bool isMainMenu;
 
-        public BackgroundWeatherSettingsBinding(WeatherEffectContainer weatherContainer, Ez2ConfigManager config)
+        public WeatherEffectSettingsBinding(
+            WeatherEffectContainer weatherContainer,
+            Ez2ConfigManager config,
+            Ez2Setting effectSetting,
+            Ez2Setting intensitySetting,
+            Ez2Setting animationSpeedSetting,
+            bool observeMainMenuToggle = false)
         {
             this.weatherContainer = weatherContainer;
 
-            effect = config.GetBindable<WeatherEffect>(Ez2Setting.BackgroundWeatherEffect);
-            intensity = config.GetBindable<double>(Ez2Setting.BackgroundWeatherIntensity);
+            effect = config.GetBindable<WeatherEffect>(effectSetting);
+            intensity = config.GetBindable<double>(intensitySetting);
+            animationSpeed = config.GetBindable<double>(animationSpeedSetting);
             effect.ValueChanged += onEffectChanged;
             intensity.ValueChanged += onIntensityChanged;
+            animationSpeed.ValueChanged += onAnimationSpeedChanged;
 
-            mainMenuEnabled = config.GetBindable<bool>(Ez2Setting.MainMenuWeatherEnabled);
-            mainMenuEnabled.ValueChanged += onMainMenuEnabledChanged;
+            if (observeMainMenuToggle)
+            {
+                mainMenuEnabled = config.GetBindable<bool>(Ez2Setting.MainMenuWeatherEnabled);
+                mainMenuEnabled.ValueChanged += onMainMenuEnabledChanged;
+            }
+
+            onTweakSettingChanged = _ => updateWeather();
+            desertHeatAmplitude = bindTweakSetting(config, Ez2Setting.WeatherDesertHeatAmplitude);
+            desertHeatScale = bindTweakSetting(config, Ez2Setting.WeatherDesertHeatScale);
+            desertHeatTint = bindTweakSetting(config, Ez2Setting.WeatherDesertHeatTint);
+            underwaterScale = bindTweakSetting(config, Ez2Setting.WeatherUnderwaterScale);
+            underwaterBrightness = bindTweakSetting(config, Ez2Setting.WeatherUnderwaterBrightness);
+            underwaterTint = bindTweakSetting(config, Ez2Setting.WeatherUnderwaterTint);
+            overcastRainDensity = bindTweakSetting(config, Ez2Setting.WeatherOvercastRainDensity);
+            overcastRainWind = bindTweakSetting(config, Ez2Setting.WeatherOvercastRainWind);
+            overcastRainCloudiness = bindTweakSetting(config, Ez2Setting.WeatherOvercastRainCloudiness);
+            lightCurtainScale = bindTweakSetting(config, Ez2Setting.WeatherLightCurtainScale);
+            lightCurtainBrightness = bindTweakSetting(config, Ez2Setting.WeatherLightCurtainBrightness);
+            lightCurtainFalloff = bindTweakSetting(config, Ez2Setting.WeatherLightCurtainFalloff);
+            lightCurtainSway = bindTweakSetting(config, Ez2Setting.WeatherLightCurtainSway);
 
             updateWeather();
         }
 
-        public void SetMainMenuContext(bool isMainMenu)
+        public void SetMainMenuContext(bool mainMenuContext)
         {
-            this.isMainMenu = isMainMenu;
+            isMainMenu = mainMenuContext;
             updateWeather();
         }
 
@@ -457,13 +506,28 @@ namespace osu.Game.Screens.Backgrounds
         {
             effect.ValueChanged -= onEffectChanged;
             intensity.ValueChanged -= onIntensityChanged;
+            animationSpeed.ValueChanged -= onAnimationSpeedChanged;
 
-            mainMenuEnabled.ValueChanged -= onMainMenuEnabledChanged;
+            if (mainMenuEnabled != null)
+                mainMenuEnabled.ValueChanged -= onMainMenuEnabledChanged;
+
+            foreach (Bindable<double> setting in weatherTweakSettings)
+                setting.ValueChanged -= onTweakSettingChanged;
+        }
+
+        private Bindable<double> bindTweakSetting(Ez2ConfigManager config, Ez2Setting setting)
+        {
+            Bindable<double> bindable = config.GetBindable<double>(setting);
+            bindable.ValueChanged += onTweakSettingChanged;
+            weatherTweakSettings.Add(bindable);
+            return bindable;
         }
 
         private void onEffectChanged(ValueChangedEvent<WeatherEffect> _) => updateWeather();
 
         private void onIntensityChanged(ValueChangedEvent<double> _) => updateWeather();
+
+        private void onAnimationSpeedChanged(ValueChangedEvent<double> _) => updateWeather();
 
         private void onMainMenuEnabledChanged(ValueChangedEvent<bool> _) => updateWeather();
 
@@ -472,6 +536,32 @@ namespace osu.Game.Screens.Backgrounds
             bool enabled = !isMainMenu || mainMenuEnabled.Value;
             weatherContainer.Effect = enabled ? effect.Value : WeatherEffect.None;
             weatherContainer.Intensity = (float)intensity.Value;
+            weatherContainer.AnimationSpeed = (float)animationSpeed.Value;
+            weatherContainer.DesertHeat = DesertHeatSettings.Default with
+            {
+                Amplitude = (float)desertHeatAmplitude.Value,
+                Scale = (float)desertHeatScale.Value,
+                Tint = (float)desertHeatTint.Value,
+            };
+            weatherContainer.Underwater = UnderwaterSettings.Default with
+            {
+                Scale = (float)underwaterScale.Value,
+                Brightness = (float)underwaterBrightness.Value,
+                Tint = (float)underwaterTint.Value,
+            };
+            weatherContainer.OvercastRain = OvercastRainSettings.Default with
+            {
+                Density = (float)overcastRainDensity.Value,
+                Wind = (float)overcastRainWind.Value,
+                Cloudiness = (float)overcastRainCloudiness.Value,
+            };
+            weatherContainer.UnderwaterLightCurtain = UnderwaterLightCurtainSettings.Default with
+            {
+                Scale = (float)lightCurtainScale.Value,
+                Brightness = (float)lightCurtainBrightness.Value,
+                Falloff = (float)lightCurtainFalloff.Value,
+                Sway = (float)lightCurtainSway.Value,
+            };
         }
     }
 }

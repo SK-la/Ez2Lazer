@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using osu.Framework.Bindables;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
-using osu.Framework.Graphics.Containers;
 using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Background.Pixiv;
@@ -103,33 +102,6 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                     HintText = EzSettingsStrings.SONG_SELECT_EZ_BACKGROUND_TOOLTIP,
                     Current = ezConfig.GetBindable<bool>(Ez2Setting.SongSelectUseEzBackground),
                 }),
-                new SettingsItemV2(new EzWeatherEffectDropdown
-                {
-                    Caption = EzSettingsStrings.BACKGROUND_WEATHER_EFFECT,
-                    HintText = EzSettingsStrings.BACKGROUND_WEATHER_EFFECT_TOOLTIP,
-                    Current = ezConfig.GetBindable<WeatherEffect>(Ez2Setting.BackgroundWeatherEffect),
-                })
-                {
-                    Keywords = new[] { "weather", "background", "rain", "underwater", "heat" },
-                },
-                new SettingsItemV2(new FormSliderBar<double>
-                {
-                    Caption = EzSettingsStrings.BACKGROUND_WEATHER_INTENSITY,
-                    Current = ezConfig.GetBindable<double>(Ez2Setting.BackgroundWeatherIntensity),
-                    KeyboardStep = 0.05f,
-                })
-                {
-                    Keywords = new[] { "weather", "background", "intensity", "strength" },
-                },
-                new SettingsItemV2(new FormCheckBox
-                {
-                    Caption = EzSettingsStrings.MAIN_MENU_WEATHER_ENABLED,
-                    HintText = EzSettingsStrings.MAIN_MENU_WEATHER_ENABLED_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.MainMenuWeatherEnabled),
-                })
-                {
-                    Keywords = new[] { "weather", "main menu", "background" },
-                },
                 new SettingsItemV2(new FormDropdown<string>
                 {
                     Caption = "Menu Logo",

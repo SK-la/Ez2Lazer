@@ -44,6 +44,7 @@ using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.UI;
 using osu.Game.Rulesets.UI.Scrolling;
+using osu.Game.Screens.Backgrounds;
 using osu.Game.Scoring;
 using osu.Game.Screens.Ranking;
 using osu.Game.Skinning;
@@ -104,8 +105,7 @@ namespace osu.Game.Screens.Play
         private readonly Bindable<bool> samplePlaybackDisabled = new Bindable<bool>();
 
         private WeatherEffectContainer playfieldWeatherContainer;
-        private Bindable<WeatherEffect> playfieldWeatherEffect;
-        private Bindable<double> playfieldWeatherIntensity;
+        private WeatherEffectSettingsBinding playfieldWeatherSettings;
 
         /// <summary>
         /// Whether gameplay should pause when the game window focus is lost.
@@ -328,11 +328,6 @@ namespace osu.Game.Screens.Play
             if (game != null)
                 gameActive.BindTo(game.IsActive);
 
-            playfieldWeatherEffect = ez2Config.GetBindable<WeatherEffect>(Ez2Setting.PlayfieldWeatherEffect);
-            playfieldWeatherIntensity = ez2Config.GetBindable<double>(Ez2Setting.PlayfieldWeatherIntensity);
-            playfieldWeatherEffect.ValueChanged += onPlayfieldWeatherEffectChanged;
-            playfieldWeatherIntensity.ValueChanged += onPlayfieldWeatherIntensityChanged;
-
             // [Ez] 进局前一口断定：诊断套件（总开关 + EZ_DIAG_PROBES 子项）与结算流程时序追踪。
             // 之后局内任何代码只读冻结值、不再读配置。放在这里而不是启动时，是为了让设置改完下一局即生效。
             EzOsuGame.Diagnostics.EzDiagnosticSwitches.Enabled = ez2Config.Get<bool>(Ez2Setting.EzJudgmentDiagEnabled);
@@ -433,7 +428,12 @@ namespace osu.Game.Screens.Play
                 },
             });
 
-            updatePlayfieldWeather();
+            playfieldWeatherSettings = new WeatherEffectSettingsBinding(
+                playfieldWeatherContainer,
+                ez2Config,
+                Ez2Setting.PlayfieldWeatherEffect,
+                Ez2Setting.PlayfieldWeatherIntensity,
+                Ez2Setting.PlayfieldWeatherAnimationSpeed);
 
             if (cancellationToken.IsCancellationRequested)
                 return;
@@ -596,19 +596,6 @@ namespace osu.Game.Screens.Play
                 },
             }
         };
-
-        private void onPlayfieldWeatherEffectChanged(ValueChangedEvent<WeatherEffect> _) => updatePlayfieldWeather();
-
-        private void onPlayfieldWeatherIntensityChanged(ValueChangedEvent<double> _) => updatePlayfieldWeather();
-
-        private void updatePlayfieldWeather()
-        {
-            if (playfieldWeatherContainer == null || playfieldWeatherEffect == null || playfieldWeatherIntensity == null)
-                return;
-
-            playfieldWeatherContainer.Effect = playfieldWeatherEffect.Value;
-            playfieldWeatherContainer.Intensity = (float)playfieldWeatherIntensity.Value;
-        }
 
         private Drawable createOverlayComponents()
         {
@@ -908,11 +895,7 @@ namespace osu.Game.Screens.Play
         {
             if (isDisposing)
             {
-                if (playfieldWeatherEffect != null)
-                    playfieldWeatherEffect.ValueChanged -= onPlayfieldWeatherEffectChanged;
-
-                if (playfieldWeatherIntensity != null)
-                    playfieldWeatherIntensity.ValueChanged -= onPlayfieldWeatherIntensityChanged;
+                playfieldWeatherSettings?.Dispose();
 
                 LatencyTracker?.Dispose();
                 LatencyTracker = null;

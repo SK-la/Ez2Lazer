@@ -122,6 +122,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.MenuLogoBackdropBlur, 10.0, 0.0, 40.0, 1.0);
             SetDefault(Ez2Setting.MenuLogoBackdropOpacity, 1.0, 0.0, 1.0, 0.01);
             SetDefault(Ez2Setting.SongSelectUseEzBackground, false);
+            SetDefault(Ez2Setting.BackgroundWeatherAnimationSpeed, 1.0, 0.0, 10.0, 0.1);
             SetDefault(Ez2Setting.NotificationBehaviour, EzNotificationBehaviour.Normal);
             SetDefault(Ez2Setting.ScreenshotAction, EzScreenshotAction.SaveAndCopy);
             SetDefault(Ez2Setting.HitObjectLifetimeUsesOwnTime, !DebugUtils.IsNUnitRunning);
@@ -137,6 +138,20 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.CatchScratchDashExitVelocity, 0.00010, 0.00010, 0.00020, 0.00001);
             SetDefault(Ez2Setting.ScratchAxisInvert, false);
             SetDefault(Ez2Setting.SkipWithGameplayKeys, true);
+            SetDefault(Ez2Setting.PlayfieldWeatherAnimationSpeed, 1.0, 0.0, 10.0, 0.1);
+            SetDefault(Ez2Setting.WeatherDesertHeatAmplitude, 4.0, 0.0, 32.0, 0.1);
+            SetDefault(Ez2Setting.WeatherDesertHeatScale, 1.0, 0.1, 8.0, 0.1);
+            SetDefault(Ez2Setting.WeatherDesertHeatTint, 0.15, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.WeatherUnderwaterScale, 1.0, 0.1, 8.0, 0.1);
+            SetDefault(Ez2Setting.WeatherUnderwaterBrightness, 0.65, 0.0, 2.0, 0.05);
+            SetDefault(Ez2Setting.WeatherUnderwaterTint, 0.3, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.WeatherOvercastRainDensity, 0.45, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.WeatherOvercastRainWind, 0.2, -2.0, 2.0, 0.05);
+            SetDefault(Ez2Setting.WeatherOvercastRainCloudiness, 0.4, 0.0, 1.0, 0.01);
+            SetDefault(Ez2Setting.WeatherLightCurtainScale, 1.0, 0.1, 8.0, 0.1);
+            SetDefault(Ez2Setting.WeatherLightCurtainBrightness, 0.5, 0.0, 2.0, 0.05);
+            SetDefault(Ez2Setting.WeatherLightCurtainFalloff, 2.0, 0.1, 8.0, 0.1);
+            SetDefault(Ez2Setting.WeatherLightCurtainSway, 0.35, 0.0, 1.0, 0.01);
 
             SetDefault(Ez2Setting.TurboMode, false);
             SetDefault(Ez2Setting.TurboModeSnapshot, string.Empty);
@@ -1586,6 +1601,22 @@ namespace osu.Game.EzOsuGame.Configuration
 
         /// <summary>选歌界面背景叠 chart-dan 段位图（「段位痴」）。</summary>
         SkillDanFanatic,
+
+        BackgroundWeatherAnimationSpeed,
+        PlayfieldWeatherAnimationSpeed,
+        WeatherDesertHeatAmplitude,
+        WeatherDesertHeatScale,
+        WeatherDesertHeatTint,
+        WeatherUnderwaterScale,
+        WeatherUnderwaterBrightness,
+        WeatherUnderwaterTint,
+        WeatherOvercastRainDensity,
+        WeatherOvercastRainWind,
+        WeatherOvercastRainCloudiness,
+        WeatherLightCurtainScale,
+        WeatherLightCurtainBrightness,
+        WeatherLightCurtainFalloff,
+        WeatherLightCurtainSway,
     }
 
     public enum EzColumnType : byte
