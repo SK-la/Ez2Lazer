@@ -144,9 +144,7 @@ namespace osu.Game.Screens.Backgrounds
         {
             if (!(other is BackgroundScreenBeatmap otherBeatmapBackground)) return false;
 
-            return base.Equals(other)
-                   && beatmap == otherBeatmapBackground.Beatmap
-                   && weatherUsage == otherBeatmapBackground.weatherUsage;
+            return base.Equals(other) && beatmap == otherBeatmapBackground.Beatmap;
         }
 
         public partial class DimmableBackground : UserDimContainer
