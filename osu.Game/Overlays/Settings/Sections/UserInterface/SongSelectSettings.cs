@@ -31,6 +31,15 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                 {
                     Keywords = new[] { "converts", "converted" }
                 },
+                new SettingsItemV2(new FormCheckBox
+                {
+                    Caption = EzSongSelectStrings.PANEL_RANK_FOLLOWS_MOD_FILTER,
+                    HintText = EzSongSelectStrings.PANEL_RANK_FOLLOWS_MOD_FILTER_TOOLTIP,
+                    Current = ezConfig.GetBindable<bool>(Ez2Setting.SongSelectPanelRankFollowsModFilter),
+                })
+                {
+                    Keywords = new[] { "rank", "grade", "mod", "score", "panel", "评级", "mod筛选" }
+                },
                 new SettingsItemV2(new SortDirectionDropdown
                 {
                     Caption = EzSongSelectStrings.SORT_DIRECTION,

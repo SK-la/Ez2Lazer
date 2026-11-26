@@ -69,6 +69,25 @@ namespace osu.Game.EzOsuGame.Scoring
         public static bool ModsMatch(Mod[] left, Mod[] right) => modsMatch(left, right);
 
         /// <summary>
+        /// 成绩列表「只看当前 Mod」的本地过滤口径：未选中 Mod 时只留无 Mod 成绩，否则 acronym 集合完全相等。
+        /// </summary>
+        /// <remarks>
+        /// 与 <c>LeaderboardManager</c> 的 Local 分支一致，也不套用 <see cref="GameplayModsMatch"/> 的 cosmetic 白名单
+        /// （那套是角逐 ghost 的候选口径，比成绩列表更宽松）。
+        /// </remarks>
+        public static bool MatchesExactMods(Mod[] scoreMods, IReadOnlyList<Mod> selectedMods)
+        {
+            if (selectedMods.Count == 0)
+                return scoreMods.Length == 0;
+
+            //TODO: 1. 排行版的「已选模组」，需要改进匹配逻辑，比如去SV之类不能被过滤。
+            //TODO: 2. 这个匹配Mod筛选，暂时使用开关。未来需要改成一个多选下拉菜单，用来控制，哪类Mod被视为高差异Mod，高差异Mod即联动「已选模组」，以及当前功能。
+            //届时，此开关将被移除，原本的开关功能完全交由「已选模组」。
+            //TODO: 3. 难度卡Panel上所展示的评级，关联排行榜中排序条件切换展示规则。
+            return selectedMods.Select(m => m.Acronym).ToHashSet().SetEquals(scoreMods.Select(m => m.Acronym));
+        }
+
+        /// <summary>
         /// 比较两侧 Mod 时忽略 <see cref="COSMETIC_GHOST_MOD_TYPES"/> 白名单项。
         /// 使非游玩 Mod 不影响 ghost 候选过滤与 beatmap 复用判定。
         /// </summary>
@@ -147,6 +166,7 @@ namespace osu.Game.EzOsuGame.Scoring
         private static bool modsMatch(Mod[] left, Mod[] right)
         {
             static IEnumerable<string> acronyms(Mod[] mods) => mods.OrderBy(m => m.Acronym).Select(m => m.Acronym);
+
             return acronyms(left).SequenceEqual(acronyms(right));
         }
     }

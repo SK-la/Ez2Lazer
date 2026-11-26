@@ -110,6 +110,7 @@ namespace osu.Game.EzOsuGame.Configuration
             SetDefault(Ez2Setting.SongSelectSkillSortAxis, string.Empty);
             SetDefault(Ez2Setting.SongSelectSkillGroupAxis, string.Empty);
             SetDefault(Ez2Setting.SongSelectSortDirection, SortDirection.Ascending);
+            SetDefault(Ez2Setting.SongSelectPanelRankFollowsModFilter, true);
             SetDefault(Ez2Setting.HideMainMenuOnlineBanner, false);
             SetDefault(Ez2Setting.BackgroundWeatherEffect, WeatherEffect.None);
             SetDefault(Ez2Setting.BackgroundWeatherIntensity, 1.0, 0.0, 1.0, 0.05);
@@ -1114,6 +1115,12 @@ namespace osu.Game.EzOsuGame.Configuration
 
         /// <summary>选歌界面排序方向；分组与排序字段相同时也同步调整分组顺序。</summary>
         SongSelectSortDirection,
+
+        /// <summary>
+        /// 选歌面板评级是否跟随成绩列表的「只看当前 Mod」：开启时取当前 Mod 筛出的本地成绩中的最高评级，
+        /// 关闭时仍显示最高分那条成绩的评级。
+        /// </summary>
+        SongSelectPanelRankFollowsModFilter,
 
         HideMainMenuOnlineBanner,
 
