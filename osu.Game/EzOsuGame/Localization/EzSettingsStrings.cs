@@ -137,6 +137,16 @@ namespace osu.Game.EzOsuGame.Localization
         public static readonly EzLocalizationManager.EzLocalisableString WEATHER_EFFECT_LIGHT_CURTAIN =
             new EzLocalizationManager.EzLocalisableString("深海光幕", "Underwater light curtain");
 
+        public static readonly EzLocalizationManager.EzLocalisableString PLAYFIELD_WEATHER_EFFECT =
+            new EzLocalizationManager.EzLocalisableString("Playfield 天气效果", "Playfield weather effect");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PLAYFIELD_WEATHER_EFFECT_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
+            "只改变 Playfield 的画面，不影响判定、分数或 HUD。",
+            "Changes the playfield visuals without affecting judgement, score or HUD.");
+
+        public static readonly EzLocalizationManager.EzLocalisableString PLAYFIELD_WEATHER_INTENSITY =
+            new EzLocalizationManager.EzLocalisableString("Playfield 天气强度", "Playfield weather intensity");
+
         public static readonly EzLocalizationManager.EzLocalisableString HIDE_MAIN_MENU_ONLINE_BANNER =
             new EzLocalizationManager.EzLocalisableString("屏蔽主界面底部新闻广告", "Hide main menu bottom news banner");
 

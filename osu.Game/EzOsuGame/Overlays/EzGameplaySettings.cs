@@ -75,6 +75,24 @@ namespace osu.Game.EzOsuGame.Overlays
                 {
                     Keywords = new[] { "colour", "divisor", "mania", "note", "gameplay" }
                 },
+                new SettingsItemV2(new EzWeatherEffectDropdown
+                {
+                    Caption = EzSettingsStrings.PLAYFIELD_WEATHER_EFFECT,
+                    HintText = EzSettingsStrings.PLAYFIELD_WEATHER_EFFECT_TOOLTIP,
+                    Current = ezConfig.GetBindable<WeatherEffect>(Ez2Setting.PlayfieldWeatherEffect),
+                })
+                {
+                    Keywords = new[] { "weather", "playfield", "rain", "underwater", "heat" }
+                },
+                new SettingsItemV2(new FormSliderBar<double>
+                {
+                    Caption = EzSettingsStrings.PLAYFIELD_WEATHER_INTENSITY,
+                    Current = ezConfig.GetBindable<double>(Ez2Setting.PlayfieldWeatherIntensity),
+                    KeyboardStep = 0.05f,
+                })
+                {
+                    Keywords = new[] { "weather", "playfield", "intensity", "strength" }
+                },
             });
         }
     }

@@ -93,6 +93,8 @@ namespace osu.Game.EzOsuGame.Configuration
 
             SetDefault(Ez2Setting.ScalingGameMode, ScalingGameMode.Mania);
             SetDefault(Ez2Setting.GameplayObjectAntialiasing, false);
+            SetDefault(Ez2Setting.PlayfieldWeatherEffect, WeatherEffect.None);
+            SetDefault(Ez2Setting.PlayfieldWeatherIntensity, 1.0, 0.0, 1.0, 0.05);
             SetDefault(Ez2Setting.ScaleSkinElements, false);
             SetDefault(Ez2Setting.GameplayDisableCmdSpace, true);
 
@@ -1030,6 +1032,8 @@ namespace osu.Game.EzOsuGame.Configuration
         // 游戏设置
         ScalingGameMode,
         GameplayObjectAntialiasing,
+        PlayfieldWeatherEffect,
+        PlayfieldWeatherIntensity,
         ScaleSkinElements,
         GameplayDisableCmdSpace,
         AccuracyCutoffS,
