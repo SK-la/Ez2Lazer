@@ -40,7 +40,7 @@ namespace osu.Game.EzOsuGame.Scoring
     internal static class LeaderboardModFilterExtensions
     {
         public static Mod[] GetRelevantMods(this IEnumerable<Mod> mods, LeaderboardModFilter filter)
-            => EzLocalScoreQueries.GetRelevantLeaderboardMods(mods, filter);
+            => LeaderboardModImpactUnit.GetRelevantMods(mods, filter);
 
         public static bool HasMatchingMods(this IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods, LeaderboardModFilter filter)
             => EzLocalScoreQueries.MatchesLeaderboardMods(scoreMods, selectedMods, filter);

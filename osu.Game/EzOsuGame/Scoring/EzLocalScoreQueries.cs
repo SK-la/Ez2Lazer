@@ -5,9 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
-using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -85,35 +85,7 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         public static bool MatchesLeaderboardMods(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods, LeaderboardModFilter filter)
-        {
-            if (filter == LeaderboardModFilter.None)
-                return true;
-
-            var unmatchedSelectedMods = GetRelevantLeaderboardMods(selectedMods, filter).ToList();
-            var relevantScoreMods = GetRelevantLeaderboardMods(scoreMods, filter);
-
-            if (unmatchedSelectedMods.Count != relevantScoreMods.Length)
-                return false;
-
-            foreach (var scoreMod in relevantScoreMods)
-            {
-                int matchingIndex = unmatchedSelectedMods.FindIndex(selectedMod => modsMatchForLeaderboard(scoreMod, selectedMod));
-
-                if (matchingIndex < 0)
-                    return false;
-
-                unmatchedSelectedMods.RemoveAt(matchingIndex);
-            }
-
-            return unmatchedSelectedMods.Count == 0;
-        }
-
-        internal static Mod[] GetRelevantLeaderboardMods(IEnumerable<Mod> mods, LeaderboardModFilter filter)
-            => filter == LeaderboardModFilter.All
-                ? mods.Where(mod => getLeaderboardModExceptions(mod) == LeaderboardModFilter.None).ToArray()
-                : mods.Where(mod => (getLeaderboardModCategories(mod) & filter) != 0
-                                    && (getLeaderboardModExceptions(mod) & filter) == 0)
-                      .ToArray();
+            => LeaderboardModImpactUnit.ModsMatch(scoreMods, selectedMods, filter);
 
         public static bool JudgeModeMatches(int scoreJudgeMode, EzEnumJudgeMode? selectedJudgeMode, LeaderboardModFilter filter)
         {
@@ -122,63 +94,6 @@ namespace osu.Game.EzOsuGame.Scoring
 
             int effectiveScoreMode = scoreJudgeMode < 0 ? (int)EzEnumJudgeMode.Lazer : scoreJudgeMode;
             return effectiveScoreMode == (int)selectedJudgeMode.Value;
-        }
-
-        private static LeaderboardModFilter getLeaderboardModCategories(Mod mod)
-        {
-            var categories = LeaderboardModFilter.None;
-
-            if (mod is IApplicableToRate)
-                categories |= LeaderboardModFilter.Rate;
-
-            if (mod is IApplicableToDifficulty)
-                categories |= LeaderboardModFilter.Difficulty;
-
-            if (mod is IApplicableToBeatmapConverter
-                || mod is IApplicableAfterBeatmapConversion and not IApplicableToDifficulty
-                || mod.Type == ModType.Conversion)
-                categories |= LeaderboardModFilter.Conversion;
-
-            return categories;
-        }
-
-        private static LeaderboardModFilter getLeaderboardModExceptions(Mod mod)
-        {
-            if (mod is ModNoMod)
-                return LeaderboardModFilter.All;
-
-            var exceptions = LeaderboardModFilter.None;
-
-            if (mod.Type == ModType.Conversion && mod.Acronym == "CS")
-                exceptions |= LeaderboardModFilter.Rate | LeaderboardModFilter.Conversion;
-
-            if (mod is ModClassic)
-                exceptions |= LeaderboardModFilter.Difficulty | LeaderboardModFilter.Conversion;
-
-            if (mod is ModFailCondition && mod is IApplicableAfterBeatmapConversion)
-                exceptions |= LeaderboardModFilter.Conversion;
-
-            return exceptions;
-        }
-
-        private static bool modsMatchForLeaderboard(Mod scoreMod, Mod selectedMod)
-        {
-            if (scoreMod.GetType() != selectedMod.GetType() || scoreMod.Acronym != selectedMod.Acronym)
-                return false;
-
-            foreach (var (settingName, scoreSetting) in scoreMod.SettingsMap)
-            {
-                if (scoreMod.Acronym == "AJ" && settingName == "constant_speed")
-                    continue;
-
-                if (!selectedMod.SettingsMap.TryGetValue(settingName, out var selectedSetting))
-                    return false;
-
-                if (!EqualityComparer<object?>.Default.Equals(scoreSetting.GetUnderlyingSettingValue(), selectedSetting.GetUnderlyingSettingValue()))
-                    return false;
-            }
-
-            return scoreMod.SettingsMap.Count == selectedMod.SettingsMap.Count;
         }
 
         /// <summary>

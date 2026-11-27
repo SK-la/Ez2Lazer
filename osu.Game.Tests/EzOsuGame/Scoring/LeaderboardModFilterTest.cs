@@ -56,11 +56,12 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var loop = new UniversalLoopPlayClip();
 
             Assert.That(new[] { maniaConstantSpeed }.GetRelevantMods(LeaderboardModFilter.Rate), Is.Empty);
+            Assert.That(new[] { maniaConstantSpeed }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
             Assert.That(new[] { taikoConstantSpeed }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
             Assert.That(new[] { classic }.GetRelevantMods(LeaderboardModFilter.Difficulty | LeaderboardModFilter.Conversion), Is.Empty);
             Assert.That(new[] { health }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
 
-            Mod[] exceptions = [maniaConstantSpeed, taikoConstantSpeed, classic, health];
+            Mod[] exceptions = [new ModNoMod(), maniaConstantSpeed, taikoConstantSpeed, classic, health];
             Assert.That(exceptions.GetRelevantMods(LeaderboardModFilter.All), Is.Empty);
             Assert.That(exceptions.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.True);
             Assert.That(new Mod[] { loop }.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.False);
