@@ -60,6 +60,11 @@ namespace osu.Game.EzOsuGame.Startup
         public static bool EnableStartupFrameSampling { get; set; }
 
         /// <summary>
+        /// Trace settings section subtree update duration while collecting cold-open performance samples.
+        /// </summary>
+        public static bool EnableSettingsSectionUpdateTrace { get; set; }
+
+        /// <summary>
         /// Keep settings sections out of the startup workload. They are loaded after the settings panel is first opened.
         /// Set false only for startup-load A/B measurements.
         /// </summary>

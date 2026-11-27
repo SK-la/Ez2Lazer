@@ -192,6 +192,25 @@ namespace osu.Game.Overlays.Settings
                 indexedSubsections = FlowContent.Children.OfType<SettingsSubsection>().ToArray();
         }
 
+        public override bool UpdateSubTree()
+        {
+            if (!EzStartupTuning.EnableSettingsSectionUpdateTrace || IsLoaded)
+            {
+                return base.UpdateSubTree();
+            }
+
+            var stopwatch = Stopwatch.StartNew();
+            bool updated = base.UpdateSubTree();
+
+            if (IsLoaded && stopwatch.Elapsed.TotalMilliseconds >= 5)
+            {
+                EzStartupTrace.LogDiagnostic(
+                    $"Settings.section update header=\"{Header}\" elapsedMs={stopwatch.Elapsed.TotalMilliseconds:F1} loadedSubsections={FlowContent.Children.OfType<SettingsSubsection>().Count(subsection => subsection.IsLoaded)}");
+            }
+
+            return updated;
+        }
+
         private bool isCurrentSection => selectedSection.Value == this;
 
         protected override bool OnHover(HoverEvent e)
