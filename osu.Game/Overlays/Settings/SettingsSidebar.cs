@@ -26,6 +26,8 @@ namespace osu.Game.Overlays.Settings
 
         protected override bool ExpandOnHover => false;
 
+        public override bool PropagatePositionalInputSubTree => Alpha > 0 && base.PropagatePositionalInputSubTree;
+
         private readonly bool showBackButton;
 
         public SettingsSidebar(bool showBackButton)

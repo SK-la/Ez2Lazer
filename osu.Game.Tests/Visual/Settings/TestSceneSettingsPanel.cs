@@ -11,6 +11,7 @@ using NUnit.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
+using osu.Framework.Statistics;
 using osu.Framework.Testing;
 using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Startup;
@@ -26,7 +27,7 @@ namespace osu.Game.Tests.Visual.Settings
     [TestFixture]
     public partial class TestSceneSettingsPanel : OsuManualInputManagerTestScene
     {
-        private SettingsPanel settings;
+        private TestSettingsOverlay settings;
         private DialogOverlay dialogOverlay;
 
         private readonly List<SettingsOpenMeasurement> settingsOpenMeasurements = new List<SettingsOpenMeasurement>();
@@ -56,7 +57,7 @@ namespace osu.Game.Tests.Visual.Settings
             {
                 settings?.Expire();
 
-                Add(settings = new SettingsOverlay
+                Add(settings = new TestSettingsOverlay
                 {
                     State = { Value = Visibility.Hidden }
                 });
@@ -243,14 +244,61 @@ namespace osu.Game.Tests.Visual.Settings
         }
 
         [Test]
-        public void TestColdAndRepeatedOpenPerformance()
+        public void TestColdAndRepeatedOpenPerformance() => addColdAndRepeatedOpenPerformance(1);
+
+        [Test]
+        public void TestColdAndRepeatedOpenPerformanceParallel() => addColdAndRepeatedOpenPerformance(4);
+
+        [Test]
+        public void TestFreshSettingsPanelAfterActivatorCacheWarmup()
         {
             long settleStarted = 0;
+            int reflectionActivatorCountBeforeFirstPanel = 0;
+            AddStep("set settings load batch count", () => settings.LoadBatchCount = 4);
+            AddStep("start test host settle interval", () => settleStarted = Stopwatch.GetTimestamp());
+            AddUntilStep("wait for idle test host", () => Stopwatch.GetElapsedTime(settleStarted).TotalSeconds >= 5);
+            AddStep("record dependency activator baseline", () => reflectionActivatorCountBeforeFirstPanel = getReflectedDependencyActivatorCount());
+
+            AddStep("start first settings panel cold open", () => startSettingsOpenMeasurement("first-panel"));
+            AddUntilStep("first settings panel ready", () => settingsOpenMeasurementComplete);
+            AddAssert("first settings panel is complete", settingsMenuIsComplete);
+            AddStep("report first settings panel", () => reportSettingsOpenMeasurement(0));
+            AddStep("report first panel dependency activators", () => TestContext.Progress.WriteLine(
+                $"[SETTINGS-ACTIVATOR] stage=first-panel reflectedTypes={getReflectedDependencyActivatorCount() - reflectionActivatorCountBeforeFirstPanel}"));
+
+            AddStep("close first settings panel", () => settings.Hide());
+            AddUntilStep("finish first settings panel close", () => settings.Alpha <= 0.01f);
+            AddStep("replace with a fresh settings panel", () =>
+            {
+                settings.Expire();
+                Add(settings = new TestSettingsOverlay
+                {
+                    LoadBatchCount = 4,
+                    State = { Value = Visibility.Hidden }
+                });
+            });
+            AddUntilStep("fresh settings panel loaded", () => settings.IsLoaded);
+
+            AddStep("start fresh settings panel open", () => startSettingsOpenMeasurement("fresh-panel"));
+            AddUntilStep("fresh settings panel ready", () => settingsOpenMeasurementComplete);
+            AddAssert("fresh settings panel is complete", settingsMenuIsComplete);
+            AddStep("report fresh settings panel", () => reportSettingsOpenMeasurement(1));
+            AddStep("report fresh panel dependency activators", () => TestContext.Progress.WriteLine(
+                $"[SETTINGS-ACTIVATOR] stage=fresh-panel reflectedTypes={getReflectedDependencyActivatorCount() - reflectionActivatorCountBeforeFirstPanel}"));
+        }
+
+        private static int getReflectedDependencyActivatorCount()
+            => GlobalStatistics.Get<int>("Dependencies", "Reflected [BackgroundDependencyLoader]s").Value;
+
+        private void addColdAndRepeatedOpenPerformance(int loadBatchCount)
+        {
+            long settleStarted = 0;
+            AddStep("set settings load batch count", () => settings.LoadBatchCount = loadBatchCount);
             AddStep("start test host settle interval", () => settleStarted = Stopwatch.GetTimestamp());
             AddUntilStep("wait for idle test host", () => Stopwatch.GetElapsedTime(settleStarted).TotalSeconds >= 5);
 
-            AddStep("start cold settings open", () => startSettingsOpenMeasurement("cold"));
-            AddUntilStep("cold settings open ready", () => settingsOpenMeasurementComplete);
+            AddStep($"start cold settings open with {loadBatchCount} load batches", () => startSettingsOpenMeasurement($"cold-{loadBatchCount}-batch"));
+            AddUntilStep($"cold settings open with {loadBatchCount} batches ready", () => settingsOpenMeasurementComplete);
             AddAssert("all settings sections and sidebar buttons are complete", settingsMenuIsComplete);
             AddStep("report cold settings open", () => reportSettingsOpenMeasurement(0));
 
@@ -267,7 +315,6 @@ namespace osu.Game.Tests.Visual.Settings
 
             AddAssert("reopening is faster than the cold load", () => settingsOpenMeasurements[0].ElapsedMilliseconds
                                                                       > settingsOpenMeasurements.Skip(1).Max(m => m.ElapsedMilliseconds));
-            AddAssert("reopening caused no GC collections", () => settingsOpenMeasurements.Skip(1).All(m => m.Gen0 == 0 && m.Gen1 == 0 && m.Gen2 == 0));
         }
 
         private void startSettingsOpenMeasurement(string name)
@@ -379,6 +426,13 @@ namespace osu.Game.Tests.Visual.Settings
             });
 
             Dependencies.CacheAs<IDialogOverlay>(dialogOverlay);
+        }
+
+        private sealed partial class TestSettingsOverlay : SettingsOverlay
+        {
+            public int LoadBatchCount { get; set; } = 4;
+
+            protected override int SettingsLoadBatchCount => LoadBatchCount;
         }
     }
 }

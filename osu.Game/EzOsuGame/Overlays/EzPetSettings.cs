@@ -11,6 +11,7 @@ using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Pets;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -34,8 +35,6 @@ namespace osu.Game.EzOsuGame.Overlays
             loader = new EzPetPackLoader(storage);
             packBindable = ezConfig.GetBindable<string>(Ez2Setting.DesktopPetPack);
 
-            // The pack list needs a directory scan and the status row reads pet.json from disk. Both are
-            // deferred to LoadComplete so the settings preload window does not touch the filesystem.
             // Seed the dropdown with just the bound value so the current selection still renders.
             AddRange(new[]
             {
@@ -136,7 +135,16 @@ namespace osu.Game.EzOsuGame.Overlays
         {
             base.LoadComplete();
 
-            Scheduler.AddOnce(populatePackList);
+            if (!EzStartupTuning.SkipSettingsPreload)
+                Scheduler.AddOnce(populatePackList);
+        }
+
+        protected override void LoadAsyncComplete()
+        {
+            base.LoadAsyncComplete();
+
+            if (EzStartupTuning.SkipSettingsPreload)
+                populatePackList();
         }
 
         private void populatePackList()
