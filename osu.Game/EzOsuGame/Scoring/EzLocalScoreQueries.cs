@@ -8,7 +8,6 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
-using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
@@ -110,7 +109,11 @@ namespace osu.Game.EzOsuGame.Scoring
         }
 
         internal static Mod[] GetRelevantLeaderboardMods(IEnumerable<Mod> mods, LeaderboardModFilter filter)
-            => mods.Where(mod => (getLeaderboardModCategories(mod) & filter) != 0).ToArray();
+            => filter == LeaderboardModFilter.All
+                ? mods.Where(mod => getLeaderboardModExceptions(mod) == LeaderboardModFilter.None).ToArray()
+                : mods.Where(mod => (getLeaderboardModCategories(mod) & filter) != 0
+                                    && (getLeaderboardModExceptions(mod) & filter) == 0)
+                      .ToArray();
 
         public static bool JudgeModeMatches(int scoreJudgeMode, EzEnumJudgeMode? selectedJudgeMode, LeaderboardModFilter filter)
         {
@@ -132,32 +135,39 @@ namespace osu.Game.EzOsuGame.Scoring
                 categories |= LeaderboardModFilter.Difficulty;
 
             if (mod is IApplicableToBeatmapConverter
-                || (mod is IApplicableAfterBeatmapConversion && mod is not IApplicableToDifficulty && mod is not ModFailCondition)
-                || (mod.Type == ModType.Conversion && !isDrawableOnlyMod(mod)))
+                || mod is IApplicableAfterBeatmapConversion and not IApplicableToDifficulty
+                || mod.Type == ModType.Conversion)
                 categories |= LeaderboardModFilter.Conversion;
 
             return categories;
         }
 
-        private static bool isDrawableOnlyMod(Mod mod)
+        private static LeaderboardModFilter getLeaderboardModExceptions(Mod mod)
         {
-            var applicableInterfaces = mod.GetType().GetInterfaces()
-                                          .Where(type => type != typeof(IApplicableMod) && typeof(IApplicableMod).IsAssignableFrom(type))
-                                          .ToArray();
+            if (mod is ModNoMod)
+                return LeaderboardModFilter.All;
 
-            return applicableInterfaces.Length == 1
-                   && applicableInterfaces[0].IsGenericType
-                   && applicableInterfaces[0].GetGenericTypeDefinition() == typeof(IApplicableToDrawableRuleset<>);
+            var exceptions = LeaderboardModFilter.None;
+
+            if (mod.Type == ModType.Conversion && mod.Acronym == "CS")
+                exceptions |= LeaderboardModFilter.Rate | LeaderboardModFilter.Conversion;
+
+            if (mod is ModClassic)
+                exceptions |= LeaderboardModFilter.Difficulty | LeaderboardModFilter.Conversion;
+
+            if (mod is ModFailCondition && mod is IApplicableAfterBeatmapConversion)
+                exceptions |= LeaderboardModFilter.Conversion;
+
+            return exceptions;
         }
 
         private static bool modsMatchForLeaderboard(Mod scoreMod, Mod selectedMod)
         {
-            if (scoreMod.GetType() != selectedMod.GetType())
+            if (scoreMod.GetType() != selectedMod.GetType() || scoreMod.Acronym != selectedMod.Acronym)
                 return false;
 
             foreach (var (settingName, scoreSetting) in scoreMod.SettingsMap)
             {
-                // Mania Adjust's constant-speed setting only changes scroll visualisation.
                 if (scoreMod.Acronym == "AJ" && settingName == "constant_speed")
                     continue;
 

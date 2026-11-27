@@ -32,7 +32,7 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                 {
                     Keywords = new[] { "converts", "converted" }
                 },
-                new SettingsItemV2(new LeaderboardModFilterDropdown
+                new SettingsItemV2(new FormEnumDropdown<LeaderboardModFilter>
                 {
                     Caption = EzSongSelectStrings.LEADERBOARD_MOD_FILTER,
                     Current = ezConfig.GetBindable<LeaderboardModFilter>(Ez2Setting.BeatmapDetailScoreModFilter),
@@ -83,19 +83,6 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
             {
                 SortDirection.Ascending => EzSongSelectStrings.SORT_DIRECTION_ASCENDING,
                 SortDirection.Descending => EzSongSelectStrings.SORT_DIRECTION_DESCENDING,
-                _ => base.GenerateItemText(item),
-            };
-        }
-
-        private partial class LeaderboardModFilterDropdown : FormEnumDropdown<LeaderboardModFilter>
-        {
-            protected override LocalisableString GenerateItemText(LeaderboardModFilter item) => item switch
-            {
-                LeaderboardModFilter.None => EzSongSelectStrings.LEADERBOARD_MOD_FILTER_EXACT,
-                LeaderboardModFilter.Rate => EzSongSelectStrings.LEADERBOARD_MOD_FILTER_RATE,
-                LeaderboardModFilter.Difficulty => EzSongSelectStrings.LEADERBOARD_MOD_FILTER_DIFFICULTY,
-                LeaderboardModFilter.Conversion => EzSongSelectStrings.LEADERBOARD_MOD_FILTER_CONVERSION,
-                LeaderboardModFilter.All => EzSongSelectStrings.LEADERBOARD_MOD_FILTER_ALL,
                 _ => base.GenerateItemText(item),
             };
         }

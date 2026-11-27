@@ -3,7 +3,9 @@
 
 using System;
 using System.Collections.Generic;
+using osu.Framework.Localisation;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Scoring
@@ -14,19 +16,24 @@ namespace osu.Game.EzOsuGame.Scoring
     [Flags]
     public enum LeaderboardModFilter
     {
-        /// <summary>No category-based mod matching.</summary>
+        /// <summary>Use the original selected-mod matching.</summary>
+        [LocalisableDescription(typeof(EzSongSelectStrings), nameof(EzSongSelectStrings.LEADERBOARD_MOD_FILTER_EXACT))]
         None = 0,
 
         /// <summary>Playback-rate changes.</summary>
+        [LocalisableDescription(typeof(EzSongSelectStrings), nameof(EzSongSelectStrings.LEADERBOARD_MOD_FILTER_RATE))]
         Rate = 1 << 0,
 
         /// <summary>Difficulty and judgement changes.</summary>
+        [LocalisableDescription(typeof(EzSongSelectStrings), nameof(EzSongSelectStrings.LEADERBOARD_MOD_FILTER_DIFFICULTY))]
         Difficulty = 1 << 1,
 
         /// <summary>Playable beatmap conversion.</summary>
+        [LocalisableDescription(typeof(EzSongSelectStrings), nameof(EzSongSelectStrings.LEADERBOARD_MOD_FILTER_CONVERSION))]
         Conversion = 1 << 2,
 
-        /// <summary>All supported categories.</summary>
+        /// <summary>Match all mods except the exceptions from every category.</summary>
+        [LocalisableDescription(typeof(EzSongSelectStrings), nameof(EzSongSelectStrings.LEADERBOARD_MOD_FILTER_ALL))]
         All = Rate | Difficulty | Conversion,
     }
 

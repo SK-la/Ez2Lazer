@@ -2,7 +2,9 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Globalization;
 using NUnit.Framework;
+using osu.Framework.Extensions;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Mods.LAsMods;
 using osu.Game.EzOsuGame.Scoring;
@@ -10,6 +12,7 @@ using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu.Mods;
+using osu.Game.Rulesets.Taiko.Mods;
 
 namespace osu.Game.Tests.EzOsuGame.Scoring
 {
@@ -42,15 +45,66 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         }
 
         [Test]
-        public void TestNonJudgementAndConversionModContracts()
+        public void TestAllCombinesCategoryExceptions()
         {
 #pragma warning disable CS0618
-            Assert.That(new Mod[] { new ManiaModO2Health() }.GetRelevantMods(LeaderboardModFilter.All), Is.Empty);
+            var health = new ManiaModO2Health();
 #pragma warning restore CS0618
-            Assert.That(new Mod[] { new ManiaModConstantSpeed() }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
-            Assert.That(new Mod[] { new ManiaModConstantSpeed() }.GetRelevantMods(LeaderboardModFilter.Rate), Is.Empty);
-            Assert.That(new Mod[] { new ManiaModConstantSpeed() }.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.True);
-            Assert.That(new Mod[] { new OsuModClassic() }.GetRelevantMods(LeaderboardModFilter.Conversion), Has.Length.EqualTo(1));
+            var maniaConstantSpeed = new ManiaModConstantSpeed();
+            var taikoConstantSpeed = new TaikoModConstantSpeed();
+            var classic = new OsuModClassic();
+            var loop = new UniversalLoopPlayClip();
+
+            Assert.That(new[] { maniaConstantSpeed }.GetRelevantMods(LeaderboardModFilter.Rate), Is.Empty);
+            Assert.That(new[] { taikoConstantSpeed }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
+            Assert.That(new[] { classic }.GetRelevantMods(LeaderboardModFilter.Difficulty | LeaderboardModFilter.Conversion), Is.Empty);
+            Assert.That(new[] { health }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
+
+            Mod[] exceptions = [maniaConstantSpeed, taikoConstantSpeed, classic, health];
+            Assert.That(exceptions.GetRelevantMods(LeaderboardModFilter.All), Is.Empty);
+            Assert.That(exceptions.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.True);
+            Assert.That(new Mod[] { loop }.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.False);
+        }
+
+        [Test]
+        public void TestAllMatchesModsOutsideIndividualCategories()
+        {
+            Mod[] hidden = [new OsuModHidden()];
+
+            Assert.That(hidden.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.Rate | LeaderboardModFilter.Difficulty), Is.True);
+            Assert.That(hidden.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.False);
+        }
+
+        [TestCase(LeaderboardModFilter.None, "原版匹配")]
+        [TestCase(LeaderboardModFilter.Rate, "变速")]
+        [TestCase(LeaderboardModFilter.Difficulty, "难度")]
+        [TestCase(LeaderboardModFilter.Conversion, "谱面转换")]
+        [TestCase(LeaderboardModFilter.All, "全部已选模组")]
+        public void TestFilterDescriptionsAreLocalised(LeaderboardModFilter filter, string expected)
+        {
+            CultureInfo previousCulture = CultureInfo.CurrentUICulture;
+
+            try
+            {
+                CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("zh-CN");
+                Assert.That(filter.GetLocalisableDescription().ToString(), Is.EqualTo(expected));
+            }
+            finally
+            {
+                CultureInfo.CurrentUICulture = previousCulture;
+            }
+        }
+
+        [Test]
+        public void TestConstantSpeedSettingDoesNotAffectModMatching()
+        {
+            var selected = new ManiaModAdjust();
+            var score = new ManiaModAdjust
+            {
+                ConstantSpeed = { Value = !selected.ConstantSpeed.Value },
+            };
+
+            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.Difficulty), Is.True);
         }
 
         [Test]
