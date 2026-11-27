@@ -10,6 +10,9 @@ using osu.Framework.Testing;
 using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Mods;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
+using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.Tests.NonVisual
@@ -152,6 +155,56 @@ namespace osu.Game.Tests.NonVisual
 
             Assert.That(new EzConfigStore(storage).ModSelectLayoutMode, Is.EqualTo(EzModSelectLayoutMode.Horizontal));
             Assert.That(File.ReadAllText(configFile), Is.EqualTo(legacy));
+        }
+
+        [Test]
+        public void TestLeaderboardImpactExceptionConfigIsCreatedAndUserEditable()
+        {
+            using var storage = new TemporaryNativeStorage("leaderboard-impact-exceptions");
+            string configFile = path(storage, EzModifyPath.CONFIG_ROOT_PATH, LeaderboardModImpactUnit.FILENAME);
+
+            _ = new EzConfigStore(storage);
+
+            Assert.That(File.Exists(configFile), Is.True);
+            var defaultDocument = JsonConvert.DeserializeObject<LeaderboardModImpactExceptionsDocument>(File.ReadAllText(configFile))!;
+            Assert.That(defaultDocument.Version, Is.EqualTo(1));
+            Assert.That(defaultDocument.Conversion, Does.Contain("osu.Game.Rulesets.Mania.Mods.ManiaModConstantSpeed"));
+
+            const string custom_json = """
+                                      {
+                                        "Version": 1,
+                                        "Rate": [],
+                                        "Difficulty": [],
+                                        "Conversion": [],
+                                        "Settings": []
+                                      }
+                                      """;
+            File.WriteAllText(configFile, custom_json);
+
+            var customStore = new EzConfigStore(storage);
+            Assert.That(customStore.ModImpactUnit.GetRelevantMods(new Mod[] { new ManiaModConstantSpeed() }, LeaderboardModFilter.All), Has.Length.EqualTo(1));
+            var selectedAdjust = new ManiaModAdjust();
+            var scoreAdjust = new ManiaModAdjust
+            {
+                ConstantSpeed = { Value = !selectedAdjust.ConstantSpeed.Value },
+            };
+            Assert.That(customStore.ModImpactUnit.ModsMatch(new Mod[] { scoreAdjust }, new Mod[] { selectedAdjust }, LeaderboardModFilter.All), Is.False);
+            Assert.That(File.ReadAllText(configFile), Is.EqualTo(custom_json));
+        }
+
+        [Test]
+        public void TestInvalidLeaderboardImpactExceptionConfigFallsBackWithoutOverwrite()
+        {
+            using var storage = new TemporaryNativeStorage("leaderboard-impact-exceptions-invalid");
+            string configFile = path(storage, EzModifyPath.CONFIG_ROOT_PATH, LeaderboardModImpactUnit.FILENAME);
+
+            _ = new EzConfigStore(storage);
+            const string invalid_json = "{ invalid json";
+            File.WriteAllText(configFile, invalid_json);
+
+            var loadedStore = new EzConfigStore(storage);
+            Assert.That(loadedStore.ModImpactUnit.GetRelevantMods(new Mod[] { new ManiaModConstantSpeed() }, LeaderboardModFilter.All), Is.Empty);
+            Assert.That(File.ReadAllText(configFile), Is.EqualTo(invalid_json));
         }
 
         private static string path(TemporaryNativeStorage storage, string directory, string filename) =>

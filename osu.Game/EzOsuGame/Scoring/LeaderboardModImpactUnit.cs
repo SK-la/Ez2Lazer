@@ -1,49 +1,36 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
+using Newtonsoft.Json;
+using osu.Framework.Logging;
+using osu.Framework.Platform;
 using osu.Game.Configuration;
 using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
-    internal static class LeaderboardModImpactUnit
+    internal sealed class LeaderboardModImpactUnit
     {
-        private readonly record struct ModIdentity(string Acronym, ModType Type);
+        public const string FILENAME = "LeaderboardModImpactExceptions.json";
 
-        private readonly record struct SettingIdentity(ModIdentity Mod, string Name);
+        private const int current_document_version = 1;
 
-        private sealed record ModImpact(Mod Mod, ModIdentity Identity, IReadOnlyDictionary<string, object> Settings);
-
-        // Use stable mod identifiers because ruleset-specific projects depend on osu.Game.
-        private static readonly IReadOnlyDictionary<LeaderboardModFilter, HashSet<ModIdentity>> mod_exceptions = new Dictionary<LeaderboardModFilter, HashSet<ModIdentity>>
+        private static readonly JsonSerializerSettings json_settings = new JsonSerializerSettings
         {
-            [LeaderboardModFilter.Rate] = new HashSet<ModIdentity>
-            {
-                new ModIdentity("NM", ModType.System),
-                new ModIdentity("CS", ModType.Conversion), // Scroll visualisation only.
-            },
-            [LeaderboardModFilter.Difficulty] = new HashSet<ModIdentity>
-            {
-                new ModIdentity("NM", ModType.System),
-                new ModIdentity("CL", ModType.Conversion), // Stable-style judgement behaviour.
-            },
-            [LeaderboardModFilter.Conversion] = new HashSet<ModIdentity>
-            {
-                new ModIdentity("NM", ModType.System),
-                // new ModIdentity("MR", ModType.Conversion),
-                new ModIdentity("CS", ModType.Conversion),
-                new ModIdentity("CL", ModType.Conversion),
-                new ModIdentity("OH", ModType.CommunityMod), // Deprecated fail-condition mod.
-            },
+            Formatting = Formatting.Indented,
+            NullValueHandling = NullValueHandling.Ignore,
         };
 
-        // Mania Adjust's constant-speed option changes only scroll visualisation.
-        private static readonly HashSet<SettingIdentity> setting_exceptions = new HashSet<SettingIdentity>
-        {
-            new SettingIdentity(new ModIdentity("AJ", ModType.CommunityMod), "constant_speed"),
-        };
+        private sealed record ModImpact(Mod Mod, string ModType, IReadOnlyDictionary<string, object> Settings);
+
+        private readonly IReadOnlyDictionary<LeaderboardModFilter, HashSet<string>> modExceptions;
+
+        private readonly HashSet<(string modType, string settingName)> settingExceptions;
 
         private static readonly LeaderboardModFilter[] categories =
         {
@@ -52,10 +39,111 @@ namespace osu.Game.EzOsuGame.Scoring
             LeaderboardModFilter.Conversion,
         };
 
-        public static Mod[] GetRelevantMods(IEnumerable<Mod> mods, LeaderboardModFilter filter)
+        private LeaderboardModImpactUnit(LeaderboardModImpactExceptionsDocument document)
+        {
+            if (document.Version != current_document_version)
+                throw new JsonSerializationException($"Unsupported exception list version {document.Version}.");
+
+            modExceptions = new Dictionary<LeaderboardModFilter, HashSet<string>>
+            {
+                [LeaderboardModFilter.Rate] = new HashSet<string>(document.Rate ?? [], StringComparer.Ordinal),
+                [LeaderboardModFilter.Difficulty] = new HashSet<string>(document.Difficulty ?? [], StringComparer.Ordinal),
+                [LeaderboardModFilter.Conversion] = new HashSet<string>(document.Conversion ?? [], StringComparer.Ordinal),
+            };
+
+            settingExceptions = new HashSet<(string modType, string settingName)>(
+                (document.Settings ?? [])
+                .Where(setting => !string.IsNullOrWhiteSpace(setting.ModType) && !string.IsNullOrWhiteSpace(setting.Name))
+                .Select(setting => (setting.ModType!, setting.Name!)));
+        }
+
+        public static LeaderboardModImpactUnit CreateDefault() => new LeaderboardModImpactUnit(createDefaultDocument());
+
+        public static LeaderboardModImpactUnit Load(Storage configStorage)
+        {
+            var defaults = createDefaultDocument();
+
+            try
+            {
+                if (!configStorage.Exists(FILENAME))
+                {
+                    writeDocument(configStorage, defaults);
+                    return new LeaderboardModImpactUnit(defaults);
+                }
+
+                using (var stream = configStorage.GetStream(FILENAME))
+                {
+                    if (stream == null)
+                        throw new IOException($"Could not open {FILENAME}.");
+
+                    using (var reader = new StreamReader(stream, Encoding.UTF8))
+                    {
+                        string json = reader.ReadToEnd();
+                        var document = JsonConvert.DeserializeObject<LeaderboardModImpactExceptionsDocument>(json, json_settings);
+
+                        if (document == null)
+                            throw new JsonSerializationException($"{FILENAME} did not contain an exception list.");
+
+                        return new LeaderboardModImpactUnit(document);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, $"Failed to load leaderboard mod exceptions {FILENAME}");
+                return new LeaderboardModImpactUnit(defaults);
+            }
+        }
+
+        private static void writeDocument(Storage configStorage, LeaderboardModImpactExceptionsDocument document)
+        {
+            using (var stream = configStorage.CreateFileSafely(FILENAME))
+            using (var writer = new StreamWriter(stream, Encoding.UTF8))
+                writer.Write(JsonConvert.SerializeObject(document, json_settings));
+        }
+
+        private static LeaderboardModImpactExceptionsDocument createDefaultDocument() => new LeaderboardModImpactExceptionsDocument
+        {
+            Version = current_document_version,
+            Rate =
+            [
+                "osu.Game.Rulesets.Mods.ModNoMod",
+                "osu.Game.Rulesets.Mania.Mods.ManiaModConstantSpeed",
+                "osu.Game.Rulesets.Taiko.Mods.TaikoModConstantSpeed",
+            ],
+            Difficulty =
+            [
+                "osu.Game.Rulesets.Mods.ModNoMod",
+                "osu.Game.Rulesets.Osu.Mods.OsuModClassic",
+                "osu.Game.Rulesets.Taiko.Mods.TaikoModClassic",
+                "osu.Game.Rulesets.Catch.Mods.CatchModClassic",
+                "osu.Game.Rulesets.Mania.Mods.ManiaModClassic",
+            ],
+            Conversion =
+            [
+                "osu.Game.Rulesets.Mods.ModNoMod",
+                "osu.Game.Rulesets.Mania.Mods.ManiaModConstantSpeed",
+                "osu.Game.Rulesets.Taiko.Mods.TaikoModConstantSpeed",
+                "osu.Game.Rulesets.Osu.Mods.OsuModClassic",
+                "osu.Game.Rulesets.Taiko.Mods.TaikoModClassic",
+                "osu.Game.Rulesets.Catch.Mods.CatchModClassic",
+                "osu.Game.Rulesets.Mania.Mods.ManiaModClassic",
+                "osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod.ManiaModO2Health",
+            ],
+            Settings =
+            [
+                new LeaderboardModSettingException
+                {
+                    ModType = "osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod.ManiaModAdjust",
+                    Name = "constant_speed",
+                },
+            ],
+        };
+
+        public Mod[] GetRelevantMods(IEnumerable<Mod> mods, LeaderboardModFilter filter)
             => getRelevantModImpacts(mods, filter).Select(impact => impact.Mod).ToArray();
 
-        public static bool ModsMatch(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods, LeaderboardModFilter filter)
+        public bool ModsMatch(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods, LeaderboardModFilter filter)
         {
             if (filter == LeaderboardModFilter.None)
                 return true;
@@ -79,7 +167,7 @@ namespace osu.Game.EzOsuGame.Scoring
             return unmatchedSelectedMods.Count == 0;
         }
 
-        private static ModImpact[] getRelevantModImpacts(IEnumerable<Mod> mods, LeaderboardModFilter filter)
+        private ModImpact[] getRelevantModImpacts(IEnumerable<Mod> mods, LeaderboardModFilter filter)
         {
             return mods.Select(createImpact)
                        .Where(impact => isRelevant(impact.Mod, filter) && !isExcepted(impact, filter))
@@ -88,21 +176,20 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private static ModImpact createImpact(Mod mod)
         {
-            var identity = new ModIdentity(mod.Acronym, mod.Type);
             var settings = mod.SettingsMap.ToDictionary(setting => setting.Key, setting => setting.Value.GetUnderlyingSettingValue());
-            return new ModImpact(mod, identity, settings);
+            return new ModImpact(mod, mod.GetType().FullName ?? mod.GetType().Name, settings);
         }
 
         private static bool isRelevant(Mod mod, LeaderboardModFilter filter)
             => filter == LeaderboardModFilter.All
                || categories.Any(category => filter.HasFlag(category) && getCategories(mod).HasFlag(category));
 
-        private static bool isExcepted(ModImpact impact, LeaderboardModFilter filter)
+        private bool isExcepted(ModImpact impact, LeaderboardModFilter filter)
             => filter == LeaderboardModFilter.All
-                ? categories.Any(category => mod_exceptions[category].Contains(impact.Identity))
+                ? categories.Any(category => modExceptions[category].Contains(impact.ModType))
                 : categories.Any(category => filter.HasFlag(category)
                                              && getCategories(impact.Mod).HasFlag(category)
-                                             && mod_exceptions[category].Contains(impact.Identity));
+                                             && modExceptions[category].Contains(impact.ModType));
 
         private static LeaderboardModFilter getCategories(Mod mod)
         {
@@ -122,14 +209,14 @@ namespace osu.Game.EzOsuGame.Scoring
             return result;
         }
 
-        private static bool impactsMatch(ModImpact scoreMod, ModImpact selectedMod)
+        private bool impactsMatch(ModImpact scoreMod, ModImpact selectedMod)
         {
-            if (scoreMod.Mod.GetType() != selectedMod.Mod.GetType() || scoreMod.Identity != selectedMod.Identity)
+            if (scoreMod.ModType != selectedMod.ModType)
                 return false;
 
             foreach (var (settingName, scoreSetting) in scoreMod.Settings)
             {
-                if (setting_exceptions.Contains(new SettingIdentity(scoreMod.Identity, settingName)))
+                if (settingExceptions.Contains((scoreMod.ModType, settingName)))
                     continue;
 
                 if (!selectedMod.Settings.TryGetValue(settingName, out object? selectedSetting)
@@ -137,8 +224,28 @@ namespace osu.Game.EzOsuGame.Scoring
                     return false;
             }
 
-            return scoreMod.Settings.Keys.Count(settingName => !setting_exceptions.Contains(new SettingIdentity(scoreMod.Identity, settingName)))
-                   == selectedMod.Settings.Keys.Count(settingName => !setting_exceptions.Contains(new SettingIdentity(selectedMod.Identity, settingName)));
+            return scoreMod.Settings.Keys.Count(settingName => !settingExceptions.Contains((scoreMod.ModType, settingName)))
+                   == selectedMod.Settings.Keys.Count(settingName => !settingExceptions.Contains((selectedMod.ModType, settingName)));
         }
+    }
+
+    internal sealed class LeaderboardModImpactExceptionsDocument
+    {
+        public int Version { get; set; } = 1;
+
+        public List<string>? Rate { get; set; }
+
+        public List<string>? Difficulty { get; set; }
+
+        public List<string>? Conversion { get; set; }
+
+        public List<LeaderboardModSettingException>? Settings { get; set; }
+    }
+
+    internal sealed class LeaderboardModSettingException
+    {
+        public string? ModType { get; set; }
+
+        public string? Name { get; set; }
     }
 }

@@ -2,11 +2,8 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Collections.Generic;
 using osu.Framework.Localisation;
-using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
-using osu.Game.Rulesets.Mods;
 
 namespace osu.Game.EzOsuGame.Scoring
 {
@@ -35,17 +32,5 @@ namespace osu.Game.EzOsuGame.Scoring
         /// <summary>Match all mods except the exceptions from every category.</summary>
         [LocalisableDescription(typeof(EzSongSelectStrings), nameof(EzSongSelectStrings.LEADERBOARD_MOD_FILTER_ALL))]
         All = Rate | Difficulty | Conversion,
-    }
-
-    internal static class LeaderboardModFilterExtensions
-    {
-        public static Mod[] GetRelevantMods(this IEnumerable<Mod> mods, LeaderboardModFilter filter)
-            => LeaderboardModImpactUnit.GetRelevantMods(mods, filter);
-
-        public static bool HasMatchingMods(this IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods, LeaderboardModFilter filter)
-            => EzLocalScoreQueries.MatchesLeaderboardMods(scoreMods, selectedMods, filter);
-
-        public static bool JudgeModeMatches(int scoreJudgeMode, EzEnumJudgeMode? selectedJudgeMode, LeaderboardModFilter filter)
-            => EzLocalScoreQueries.JudgeModeMatches(scoreJudgeMode, selectedJudgeMode, filter);
     }
 }

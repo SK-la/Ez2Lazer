@@ -19,15 +19,17 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
     [TestFixture]
     public class LeaderboardModFilterTest
     {
+        private readonly LeaderboardModImpactUnit impactUnit = LeaderboardModImpactUnit.CreateDefault();
+
         [Test]
         public void TestLoopPlayClipIsConversionNotRate()
         {
             var loop = new UniversalLoopPlayClip();
 
-            Assert.That(new[] { loop }.GetRelevantMods(LeaderboardModFilter.Rate), Is.Empty);
-            Assert.That(new[] { loop }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.EqualTo(new[] { loop }));
-            Assert.That(new Mod[] { loop }.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.Rate), Is.True);
-            Assert.That(new Mod[] { loop }.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.Conversion), Is.False);
+            Assert.That(impactUnit.GetRelevantMods(new[] { loop }, LeaderboardModFilter.Rate), Is.Empty);
+            Assert.That(impactUnit.GetRelevantMods(new[] { loop }, LeaderboardModFilter.Conversion), Is.EqualTo(new[] { loop }));
+            Assert.That(impactUnit.ModsMatch(new Mod[] { loop }, Array.Empty<Mod>(), LeaderboardModFilter.Rate), Is.True);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { loop }, Array.Empty<Mod>(), LeaderboardModFilter.Conversion), Is.False);
         }
 
         [Test]
@@ -40,8 +42,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                 new ManiaModRemedy()
             };
 
-            Assert.That(mods.GetRelevantMods(LeaderboardModFilter.Difficulty), Is.EqualTo(mods));
-            Assert.That(mods.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
+            Assert.That(impactUnit.GetRelevantMods(mods, LeaderboardModFilter.Difficulty), Is.EqualTo(mods));
+            Assert.That(impactUnit.GetRelevantMods(mods, LeaderboardModFilter.Conversion), Is.Empty);
         }
 
         [Test]
@@ -55,16 +57,16 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var classic = new OsuModClassic();
             var loop = new UniversalLoopPlayClip();
 
-            Assert.That(new[] { maniaConstantSpeed }.GetRelevantMods(LeaderboardModFilter.Rate), Is.Empty);
-            Assert.That(new[] { maniaConstantSpeed }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
-            Assert.That(new[] { taikoConstantSpeed }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
-            Assert.That(new[] { classic }.GetRelevantMods(LeaderboardModFilter.Difficulty | LeaderboardModFilter.Conversion), Is.Empty);
-            Assert.That(new[] { health }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
+            Assert.That(impactUnit.GetRelevantMods(new[] { maniaConstantSpeed }, LeaderboardModFilter.Rate), Is.Empty);
+            Assert.That(impactUnit.GetRelevantMods(new[] { maniaConstantSpeed }, LeaderboardModFilter.Conversion), Is.Empty);
+            Assert.That(impactUnit.GetRelevantMods(new[] { taikoConstantSpeed }, LeaderboardModFilter.Conversion), Is.Empty);
+            Assert.That(impactUnit.GetRelevantMods(new[] { classic }, LeaderboardModFilter.Difficulty | LeaderboardModFilter.Conversion), Is.Empty);
+            Assert.That(impactUnit.GetRelevantMods(new[] { health }, LeaderboardModFilter.Conversion), Is.Empty);
 
             Mod[] exceptions = [new ModNoMod(), maniaConstantSpeed, taikoConstantSpeed, classic, health];
-            Assert.That(exceptions.GetRelevantMods(LeaderboardModFilter.All), Is.Empty);
-            Assert.That(exceptions.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.True);
-            Assert.That(new Mod[] { loop }.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.False);
+            Assert.That(impactUnit.GetRelevantMods(exceptions, LeaderboardModFilter.All), Is.Empty);
+            Assert.That(impactUnit.ModsMatch(exceptions, Array.Empty<Mod>(), LeaderboardModFilter.All), Is.True);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { loop }, Array.Empty<Mod>(), LeaderboardModFilter.All), Is.False);
         }
 
         [Test]
@@ -72,8 +74,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
         {
             Mod[] hidden = [new OsuModHidden()];
 
-            Assert.That(hidden.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.Rate | LeaderboardModFilter.Difficulty), Is.True);
-            Assert.That(hidden.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.False);
+            Assert.That(impactUnit.ModsMatch(hidden, Array.Empty<Mod>(), LeaderboardModFilter.Rate | LeaderboardModFilter.Difficulty), Is.True);
+            Assert.That(impactUnit.ModsMatch(hidden, Array.Empty<Mod>(), LeaderboardModFilter.All), Is.False);
         }
 
         [TestCase(LeaderboardModFilter.None, "原版匹配")]
@@ -105,7 +107,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                 ConstantSpeed = { Value = !selected.ConstantSpeed.Value },
             };
 
-            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.Difficulty), Is.True);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { score }, new Mod[] { selected }, LeaderboardModFilter.Difficulty), Is.True);
         }
 
         [Test]
@@ -121,10 +123,10 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                 OverallDifficulty = { Value = 4 },
             };
 
-            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.All), Is.True);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { score }, new Mod[] { selected }, LeaderboardModFilter.All), Is.True);
 
             score.OverallDifficulty.Value = 5;
-            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.Difficulty), Is.False);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { score }, new Mod[] { selected }, LeaderboardModFilter.Difficulty), Is.False);
         }
 
         [Test]
@@ -139,8 +141,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                 PerfectHit = { Value = 25 },
             };
 
-            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.Rate), Is.True);
-            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.Difficulty), Is.False);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { score }, new Mod[] { selected }, LeaderboardModFilter.Rate), Is.True);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { score }, new Mod[] { selected }, LeaderboardModFilter.Difficulty), Is.False);
         }
 
         [Test]
@@ -152,10 +154,10 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
                 SpeedChange = { Value = 1.75 },
             };
 
-            Assert.That(new Mod[] { selected }.HasMatchingMods(new Mod[] { score }, LeaderboardModFilter.Rate), Is.False);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { selected }, new Mod[] { score }, LeaderboardModFilter.Rate), Is.False);
 
             score.SpeedChange.Value = selected.SpeedChange.Value;
-            Assert.That(new Mod[] { selected }.HasMatchingMods(new Mod[] { score }, LeaderboardModFilter.Rate), Is.True);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { selected }, new Mod[] { score }, LeaderboardModFilter.Rate), Is.True);
         }
 
         [Test]
@@ -164,7 +166,7 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             var selected = new Mod[] { new ManiaModJudgmentsAdjust(), new OsuModDoubleTime() };
             var scoreWithUnrelated = new Mod[] { new ManiaModJudgmentsAdjust(), new OsuModDoubleTime(), new OsuModNoFail() };
 
-            Assert.That(scoreWithUnrelated.HasMatchingMods(selected, LeaderboardModFilter.Rate | LeaderboardModFilter.Difficulty), Is.True);
+            Assert.That(impactUnit.ModsMatch(scoreWithUnrelated, selected, LeaderboardModFilter.Rate | LeaderboardModFilter.Difficulty), Is.True);
 
             var differentRate = new OsuModDoubleTime
             {
@@ -172,17 +174,17 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             };
             var scoreWithDifferentSelectedCategory = new Mod[] { new ManiaModJudgmentsAdjust(), differentRate, new OsuModNoFail() };
 
-            Assert.That(scoreWithDifferentSelectedCategory.HasMatchingMods(selected, LeaderboardModFilter.Rate | LeaderboardModFilter.Difficulty), Is.False);
-            Assert.That(scoreWithDifferentSelectedCategory.HasMatchingMods(selected, LeaderboardModFilter.Difficulty), Is.True);
+            Assert.That(impactUnit.ModsMatch(scoreWithDifferentSelectedCategory, selected, LeaderboardModFilter.Rate | LeaderboardModFilter.Difficulty), Is.False);
+            Assert.That(impactUnit.ModsMatch(scoreWithDifferentSelectedCategory, selected, LeaderboardModFilter.Difficulty), Is.True);
         }
 
         [Test]
         public void TestSelectedDifficultyCategoryMatchesJudgeMode()
         {
-            Assert.That(LeaderboardModFilterExtensions.JudgeModeMatches((int)EzEnumJudgeMode.StableClassic, EzEnumJudgeMode.StableClassic, LeaderboardModFilter.Difficulty), Is.True);
-            Assert.That(LeaderboardModFilterExtensions.JudgeModeMatches((int)EzEnumJudgeMode.Lazer, EzEnumJudgeMode.StableClassic, LeaderboardModFilter.Difficulty), Is.False);
-            Assert.That(LeaderboardModFilterExtensions.JudgeModeMatches((int)EzEnumJudgeMode.Lazer, EzEnumJudgeMode.StableClassic, LeaderboardModFilter.Rate), Is.True);
-            Assert.That(LeaderboardModFilterExtensions.JudgeModeMatches(-1, EzEnumJudgeMode.Lazer, LeaderboardModFilter.Difficulty), Is.True);
+            Assert.That(EzLocalScoreQueries.JudgeModeMatches((int)EzEnumJudgeMode.StableClassic, EzEnumJudgeMode.StableClassic, LeaderboardModFilter.Difficulty), Is.True);
+            Assert.That(EzLocalScoreQueries.JudgeModeMatches((int)EzEnumJudgeMode.Lazer, EzEnumJudgeMode.StableClassic, LeaderboardModFilter.Difficulty), Is.False);
+            Assert.That(EzLocalScoreQueries.JudgeModeMatches((int)EzEnumJudgeMode.Lazer, EzEnumJudgeMode.StableClassic, LeaderboardModFilter.Rate), Is.True);
+            Assert.That(EzLocalScoreQueries.JudgeModeMatches(-1, EzEnumJudgeMode.Lazer, LeaderboardModFilter.Difficulty), Is.True);
         }
     }
 }

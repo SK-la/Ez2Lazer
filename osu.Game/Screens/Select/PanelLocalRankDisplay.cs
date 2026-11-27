@@ -12,6 +12,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Configuration;
 using osu.Game.Database;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests.Responses;
@@ -52,6 +53,9 @@ namespace osu.Game.Screens.Select
 
         [Resolved]
         private RealmAccess realm { get; set; } = null!;
+
+        [Resolved]
+        private EzConfigStore ezConfigStore { get; set; } = null!;
 
         [Resolved]
         private OsuConfigManager osuConfig { get; set; } = null!;
@@ -185,7 +189,7 @@ namespace osu.Game.Screens.Select
                 {
                     var selectedJudgeMode = ezConfig.GetGameplayEnvironment(ruleset.Value).JudgeMode;
                     matchingScores = matchingScores.Where(score =>
-                        EzLocalScoreQueries.MatchesLeaderboardMods(score.Mods, selectedMods.Value, modFilter.Value)
+                        ezConfigStore.ModImpactUnit.ModsMatch(score.Mods, selectedMods.Value, modFilter.Value)
                         && EzLocalScoreQueries.JudgeModeMatches(score.JudgeMode, selectedJudgeMode, modFilter.Value));
                 }
             }

@@ -14,6 +14,7 @@ using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Extensions;
 using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
@@ -47,6 +48,9 @@ namespace osu.Game.Online.Leaderboards
 
         [Resolved]
         private RulesetStore rulesets { get; set; } = null!;
+
+        [Resolved]
+        private EzConfigStore ezConfigStore { get; set; } = null!;
 
         /// <summary>
         /// Fetch leaderboard content with the new criteria specified in the background.
@@ -147,7 +151,7 @@ namespace osu.Game.Online.Leaderboards
 
                         if (filterCategories)
                         {
-                            matchingScores = matchingScores.Where(s => s.Mods.HasMatchingMods(newCriteria.ExactMods!, newCriteria.ModFilter));
+                            matchingScores = matchingScores.Where(s => ezConfigStore.ModImpactUnit.ModsMatch(s.Mods, newCriteria.ExactMods!, newCriteria.ModFilter));
 
                             // An unfiltered personal best is not necessarily the best matching score.
                             userScore = null;
@@ -197,8 +201,8 @@ namespace osu.Game.Online.Leaderboards
             {
                 if (CurrentCriteria.ModFilter != LeaderboardModFilter.None)
                 {
-                    newScores = newScores.Where(s => s.Mods.HasMatchingMods(CurrentCriteria.ExactMods, CurrentCriteria.ModFilter)
-                                                     && LeaderboardModFilterExtensions.JudgeModeMatches(s.JudgeMode, CurrentCriteria.EzJudgeMode, CurrentCriteria.ModFilter));
+                    newScores = newScores.Where(s => ezConfigStore.ModImpactUnit.ModsMatch(s.Mods, CurrentCriteria.ExactMods, CurrentCriteria.ModFilter)
+                                                     && EzLocalScoreQueries.JudgeModeMatches(s.JudgeMode, CurrentCriteria.EzJudgeMode, CurrentCriteria.ModFilter));
                 }
                 else
                 {

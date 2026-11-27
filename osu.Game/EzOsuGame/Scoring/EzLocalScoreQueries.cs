@@ -84,9 +84,6 @@ namespace osu.Game.EzOsuGame.Scoring
             return selectedMods.Select(m => m.Acronym).ToHashSet().SetEquals(scoreMods.Select(m => m.Acronym));
         }
 
-        public static bool MatchesLeaderboardMods(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods, LeaderboardModFilter filter)
-            => LeaderboardModImpactUnit.ModsMatch(scoreMods, selectedMods, filter);
-
         public static bool JudgeModeMatches(int scoreJudgeMode, EzEnumJudgeMode? selectedJudgeMode, LeaderboardModFilter filter)
         {
             if (!filter.HasFlag(LeaderboardModFilter.Difficulty) || selectedJudgeMode == null)
