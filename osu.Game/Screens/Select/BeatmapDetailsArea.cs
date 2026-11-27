@@ -106,6 +106,7 @@ namespace osu.Game.Screens.Select
                         Scope = { BindTarget = header.Scope },
                         Sorting = { BindTarget = header.Sorting },
                         FilterBySelectedMods = { BindTarget = header.FilterBySelectedMods },
+                        ModFilter = { BindTarget = header.ModFilter },
                     };
 
                     break;

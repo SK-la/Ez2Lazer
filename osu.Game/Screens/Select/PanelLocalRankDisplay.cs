@@ -18,6 +18,7 @@ using osu.Game.Online.API.Requests.Responses;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Scoring;
 using osuTK;
 using Realms;
@@ -47,13 +48,13 @@ namespace osu.Game.Screens.Select
         private IBindable<RulesetInfo> ruleset { get; set; } = null!;
 
         [Resolved]
+        private Ez2ConfigManager ezConfig { get; set; } = null!;
+
+        [Resolved]
         private RealmAccess realm { get; set; } = null!;
 
         [Resolved]
         private OsuConfigManager osuConfig { get; set; } = null!;
-
-        [Resolved]
-        private Ez2ConfigManager ezConfig { get; set; } = null!;
 
         [Resolved]
         private IBindable<IReadOnlyList<Mod>> selectedMods { get; set; } = null!;
@@ -64,13 +65,17 @@ namespace osu.Game.Screens.Select
 
         private readonly UpdateableRank updateable;
 
+        private Bindable<LeaderboardModFilter> modFilter = null!;
         private Bindable<bool> filterBySelectedMods = null!;
-        private Bindable<bool> rankFollowsModFilter = null!;
+        private Bindable<LeaderboardSortMode> sorting = null!;
+        private Bindable<BeatmapDetailTab> detailTab = null!;
+        private Bindable<EzEnumJudgeMode> standardJudgeMode = null!;
+        private Bindable<EzEnumJudgeMode> maniaJudgeMode = null!;
 
         /// <summary>
-        /// 当前谱面本地成绩的最小快照：Mod / 筛选开关变化时要在同一批成绩上重算，不能只留一条 top。
+        /// A detached snapshot lets filter and sorting changes reuse the same score set.
         /// </summary>
-        private readonly List<LocalScoreEntry> entries = new List<LocalScoreEntry>();
+        private readonly List<LocalScoreEntry> localScores = new List<LocalScoreEntry>();
 
         public bool HasRank => updateable.Rank != null;
 
@@ -97,11 +102,19 @@ namespace osu.Game.Screens.Select
         {
             base.LoadComplete();
 
+            modFilter = ezConfig.GetBindable<LeaderboardModFilter>(Ez2Setting.BeatmapDetailScoreModFilter);
             filterBySelectedMods = osuConfig.GetBindable<bool>(OsuSetting.BeatmapDetailModsFilter);
-            rankFollowsModFilter = ezConfig.GetBindable<bool>(Ez2Setting.SongSelectPanelRankFollowsModFilter);
+            sorting = osuConfig.GetBindable<LeaderboardSortMode>(OsuSetting.BeatmapLeaderboardSortMode);
+            detailTab = osuConfig.GetBindable<BeatmapDetailTab>(OsuSetting.BeatmapDetailTab);
+            standardJudgeMode = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
+            maniaJudgeMode = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
 
+            modFilter.BindValueChanged(_ => updateRank());
             filterBySelectedMods.BindValueChanged(_ => updateRank());
-            rankFollowsModFilter.BindValueChanged(_ => updateRank());
+            sorting.BindValueChanged(_ => updateRank());
+            detailTab.BindValueChanged(_ => updateRank());
+            standardJudgeMode.BindValueChanged(onJudgeModeChanged);
+            maniaJudgeMode.BindValueChanged(onJudgeModeChanged);
             selectedMods.BindValueChanged(_ => updateRank());
 
             ruleset.BindValueChanged(_ => updateSubscription());
@@ -111,7 +124,7 @@ namespace osu.Game.Screens.Select
         private void updateSubscription()
         {
             scoreSubscription?.Dispose();
-            entries.Clear();
+            localScores.Clear();
             setRank(null);
 
             if (beatmap == null)
@@ -127,7 +140,7 @@ namespace osu.Game.Screens.Select
             if (changes?.HasCollectionChanges() == false)
                 return;
 
-            entries.Clear();
+            localScores.Clear();
 
             foreach (var score in sender)
             {
@@ -137,15 +150,20 @@ namespace osu.Game.Screens.Select
                 if (!ruleset.Value.Equals(score.Ruleset))
                     continue;
 
-                entries.Add(new LocalScoreEntry(score.Rank, score.TotalScore, score.Date.UtcDateTime.Ticks, score.Mods));
+                localScores.Add(new LocalScoreEntry(
+                    score.Rank,
+                    score.TotalScore,
+                    score.Accuracy,
+                    score.MaxCombo,
+                    score.Statistics.GetValueOrDefault(HitResult.Miss, 0),
+                    score.Date.UtcDateTime.Ticks,
+                    score.Mods,
+                    score.JudgeMode));
             }
 
             updateRank();
         }
 
-        /// <summary>
-        /// 重算面板评级。筛选开关未生效时保持上游语义（最高分那条成绩的评级）。
-        /// </summary>
         private void updateRank()
         {
             if (IsDisposed)
@@ -157,37 +175,56 @@ namespace osu.Game.Screens.Select
                 return;
             }
 
-            bool followsModFilter = rankFollowsModFilter.Value && filterBySelectedMods.Value;
+            IEnumerable<LocalScoreEntry> matchingScores = localScores;
 
-            ScoreRank? best = null;
-            long bestTotalScore = long.MinValue;
-            long bestDateTicks = long.MaxValue;
-
-            foreach (var entry in entries)
+            if (filterBySelectedMods.Value)
             {
-                if (followsModFilter)
+                if (modFilter.Value == LeaderboardModFilter.None)
+                    matchingScores = matchingScores.Where(score => EzLocalScoreQueries.MatchesExactMods(score.Mods, selectedMods.Value));
+                else
                 {
-                    if (!EzLocalScoreQueries.MatchesExactMods(entry.Mods, selectedMods.Value))
-                        continue;
-
-                    if (best == null || entry.Rank > best.Value)
-                        best = entry.Rank;
-
-                    continue;
-                }
-
-                // 未过滤：TotalScore 最高者优先，同分取更早的成绩。
-                if (best == null
-                    || entry.TotalScore > bestTotalScore
-                    || (entry.TotalScore == bestTotalScore && entry.DateTicks < bestDateTicks))
-                {
-                    best = entry.Rank;
-                    bestTotalScore = entry.TotalScore;
-                    bestDateTicks = entry.DateTicks;
+                    var selectedJudgeMode = ezConfig.GetGameplayEnvironment(ruleset.Value).JudgeMode;
+                    matchingScores = matchingScores.Where(score =>
+                        EzLocalScoreQueries.MatchesLeaderboardMods(score.Mods, selectedMods.Value, modFilter.Value)
+                        && EzLocalScoreQueries.JudgeModeMatches(score.JudgeMode, selectedJudgeMode, modFilter.Value));
                 }
             }
 
-            setRank(best);
+            LeaderboardSortMode effectiveSorting = detailTab.Value == BeatmapDetailTab.Local
+                ? sorting.Value
+                : LeaderboardSortMode.Score;
+            setRank(orderByCriteria(matchingScores, effectiveSorting).Select(score => (ScoreRank?)score.Rank).FirstOrDefault());
+        }
+
+        // Keep these keys aligned with ScoreInfoExtensions.OrderByCriteria.
+        private static IOrderedEnumerable<LocalScoreEntry> orderByCriteria(IEnumerable<LocalScoreEntry> scores, LeaderboardSortMode sorting)
+        {
+            switch (sorting)
+            {
+                case LeaderboardSortMode.Score:
+                    return scores.OrderByDescending(score => score.TotalScore);
+
+                case LeaderboardSortMode.Accuracy:
+                    return scores.OrderByDescending(score => score.Accuracy).ThenByDescending(score => score.TotalScore);
+
+                case LeaderboardSortMode.MaxCombo:
+                    return scores.OrderByDescending(score => score.MaxCombo).ThenByDescending(score => score.TotalScore);
+
+                case LeaderboardSortMode.Misses:
+                    return scores.OrderBy(score => score.Misses).ThenByDescending(score => score.TotalScore);
+
+                case LeaderboardSortMode.Date:
+                    return scores.OrderByDescending(score => score.DateTicks);
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(sorting), sorting, null);
+            }
+        }
+
+        private void onJudgeModeChanged(ValueChangedEvent<EzEnumJudgeMode> _)
+        {
+            if (filterBySelectedMods.Value && modFilter.Value.HasFlag(LeaderboardModFilter.Difficulty))
+                updateRank();
         }
 
         private void setRank(ScoreRank? rank)
@@ -200,17 +237,21 @@ namespace osu.Game.Screens.Select
         {
             scoreSubscription?.Dispose();
             beatmap = null;
-            entries.Clear();
+            localScores.Clear();
 
             if (IsLoaded)
             {
+                modFilter.UnbindAll();
                 filterBySelectedMods.UnbindAll();
-                rankFollowsModFilter.UnbindAll();
+                sorting.UnbindAll();
+                detailTab.UnbindAll();
+                standardJudgeMode.ValueChanged -= onJudgeModeChanged;
+                maniaJudgeMode.ValueChanged -= onJudgeModeChanged;
             }
 
             base.Dispose(isDisposing);
         }
 
-        private readonly record struct LocalScoreEntry(ScoreRank Rank, long TotalScore, long DateTicks, Mod[] Mods);
+        private readonly record struct LocalScoreEntry(ScoreRank Rank, long TotalScore, double Accuracy, int MaxCombo, int Misses, long DateTicks, Mod[] Mods, int JudgeMode);
     }
 }

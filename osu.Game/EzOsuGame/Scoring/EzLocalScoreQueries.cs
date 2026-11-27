@@ -5,7 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -80,11 +82,93 @@ namespace osu.Game.EzOsuGame.Scoring
             if (selectedMods.Count == 0)
                 return scoreMods.Length == 0;
 
-            //TODO: 1. 排行版的「已选模组」，需要改进匹配逻辑，比如去SV之类不能被过滤。
-            //TODO: 2. 这个匹配Mod筛选，暂时使用开关。未来需要改成一个多选下拉菜单，用来控制，哪类Mod被视为高差异Mod，高差异Mod即联动「已选模组」，以及当前功能。
-            //届时，此开关将被移除，原本的开关功能完全交由「已选模组」。
-            //TODO: 3. 难度卡Panel上所展示的评级，关联排行榜中排序条件切换展示规则。
             return selectedMods.Select(m => m.Acronym).ToHashSet().SetEquals(scoreMods.Select(m => m.Acronym));
+        }
+
+        public static bool MatchesLeaderboardMods(IReadOnlyList<Mod> scoreMods, IReadOnlyList<Mod> selectedMods, LeaderboardModFilter filter)
+        {
+            if (filter == LeaderboardModFilter.None)
+                return true;
+
+            var unmatchedSelectedMods = GetRelevantLeaderboardMods(selectedMods, filter).ToList();
+            var relevantScoreMods = GetRelevantLeaderboardMods(scoreMods, filter);
+
+            if (unmatchedSelectedMods.Count != relevantScoreMods.Length)
+                return false;
+
+            foreach (var scoreMod in relevantScoreMods)
+            {
+                int matchingIndex = unmatchedSelectedMods.FindIndex(selectedMod => modsMatchForLeaderboard(scoreMod, selectedMod));
+
+                if (matchingIndex < 0)
+                    return false;
+
+                unmatchedSelectedMods.RemoveAt(matchingIndex);
+            }
+
+            return unmatchedSelectedMods.Count == 0;
+        }
+
+        internal static Mod[] GetRelevantLeaderboardMods(IEnumerable<Mod> mods, LeaderboardModFilter filter)
+            => mods.Where(mod => (getLeaderboardModCategories(mod) & filter) != 0).ToArray();
+
+        public static bool JudgeModeMatches(int scoreJudgeMode, EzEnumJudgeMode? selectedJudgeMode, LeaderboardModFilter filter)
+        {
+            if (!filter.HasFlag(LeaderboardModFilter.Difficulty) || selectedJudgeMode == null)
+                return true;
+
+            int effectiveScoreMode = scoreJudgeMode < 0 ? (int)EzEnumJudgeMode.Lazer : scoreJudgeMode;
+            return effectiveScoreMode == (int)selectedJudgeMode.Value;
+        }
+
+        private static LeaderboardModFilter getLeaderboardModCategories(Mod mod)
+        {
+            var categories = LeaderboardModFilter.None;
+
+            if (mod is IApplicableToRate)
+                categories |= LeaderboardModFilter.Rate;
+
+            if (mod is IApplicableToDifficulty)
+                categories |= LeaderboardModFilter.Difficulty;
+
+            if (mod is IApplicableToBeatmapConverter
+                || (mod is IApplicableAfterBeatmapConversion && mod is not IApplicableToDifficulty && mod is not ModFailCondition)
+                || (mod.Type == ModType.Conversion && !isDrawableOnlyMod(mod)))
+                categories |= LeaderboardModFilter.Conversion;
+
+            return categories;
+        }
+
+        private static bool isDrawableOnlyMod(Mod mod)
+        {
+            var applicableInterfaces = mod.GetType().GetInterfaces()
+                                          .Where(type => type != typeof(IApplicableMod) && typeof(IApplicableMod).IsAssignableFrom(type))
+                                          .ToArray();
+
+            return applicableInterfaces.Length == 1
+                   && applicableInterfaces[0].IsGenericType
+                   && applicableInterfaces[0].GetGenericTypeDefinition() == typeof(IApplicableToDrawableRuleset<>);
+        }
+
+        private static bool modsMatchForLeaderboard(Mod scoreMod, Mod selectedMod)
+        {
+            if (scoreMod.GetType() != selectedMod.GetType())
+                return false;
+
+            foreach (var (settingName, scoreSetting) in scoreMod.SettingsMap)
+            {
+                // Mania Adjust's constant-speed setting only changes scroll visualisation.
+                if (scoreMod.Acronym == "AJ" && settingName == "constant_speed")
+                    continue;
+
+                if (!selectedMod.SettingsMap.TryGetValue(settingName, out var selectedSetting))
+                    return false;
+
+                if (!EqualityComparer<object?>.Default.Equals(scoreSetting.GetUnderlyingSettingValue(), selectedSetting.GetUnderlyingSettingValue()))
+                    return false;
+            }
+
+            return scoreMod.SettingsMap.Count == selectedMod.SettingsMap.Count;
         }
 
         /// <summary>

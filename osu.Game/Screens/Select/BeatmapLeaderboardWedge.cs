@@ -20,6 +20,10 @@ using osu.Framework.Input.Events;
 using osu.Framework.Threading;
 using osu.Framework.Utils;
 using osu.Game.Beatmaps;
+using osu.Game.Configuration;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.UI;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Containers;
@@ -49,6 +53,8 @@ namespace osu.Game.Screens.Select
         public IBindable<LeaderboardSortMode> Sorting { get; } = new Bindable<LeaderboardSortMode>();
 
         public IBindable<bool> FilterBySelectedMods { get; } = new BindableBool();
+
+        public IBindable<LeaderboardModFilter> ModFilter { get; } = new Bindable<LeaderboardModFilter>();
 
         [Resolved]
         private LeaderboardManager leaderboardManager { get; set; } = null!;
@@ -82,8 +88,20 @@ namespace osu.Game.Screens.Select
         private Container<BeatmapLeaderboardScore> personalBestScoreContainer = null!;
         private OsuSpriteText personalBestText = null!;
         private LoadingLayer loading = null!;
+        private TruncatingSpriteText onlineSampleNotice = null!;
+
+        private bool filteringOnlineSample => Scope.Value != BeatmapLeaderboardScope.Local
+                                              && FilterBySelectedMods.Value
+                                              && ModFilter.Value != LeaderboardModFilter.None;
 
         private CancellationTokenSource? cancellationTokenSource;
+
+        private ModSettingChangeTracker? modSettingChangeTracker;
+
+        private Bindable<EzEnumJudgeMode> stdJudgeMode = null!;
+        private Bindable<EzEnumJudgeMode> maniaJudgeMode = null!;
+
+        private Ez2ConfigManager ezConfig = null!;
 
         private readonly IBindable<LeaderboardScores?> fetchedScores = new Bindable<LeaderboardScores?>();
 
@@ -118,9 +136,13 @@ namespace osu.Game.Screens.Select
         private readonly List<ScheduledDelegate> scoreSfxDelegates = new List<ScheduledDelegate>();
 
         [BackgroundDependencyLoader]
-        private void load(AudioManager audio)
+        private void load(AudioManager audio, Ez2ConfigManager ezConfig)
         {
+            this.ezConfig = ezConfig;
             RelativeSizeAxes = Axes.Both;
+
+            stdJudgeMode = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.StdJudgeMode);
+            maniaJudgeMode = ezConfig.GetBindable<EzEnumJudgeMode>(Ez2Setting.ManiaJudgeMode);
 
             Child = new OsuContextMenuContainer
             {
@@ -196,6 +218,21 @@ namespace osu.Game.Screens.Select
                             }
                         },
                     },
+                    new Container
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        Height = 20,
+                        Padding = new MarginPadding { Left = scores_scroll_left_padding, Right = 10 },
+                        Child = onlineSampleNotice = new TruncatingSpriteText
+                        {
+                            RelativeSizeAxes = Axes.X,
+                            Width = 1,
+                            Font = OsuFont.Style.Caption1,
+                            Colour = colourProvider.Content2,
+                            Text = EzSongSelectStrings.LEADERBOARD_FILTERED_ONLINE_SAMPLE,
+                            Alpha = 0,
+                        },
+                    },
                     placeholderContainer = new Container<Placeholder>
                     {
                         Anchor = Anchor.Centre,
@@ -216,9 +253,22 @@ namespace osu.Game.Screens.Select
             Scope.BindValueChanged(_ => RefetchScores());
             Sorting.BindValueChanged(_ => RefetchScores());
             FilterBySelectedMods.BindValueChanged(_ => RefetchScores());
+            ModFilter.BindValueChanged(_ =>
+            {
+                if (FilterBySelectedMods.Value)
+                    RefetchScores();
+            });
             beatmap.BindValueChanged(_ => RefetchScores());
             ruleset.BindValueChanged(_ => RefetchScores());
-            mods.BindValueChanged(_ => refetchScoresFromMods());
+            stdJudgeMode.BindValueChanged(onJudgeModeChanged);
+            maniaJudgeMode.BindValueChanged(onJudgeModeChanged);
+            mods.BindValueChanged(e =>
+            {
+                modSettingChangeTracker?.Dispose();
+                modSettingChangeTracker = new ModSettingChangeTracker(e.NewValue);
+                modSettingChangeTracker.SettingChanged += _ => Scheduler.AddOnce(refetchScoresFromMods);
+                refetchScoresFromMods();
+            }, true);
 
             RefetchScores();
         }
@@ -233,6 +283,12 @@ namespace osu.Game.Screens.Select
             this.FadeOut(300, Easing.OutQuint);
         }
 
+        private void onJudgeModeChanged(ValueChangedEvent<EzEnumJudgeMode> _)
+        {
+            if (FilterBySelectedMods.Value && ModFilter.Value.HasFlag(LeaderboardModFilter.Difficulty))
+                RefetchScores();
+        }
+
         private void refetchScoresFromMods()
         {
             if (FilterBySelectedMods.Value)
@@ -245,6 +301,13 @@ namespace osu.Game.Screens.Select
 
         public void RefetchScores()
         {
+            onlineSampleNotice.Alpha = filteringOnlineSample ? 1 : 0;
+            scoresContainer.Padding = new MarginPadding
+            {
+                Top = scores_scroll_top_padding + (filteringOnlineSample ? 20 : 0),
+                Left = scores_scroll_left_padding,
+                Bottom = BeatmapLeaderboardScore.HEIGHT * 3,
+            };
             SetScores(Array.Empty<ScoreInfo>());
 
             if (beatmap.IsDefault)
@@ -267,7 +330,11 @@ namespace osu.Game.Screens.Select
                 // For now, we forcefully refresh to keep things simple.
                 // In the future, removing this requirement may be deemed useful, but will need ample testing of edge case scenarios
                 // (like returning from gameplay after setting a new score, returning to song select after main menu).
-                leaderboardManager.FetchWithCriteria(new LeaderboardCriteria(fetchBeatmapInfo, fetchRuleset, fetchScope, FilterBySelectedMods.Value ? mods.Value.ToArray() : null, fetchSorting),
+                Mod[]? exactMods = FilterBySelectedMods.Value ? mods.Value.ToArray() : null;
+
+                leaderboardManager.FetchWithCriteria(
+                    new LeaderboardCriteria(fetchBeatmapInfo, fetchRuleset, fetchScope, exactMods, fetchSorting, ModFilter.Value,
+                        EzJudgeMode: ezConfig.GetGameplayEnvironment(fetchRuleset).JudgeMode),
                     forceRefresh: true);
 
                 if (!initialFetchComplete)
@@ -325,7 +392,7 @@ namespace osu.Game.Screens.Select
 
                 return new BeatmapLeaderboardScore(s)
                 {
-                    Rank = i + 1,
+                    Rank = filteringOnlineSample ? null : i + 1,
                     Highlight = highlightType,
                     SelectedMods = { BindTarget = mods },
                     Action = songSelect?.CanPresentScore == true
@@ -520,6 +587,18 @@ namespace osu.Game.Screens.Select
 
         #endregion
 
+        protected override void Dispose(bool isDisposing)
+        {
+            if (IsLoaded)
+            {
+                stdJudgeMode.ValueChanged -= onJudgeModeChanged;
+                maniaJudgeMode.ValueChanged -= onJudgeModeChanged;
+            }
+
+            base.Dispose(isDisposing);
+            modSettingChangeTracker?.Dispose();
+        }
+
         private Placeholder? getPlaceholderFor(LeaderboardState state)
         {
             switch (state)
@@ -540,7 +619,7 @@ namespace osu.Game.Screens.Select
                     return new MessagePlaceholder(LeaderboardStrings.LeaderboardsAreNotAvailableForThisBeatmap);
 
                 case LeaderboardState.NoScores:
-                    return new MessagePlaceholder(LeaderboardStrings.NoRecordsYet);
+                    return new MessagePlaceholder(filteringOnlineSample ? EzSongSelectStrings.LEADERBOARD_NO_MATCHING_SAMPLE_SCORES : LeaderboardStrings.NoRecordsYet);
 
                 case LeaderboardState.NotLoggedIn:
                     return new LoginPlaceholder(LeaderboardStrings.PleaseSignInToViewOnlineLeaderboards);

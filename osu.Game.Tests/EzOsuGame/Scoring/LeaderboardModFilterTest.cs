@@ -1,0 +1,133 @@
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// See the LICENCE file in the repository root for full licence text.
+
+using System;
+using NUnit.Framework;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Mods.LAsMods;
+using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod;
+using osu.Game.Rulesets.Mania.Mods;
+using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Osu.Mods;
+
+namespace osu.Game.Tests.EzOsuGame.Scoring
+{
+    [TestFixture]
+    public class LeaderboardModFilterTest
+    {
+        [Test]
+        public void TestLoopPlayClipIsConversionNotRate()
+        {
+            var loop = new UniversalLoopPlayClip();
+
+            Assert.That(new[] { loop }.GetRelevantMods(LeaderboardModFilter.Rate), Is.Empty);
+            Assert.That(new[] { loop }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.EqualTo(new[] { loop }));
+            Assert.That(new Mod[] { loop }.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.Rate), Is.True);
+            Assert.That(new Mod[] { loop }.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.Conversion), Is.False);
+        }
+
+        [Test]
+        public void TestJudgementModsAreDifficultyNotConversion()
+        {
+            var mods = new Mod[]
+            {
+                new ManiaModJudgmentsAdjust(),
+                new ManiaModLNJudgementAdjust(),
+                new ManiaModRemedy()
+            };
+
+            Assert.That(mods.GetRelevantMods(LeaderboardModFilter.Difficulty), Is.EqualTo(mods));
+            Assert.That(mods.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
+        }
+
+        [Test]
+        public void TestNonJudgementAndConversionModContracts()
+        {
+#pragma warning disable CS0618
+            Assert.That(new Mod[] { new ManiaModO2Health() }.GetRelevantMods(LeaderboardModFilter.All), Is.Empty);
+#pragma warning restore CS0618
+            Assert.That(new Mod[] { new ManiaModConstantSpeed() }.GetRelevantMods(LeaderboardModFilter.Conversion), Is.Empty);
+            Assert.That(new Mod[] { new ManiaModConstantSpeed() }.GetRelevantMods(LeaderboardModFilter.Rate), Is.Empty);
+            Assert.That(new Mod[] { new ManiaModConstantSpeed() }.HasMatchingMods(Array.Empty<Mod>(), LeaderboardModFilter.All), Is.True);
+            Assert.That(new Mod[] { new OsuModClassic() }.GetRelevantMods(LeaderboardModFilter.Conversion), Has.Length.EqualTo(1));
+        }
+
+        [Test]
+        public void TestNoSvSettingDoesNotFilterLeaderboardScores()
+        {
+            var selected = new ManiaModAdjust
+            {
+                OverallDifficulty = { Value = 4 },
+            };
+            var score = new ManiaModAdjust
+            {
+                ConstantSpeed = { Value = !selected.ConstantSpeed.Value },
+                OverallDifficulty = { Value = 4 },
+            };
+
+            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.All), Is.True);
+
+            score.OverallDifficulty.Value = 5;
+            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.Difficulty), Is.False);
+        }
+
+        [Test]
+        public void TestOnlySelectedCategoriesParticipateInMatching()
+        {
+            var selected = new ManiaModJudgmentsAdjust
+            {
+                PerfectHit = { Value = 20 },
+            };
+            var score = new ManiaModJudgmentsAdjust
+            {
+                PerfectHit = { Value = 25 },
+            };
+
+            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.Rate), Is.True);
+            Assert.That(new Mod[] { score }.HasMatchingMods(new Mod[] { selected }, LeaderboardModFilter.Difficulty), Is.False);
+        }
+
+        [Test]
+        public void TestRateSettingsParticipateInRateMatching()
+        {
+            var selected = new OsuModDoubleTime();
+            var score = new OsuModDoubleTime
+            {
+                SpeedChange = { Value = 1.75 },
+            };
+
+            Assert.That(new Mod[] { selected }.HasMatchingMods(new Mod[] { score }, LeaderboardModFilter.Rate), Is.False);
+
+            score.SpeedChange.Value = selected.SpeedChange.Value;
+            Assert.That(new Mod[] { selected }.HasMatchingMods(new Mod[] { score }, LeaderboardModFilter.Rate), Is.True);
+        }
+
+        [Test]
+        public void TestCombinedCategoriesAndUnrelatedMods()
+        {
+            var selected = new Mod[] { new ManiaModJudgmentsAdjust(), new OsuModDoubleTime() };
+            var scoreWithUnrelated = new Mod[] { new ManiaModJudgmentsAdjust(), new OsuModDoubleTime(), new OsuModNoFail() };
+
+            Assert.That(scoreWithUnrelated.HasMatchingMods(selected, LeaderboardModFilter.Rate | LeaderboardModFilter.Difficulty), Is.True);
+
+            var differentRate = new OsuModDoubleTime
+            {
+                SpeedChange = { Value = 1.75 },
+            };
+            var scoreWithDifferentSelectedCategory = new Mod[] { new ManiaModJudgmentsAdjust(), differentRate, new OsuModNoFail() };
+
+            Assert.That(scoreWithDifferentSelectedCategory.HasMatchingMods(selected, LeaderboardModFilter.Rate | LeaderboardModFilter.Difficulty), Is.False);
+            Assert.That(scoreWithDifferentSelectedCategory.HasMatchingMods(selected, LeaderboardModFilter.Difficulty), Is.True);
+        }
+
+        [Test]
+        public void TestSelectedDifficultyCategoryMatchesJudgeMode()
+        {
+            Assert.That(LeaderboardModFilterExtensions.JudgeModeMatches((int)EzEnumJudgeMode.StableClassic, EzEnumJudgeMode.StableClassic, LeaderboardModFilter.Difficulty), Is.True);
+            Assert.That(LeaderboardModFilterExtensions.JudgeModeMatches((int)EzEnumJudgeMode.Lazer, EzEnumJudgeMode.StableClassic, LeaderboardModFilter.Difficulty), Is.False);
+            Assert.That(LeaderboardModFilterExtensions.JudgeModeMatches((int)EzEnumJudgeMode.Lazer, EzEnumJudgeMode.StableClassic, LeaderboardModFilter.Rate), Is.True);
+            Assert.That(LeaderboardModFilterExtensions.JudgeModeMatches(-1, EzEnumJudgeMode.Lazer, LeaderboardModFilter.Difficulty), Is.True);
+        }
+    }
+}

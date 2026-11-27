@@ -1,9 +1,9 @@
-﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
+// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
-using System.Linq;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using ManagedBass.Fx;
 using osu.Framework.Allocation;
@@ -370,7 +370,9 @@ namespace osu.Game.Screens.Play
                 Beatmap.Value.BeatmapInfo,
                 Ruleset.Value,
                 leaderboardManager?.CurrentCriteria?.Scope ?? BeatmapLeaderboardScope.Global,
-                leaderboardManager?.CurrentCriteria?.ExactMods), force);
+                leaderboardManager?.CurrentCriteria?.ExactMods,
+                ModFilter: leaderboardManager?.CurrentCriteria?.ModFilter ?? LeaderboardModFilter.None,
+                EzJudgeMode: leaderboardManager?.CurrentCriteria?.EzJudgeMode), force);
         }
 
         #region Screen handling

@@ -9,6 +9,7 @@ using osu.Framework.Allocation;
 using osu.Framework.Bindables;
 using osu.Framework.Logging;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Online.API;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Scoring;
@@ -56,7 +57,9 @@ namespace osu.Game.Screens.Ranking
                 Score.BeatmapInfo!,
                 Score.Ruleset,
                 leaderboardManager.CurrentCriteria?.Scope ?? BeatmapLeaderboardScope.Global,
-                leaderboardManager.CurrentCriteria?.ExactMods
+                leaderboardManager.CurrentCriteria?.ExactMods,
+                ModFilter: leaderboardManager.CurrentCriteria?.ModFilter ?? LeaderboardModFilter.None,
+                EzJudgeMode: leaderboardManager.CurrentCriteria?.EzJudgeMode
             );
 
             Debug.Assert(requestTaskSource == null || requestTaskSource.Task.IsCompleted);
@@ -78,6 +81,9 @@ namespace osu.Game.Screens.Ranking
                 Logger.Log($"Failed to fetch scores (beatmap: {Score.BeatmapInfo}, ruleset: {Score.Ruleset}): {result.FailState}");
                 return [];
             }
+
+            if (criteria.Scope != BeatmapLeaderboardScope.Local && criteria.ModFilter != LeaderboardModFilter.None)
+                Score.Position = null;
 
             var clonedScores = result.AllScores.Select(s => s.DeepClone()).ToArray();
 
