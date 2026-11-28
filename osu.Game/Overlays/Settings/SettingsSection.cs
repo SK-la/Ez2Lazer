@@ -52,7 +52,7 @@ namespace osu.Game.Overlays.Settings
 
         private bool matchingFilter = true;
 
-        public bool MatchingFilter
+        public virtual bool MatchingFilter
         {
             get => matchingFilter;
             set
@@ -188,8 +188,18 @@ namespace osu.Game.Overlays.Settings
         {
             base.LoadComplete();
 
-            if (ShowSubsectionIndex)
-                indexedSubsections = FlowContent.Children.OfType<SettingsSubsection>().ToArray();
+            RefreshIndexedSubsections();
+        }
+
+        protected void RefreshParentSearchFilter() => settingsPanel?.RefreshSearchFilter();
+
+        protected void RefreshIndexedSubsections()
+        {
+            if (!ShowSubsectionIndex)
+                return;
+
+            indexedSubsections = FlowContent.Children.OfType<SettingsSubsection>().ToArray();
+            settingsPanel?.RefreshSubsectionNavigation(this);
         }
 
         public override bool UpdateSubTree()
