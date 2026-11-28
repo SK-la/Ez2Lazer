@@ -69,12 +69,14 @@ namespace osu.Game.EzOsuGame.Startup
         {
             this.songSelectHost = songSelectHost;
             registerSongSelectPreloadSchedule();
+            preloader.ScheduleSettingsPreload();
         }
 
         public void OnMainMenuEntered(IEzStartupSongSelectPreloadHost songSelectHost)
         {
             this.songSelectHost = songSelectHost;
             mainMenuEntered = true;
+            preloader.ScheduleSettingsPreload();
 
             // Fallback if offscreen MainMenu load finished after Push.
             if (!songSelectScheduleRegistered)

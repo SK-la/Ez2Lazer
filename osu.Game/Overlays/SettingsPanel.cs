@@ -115,6 +115,7 @@ namespace osu.Game.Overlays
         private bool searchBindingAdded;
         private bool selectedSectionBindingAdded;
         private bool sectionsMountInProgress;
+        private bool hiddenPreloadActive;
         private Stopwatch sectionsLoadStopwatch;
         private long? sectionsLoadDurationMs;
         private bool loadHeartbeatActive;
@@ -247,6 +248,9 @@ namespace osu.Game.Overlays
 
         protected override void PopIn()
         {
+            if (hiddenPreloadActive)
+                setHiddenPreloadState(false);
+
             if (!AreSectionsReadyForDisplay)
             {
                 SectionsContainer.SearchContainer.AlwaysPresent = true;
@@ -285,15 +289,22 @@ namespace osu.Game.Overlays
         {
             base.PopOut();
 
-            SectionsContainer.SearchContainer.AlwaysPresent = false;
-            Sidebar.AlwaysPresent = false;
+            if (sectionsConstructionStarted && !AreSectionsReadyForDisplay)
+                setHiddenPreloadState(true);
+
+            SectionsContainer.SearchContainer.AlwaysPresent = hiddenPreloadActive;
+            Sidebar.AlwaysPresent = hiddenPreloadActive;
 
             stopSubsectionHighlight();
 
             SectionsContainer.FadeEdgeEffectTo(0, WaveContainer.DISAPPEAR_DURATION, Easing.In);
-            ContentContainer.MoveToX(-WIDTH + ExpandedPosition, TRANSITION_LENGTH, Easing.OutQuint);
+            ContentContainer.MoveToX(hiddenPreloadActive ? ExpandedPosition : -WIDTH + ExpandedPosition,
+                                     hiddenPreloadActive ? 0 : TRANSITION_LENGTH,
+                                     Easing.OutQuint);
 
-            Sidebar?.MoveToX(-sidebar_width, TRANSITION_LENGTH, Easing.OutQuint);
+            Sidebar?.MoveToX(hiddenPreloadActive ? 0 : -sidebar_width,
+                             hiddenPreloadActive ? 0 : TRANSITION_LENGTH,
+                             Easing.OutQuint);
             this.FadeTo(0, TRANSITION_LENGTH / 2, Easing.OutQuint);
 
             SearchTextBox.HoldFocus = false;
@@ -335,7 +346,7 @@ namespace osu.Game.Overlays
                 && firstSection.IsLoaded)
             {
                 IsInitialSectionReady = true;
-                SectionsContainer.SearchContainer.AlwaysPresent = false;
+                SectionsContainer.SearchContainer.AlwaysPresent = hiddenPreloadActive || State.Value == Visibility.Visible && !AreSectionsReadyForDisplay;
                 EzStartupTrace.Log($"Settings.initialSection readyMs={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}");
             }
 
@@ -351,7 +362,13 @@ namespace osu.Game.Overlays
                 AreSectionsReadyForDisplay = true;
                 loadHeartbeatActive = false;
 
-                SectionsContainer.SearchContainer.AlwaysPresent = false;
+                if (hiddenPreloadActive)
+                {
+                    EzStartupTrace.Log($"Settings.preload ready sections={SectionsContainer.Count} readyMs={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}");
+                    setHiddenPreloadState(false);
+                }
+
+                SectionsContainer.SearchContainer.AlwaysPresent = State.Value == Visibility.Visible && searchActive;
                 Sidebar.AlwaysPresent = false;
                 SectionsContainer.SearchContainer.FadeTo(1);
                 Sidebar.FadeTo(1, 150, Easing.OutQuint);
@@ -397,8 +414,34 @@ namespace osu.Game.Overlays
         /// </summary>
         public void BeginLoadingSections()
         {
+            if (State.Value == Visibility.Hidden)
+            {
+                if (!sectionsConstructionStarted)
+                    EzStartupTrace.Log("Settings.preload hidden begin");
+
+                setHiddenPreloadState(true);
+            }
+
             loadSections();
         }
+
+        private void setHiddenPreloadState(bool active)
+        {
+            hiddenPreloadActive = active;
+            AlwaysPresent = active;
+
+            if (SectionsContainer == null || Sidebar == null)
+                return;
+
+            SectionsContainer.SearchContainer.AlwaysPresent = active || State.Value == Visibility.Visible && !AreSectionsReadyForDisplay;
+            Sidebar.AlwaysPresent = active || State.Value == Visibility.Visible && !AreSectionsReadyForDisplay;
+
+            ContentContainer?.MoveToX(active ? ExpandedPosition : -WIDTH + ExpandedPosition, 0);
+
+            Sidebar?.MoveToX(active ? 0 : -sidebar_width, 0);
+        }
+
+        private bool canMountSettings => State.Value == Visibility.Visible || hiddenPreloadActive;
 
         /// <summary>
         /// Emit a snapshot of section preload progress to the startup trace log.
@@ -538,7 +581,7 @@ namespace osu.Game.Overlays
             if (!sidebarButtonsLoaded || sidebarButtonsMountInProgress || Sidebar.Children.OfType<SidebarIconButton>().Count() >= loadableSections.Count)
                 return;
 
-            if (State.Value != Visibility.Visible)
+            if (!canMountSettings)
                 return;
 
             sidebarButtonsMountInProgress = true;
@@ -547,7 +590,7 @@ namespace osu.Game.Overlays
 
         private void addSidebarButtonsBatch()
         {
-            if (State.Value != Visibility.Visible)
+            if (!canMountSettings)
             {
                 sidebarButtonsMountInProgress = false;
                 return;
@@ -585,7 +628,7 @@ namespace osu.Game.Overlays
 
         private void scheduleMountLoadedSections()
         {
-            if (State.Value != Visibility.Visible || sectionsMountInProgress || SectionsContainer.Count >= loadedSections.Count)
+            if (!canMountSettings || sectionsMountInProgress || SectionsContainer.Count >= loadedSections.Count)
                 return;
 
             sectionsMountInProgress = true;
@@ -605,7 +648,7 @@ namespace osu.Game.Overlays
         {
             preloadScheduler.AddDelayed(() =>
             {
-                if (AreSectionsReadyForDisplay || (AreSectionsLoaded && State.Value != Visibility.Visible))
+                if (AreSectionsReadyForDisplay || (AreSectionsLoaded && !canMountSettings))
                 {
                     loadHeartbeatActive = false;
                     return;
@@ -620,7 +663,7 @@ namespace osu.Game.Overlays
 
         private void addNextLoadedSection()
         {
-            if (State.Value != Visibility.Visible)
+            if (!canMountSettings)
             {
                 sectionsMountInProgress = false;
                 return;

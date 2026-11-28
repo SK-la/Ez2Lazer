@@ -47,6 +47,23 @@ Framework 的滚动遮罩会推迟屏外 drawable 的首次 `UpdateSubTree()`。
 
 Release 的 593.6–641.9 ms 冷开样本单列记录；它与改动前 Debug 基线配置不同，不在本表中计算收益。
 
+### Intro 隐藏预加载对照
+
+两个新的 Release 可视测试在独立进程中分别运行，完整菜单计数和 ready 判据相同（12 sections、46 subsections、244 rows、33 weather controls）。冷开测量从 `Show()` 到完整树 ready；预加载测量从隐藏的 `BeginLoadingSections()` 到完整树 ready，再单独测首次 `Show()`。
+
+| 阶段 / 指标 | 冷开：首次点击开始加载 | Intro 式隐藏预加载 | 首次点击变化 |
+| --- | ---: | ---: | ---: |
+| 完整菜单 ready | 787.2 ms | 预加载已花 757.6 ms；Show 后 2.1 ms | 点击后 ready 快 99.7% |
+| `Show()` 同步调用 | 2.29 ms | 2.11 ms | 基本相同 |
+| 阶段内最大 Update 间隔 | 85.7 ms | 90.8 ms（预加载阶段） | 卡顿转移到点击前，峰值略高 |
+| 托管分配 | 64,418.9 KB | 63,636.1 KB 预加载；24.0 KB 首次 Show | 同等总准备成本移出点击路径 |
+| GC pause | 47.7 ms | 42.9 ms 预加载；0 ms 首次 Show | 随准备工作移出点击路径 |
+| 第二次/后续打开 ready | 0.0–0.1 ms | 0.0–0.1 ms | 保持秒开 |
+
+这表明隐藏预加载显著降低设置点击后的树就绪延迟，但**没有减少冷启动总工作量**。隐藏预加载最大 Update 约 91 ms，可能影响动画帧；后续启动优化需要降低这个峰值。`Show()` 到 ready 的约 2 ms 是更新线程状态/完整树 ready，不代表已经 GPU present；现有 600 ms 面板过渡仍保留。
+
+真实 `Intro → MainMenu` 集成测试当前无法给出有效帧数据：`OsuGameTestScene` 在预加载前创建 `BackgroundScreenDefault` 时，默认 `WeatherOvercastRainWind=4.5` 超出 `WeatherEffectContainer` 的 `[-2, 2]` 范围并抛异常。没有改天气生产代码来绕过此问题，也没有对用户数据目录启动游戏。生产启动追踪现会记录 settings preload requested / scheduled / hidden begin / ready，可用 `EZ2LAZER_STARTUP_TRACE=1` 在独立运行中验证它是否赶在 MainMenu 入场前完成。
+
 同日另用 Release 配置复测两次，完整菜单 ready 为 641.9 ms 与 593.6 ms，托管分配约 49.3 MB，GC pause 为 22.6 ms 与 31.8 ms；同面板重复打开仍为 0.0–0.1 ms。Release 峰值 Update 仍为 27.6–30.6 ms，其中一次最大 GC pause 为 24.2 ms。Release 样本与旧 Debug 基线配置不同，不直接计算跨配置百分比。
 
 `TestFreshSettingsPanelAfterActivatorCacheWarmup` 的同宿主对照中，首个完整面板 ready 为 1,335.1 ms、分配 124,191.8 KB、GC pause 150.4 ms，反射激活器增量 503；随后新建面板为 159.0 ms、分配 31,454.6 KB、GC pause 35.5 ms，反射激活器增量 0。新面板样本同时享受 JIT、资源和其他进程级缓存升温，不能把全部差值归因于反射；它仍表明首次依赖激活器构造是主要冷路径，且同一面板复开 0.1 ms 与“新建面板 159 ms”是两个不同场景。

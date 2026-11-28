@@ -36,10 +36,11 @@ namespace osu.Game.EzOsuGame.Startup
                 return;
 
             lightStarted = true;
+            EzStartupTrace.Log("Settings.preload requested");
 
             if (EzStartupTuning.SkipSettingsPreload)
             {
-                EzStartupTrace.LogDiagnostic("Settings.preload skipped (SkipSettingsPreload)");
+                EzStartupTrace.Log("Settings.preload skipped (SkipSettingsPreload)");
                 return;
             }
 
@@ -54,7 +55,7 @@ namespace osu.Game.EzOsuGame.Startup
                 return;
             }
 
-            EzStartupTrace.LogDiagnostic("Settings.preload scheduled");
+            EzStartupTrace.Log("Settings.preload scheduled");
             settings.BeginLoadingSections();
         }
 

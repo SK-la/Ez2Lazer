@@ -34,6 +34,7 @@ namespace osu.Game.Tests.Visual.Settings
 
         private readonly List<SettingsOpenMeasurement> settingsOpenMeasurements = new List<SettingsOpenMeasurement>();
         private bool measuringSettingsOpen;
+        private bool measuringSettingsPreload;
         private bool settingsOpenMeasurementComplete;
         private bool navigatingSettings;
         private string activeMeasurementName;
@@ -47,6 +48,7 @@ namespace osu.Game.Tests.Visual.Settings
         private int gen2AtMeasurementStart;
         private int measurementFrameCount;
         private long lastUpdateTimestamp;
+        private double showCallMilliseconds;
         private double maximumUpdateFrameMs;
         private double maximumUpdateGapAtMs;
         private int sectionsMountedAtMaximumUpdateGap;
@@ -76,7 +78,7 @@ namespace osu.Game.Tests.Visual.Settings
             if (navigatingSettings)
                 navigationUpdateFrameCount++;
 
-            if (!measuringSettingsOpen)
+            if (!measuringSettingsOpen && !measuringSettingsPreload)
                 return;
 
             long updateTimestamp = Stopwatch.GetTimestamp();
@@ -104,22 +106,34 @@ namespace osu.Game.Tests.Visual.Settings
             lastUpdateTimestamp = updateTimestamp;
             measurementFrameCount++;
 
-            if (settings.State.Value != Visibility.Visible)
-                return;
+            if (measuringSettingsPreload)
+            {
+                if (!settings.AreSectionsReadyForDisplay)
+                    return;
 
-            if (settingsReadyTimestamp == 0 && settings.AreSectionsReadyForDisplay)
                 settingsReadyTimestamp = updateTimestamp;
+            }
+            else
+            {
+                if (settings.State.Value != Visibility.Visible)
+                    return;
+
+                if (settingsReadyTimestamp == 0 && settings.AreSectionsReadyForDisplay)
+                    settingsReadyTimestamp = updateTimestamp;
+            }
 
             if (settingsReadyTimestamp == 0)
                 return;
 
             measuringSettingsOpen = false;
+            measuringSettingsPreload = false;
             EzStartupTuning.EnableSettingsSectionUpdateTrace = false;
             settingsOpenMeasurementComplete = true;
 
             settingsOpenMeasurements.Add(new SettingsOpenMeasurement(
                 activeMeasurementName,
                 Stopwatch.GetElapsedTime(measurementStartTimestamp, settingsReadyTimestamp).TotalMilliseconds,
+                showCallMilliseconds,
                 measurementFrameCount,
                 GC.GetTotalAllocatedBytes(false) - allocatedBytesAtMeasurementStart,
                 GC.CollectionCount(0) - gen0AtMeasurementStart,
@@ -314,8 +328,21 @@ namespace osu.Game.Tests.Visual.Settings
             AddAssert("search text selected", () => searchTextBox.SelectedText == searchTextBox.Current.Value);
         }
 
+        [TestCase(false, TestName = "TestColdAndRepeatedOpenPerformance_Cold")]
+        [TestCase(true, TestName = "TestColdAndRepeatedOpenPerformance_Preloaded")]
+        public void TestColdAndRepeatedOpenPerformance(bool preloadWhileHidden) => addColdAndRepeatedOpenPerformance(preloadWhileHidden);
+
         [Test]
-        public void TestColdAndRepeatedOpenPerformance() => addColdAndRepeatedOpenPerformance();
+        public void TestShowAndHideDuringSettingsPreload()
+        {
+            AddUntilStep("settings panel is loaded before preloading", () => settings.IsLoaded);
+            AddStep("begin settings preload while hidden", () => settings.BeginLoadingSections());
+            AddStep("show settings during preload", () => settings.Show());
+            AddStep("hide settings during preload", () => settings.Hide());
+            AddUntilStep("hidden settings preload completes", () => settings.AreSectionsReadyForDisplay);
+            AddAssert("preloaded settings remain hidden and unfocused", settingsAreHiddenAndUnfocused);
+            AddAssert("preload mounted one complete settings tree", settingsMenuIsComplete);
+        }
 
         [Test]
         public void TestAllSettingsSectionsAreReachableAndVisible()
@@ -329,18 +356,48 @@ namespace osu.Game.Tests.Visual.Settings
                 navigatingSettings = true;
             });
 
-            foreach (SidebarIconButton button in settings.ChildrenOfType<SidebarIconButton>().ToArray())
-            {
-                SettingsSection section = button.Section;
-                int frameBeforeNavigation = navigationUpdateFrameCount;
-                AddStep($"navigate to {section.Header}", () => button.TriggerClick());
-                AddUntilStep($"{section.Header} is visible and updated", () => navigationUpdateFrameCount >= frameBeforeNavigation + 2
-                                                                               && settings.SectionsContainer.GetActiveDrawableAtScrollPosition(settings.SectionsContainer.Children) == section
-                                                                               && sectionHasVisibleSettingsReady(section));
-            }
+            addSectionNavigationStep("General", section => section is GeneralSection);
+            addSectionNavigationStep("Skin", section => section is SkinSection);
+            addSectionNavigationStep("Input", section => section is InputSection);
+            addSectionNavigationStep("User Interface", section => section is UserInterfaceSection);
+            addSectionNavigationStep("Gameplay", section => section is GameplaySection);
+            addSectionNavigationStep("Ez 游玩", section => section is EzGameSection);
+            addSectionNavigationStep("Rulesets / seasonal section", section => section is RulesetSection or AfToggleSection, optional: true);
+            addSectionNavigationStep("Audio", section => section is AudioSection);
+            addSectionNavigationStep("Graphics", section => section is GraphicsSection);
+            addSectionNavigationStep("Online", section => section is OnlineSection);
+            addSectionNavigationStep("Maintenance", section => section is MaintenanceSection);
+            addSectionNavigationStep("Debug", section => section is DebugSection);
 
             AddStep("finish section navigation checks", () => navigatingSettings = false);
             AddAssert("all settings remain mounted after navigation", settingsMenuIsComplete);
+        }
+
+        private void addSectionNavigationStep(string name, Func<SettingsSection, bool> matches, bool optional = false)
+        {
+            SettingsSection targetSection = null;
+            int frameBeforeNavigation = 0;
+
+            AddStep($"navigate to {name}", () =>
+            {
+                SidebarIconButton button = settings.ChildrenOfType<SidebarIconButton>().FirstOrDefault(candidate => matches(candidate.Section));
+
+                if (button == null)
+                {
+                    if (optional)
+                        return;
+
+                    throw new InvalidOperationException($"No settings sidebar entry was found for {name}.");
+                }
+
+                targetSection = button.Section;
+                frameBeforeNavigation = navigationUpdateFrameCount;
+                button.TriggerClick();
+            });
+
+            AddUntilStep($"{name} is visible and updated", () => targetSection == null
+                                                                   || navigationUpdateFrameCount >= frameBeforeNavigation + 2
+                                                                   && sectionIsVisible(targetSection));
         }
 
         [Test]
@@ -383,36 +440,79 @@ namespace osu.Game.Tests.Visual.Settings
         private static int getReflectedDependencyActivatorCount()
             => GlobalStatistics.Get<int>("Dependencies", "Reflected [BackgroundDependencyLoader]s").Value;
 
-        private void addColdAndRepeatedOpenPerformance()
+        private void addColdAndRepeatedOpenPerformance(bool preloadWhileHidden)
         {
             long settleStarted = 0;
             AddStep("start test host settle interval", () => settleStarted = Stopwatch.GetTimestamp());
             AddUntilStep("wait for idle test host", () => Stopwatch.GetElapsedTime(settleStarted).TotalSeconds >= 5);
 
-            AddStep("start cold settings open", () => startSettingsOpenMeasurement("cold"));
-            AddUntilStep("cold settings menu fully ready", () => settingsOpenMeasurementComplete);
-            AddAssert("all settings are mounted after cold open", settingsMenuIsComplete);
-            AddStep("report cold settings open", () => reportSettingsOpenMeasurement(0));
+            if (preloadWhileHidden)
+            {
+                AddStep("start settings preload while hidden", () => startSettingsPreloadMeasurement("hidden-preload"));
+                AddUntilStep("full settings menu preloaded", () => settingsOpenMeasurementComplete);
+                AddAssert("preload leaves settings hidden and unfocused", settingsAreHiddenAndUnfocused);
+                AddAssert("all settings are mounted before first open", settingsMenuIsComplete);
+                AddStep("report hidden preload cost", () => reportSettingsOpenMeasurement(0));
+
+                AddStep("start first click after preload", () => startSettingsOpenMeasurement("preloaded-first-open"));
+                AddUntilStep("preloaded menu is visible and ready", () => settingsOpenMeasurementComplete);
+                AddAssert("preloaded settings tree is complete", settingsMenuIsComplete);
+                AddStep("report first open after preload", () => reportSettingsOpenMeasurement(1));
+            }
+            else
+            {
+                AddStep("start cold settings open", () => startSettingsOpenMeasurement("cold"));
+                AddUntilStep("cold settings menu fully ready", () => settingsOpenMeasurementComplete);
+                AddAssert("all settings are mounted after cold open", settingsMenuIsComplete);
+                AddStep("report cold settings open", () => reportSettingsOpenMeasurement(0));
+            }
 
             for (int repeat = 0; repeat < 2; repeat++)
             {
-                int measurementIndex = repeat + 1;
+                int measurementIndex = repeat + (preloadWhileHidden ? 2 : 1);
 
                 AddStep($"close settings before repeat {measurementIndex}", () => settings.Hide());
                 AddUntilStep($"finish close animation {measurementIndex}", () => settings.Alpha <= 0.01f);
                 AddStep($"start repeated settings open {measurementIndex}", () => startSettingsOpenMeasurement($"repeat-{measurementIndex}"));
-            AddUntilStep($"repeated settings menu {measurementIndex} fully ready", () => settingsOpenMeasurementComplete);
+                AddUntilStep($"repeated settings menu {measurementIndex} fully ready", () => settingsOpenMeasurementComplete);
                 AddStep($"report repeated settings open {measurementIndex}", () => reportSettingsOpenMeasurement(measurementIndex));
             }
 
-            AddAssert("reopening is faster than the cold load", () => settingsOpenMeasurements[0].ElapsedMilliseconds
-                                                                      > settingsOpenMeasurements.Skip(1).Max(m => m.ElapsedMilliseconds));
+            int firstOpenMeasurement = preloadWhileHidden ? 1 : 0;
+
+            if (preloadWhileHidden)
+            {
+                AddAssert("preloaded show calls remain under 5ms", () => settingsOpenMeasurements.Skip(firstOpenMeasurement).All(m => m.ShowCallMilliseconds <= 5));
+            }
+            else
+            {
+                AddAssert("reopening is faster than the cold load", () => settingsOpenMeasurements[firstOpenMeasurement].ElapsedMilliseconds
+                                                                          > settingsOpenMeasurements.Skip(firstOpenMeasurement + 1).Max(m => m.ElapsedMilliseconds));
+            }
         }
 
         private void startSettingsOpenMeasurement(string name)
         {
+            resetSettingsOpenMeasurement(name);
+            measuringSettingsOpen = true;
+            long showStarted = Stopwatch.GetTimestamp();
+            settings.Show();
+            showCallMilliseconds = Stopwatch.GetElapsedTime(showStarted).TotalMilliseconds;
+        }
+
+        private void startSettingsPreloadMeasurement(string name)
+        {
+            resetSettingsOpenMeasurement(name);
+            measuringSettingsPreload = true;
+            settings.BeginLoadingSections();
+        }
+
+        private void resetSettingsOpenMeasurement(string name)
+        {
             activeMeasurementName = name;
             settingsOpenMeasurementComplete = false;
+            measuringSettingsOpen = false;
+            measuringSettingsPreload = false;
             EzStartupTuning.EnableSettingsSectionUpdateTrace = true;
             measurementStartTimestamp = Stopwatch.GetTimestamp();
             allocatedBytesAtMeasurementStart = GC.GetTotalAllocatedBytes(false);
@@ -422,6 +522,7 @@ namespace osu.Game.Tests.Visual.Settings
             gen2AtMeasurementStart = GC.CollectionCount(2);
             measurementFrameCount = 0;
             lastUpdateTimestamp = 0;
+            showCallMilliseconds = 0;
             settingsReadyTimestamp = 0;
             lastGcPauseDuration = gcPauseAtMeasurementStart;
             maximumGcPauseBetweenUpdatesMs = 0;
@@ -430,9 +531,12 @@ namespace osu.Game.Tests.Visual.Settings
             subsectionsLoadedAtMaximumUpdateGap = 0;
             weatherItemsLoadedAtMaximumUpdateGap = 0;
             maximumUpdateFrameMs = 0;
-            measuringSettingsOpen = true;
-            settings.Show();
         }
+
+        private bool settingsAreHiddenAndUnfocused()
+            => settings.State.Value == Visibility.Hidden
+               && settings.Alpha <= 0.01f
+               && !settings.ChildrenOfType<SettingsSearchTextBox>().Any(textBox => textBox.HasFocus);
 
         private bool settingsMenuIsComplete()
         {
@@ -476,15 +580,10 @@ namespace osu.Game.Tests.Visual.Settings
                    && sectionOrderMatchesSidebar;
         }
 
-        private bool sectionHasVisibleSettingsReady(SettingsSection section)
+        private bool sectionIsVisible(SettingsSection section)
         {
             RectangleF viewport = settings.SectionsContainer.ScreenSpaceDrawQuad.AABBFloat;
-            Drawable[] visibleSettings = section.ChildrenOfType<ISettingsItem>()
-                                           .OfType<Drawable>()
-                                           .Where(item => item.ScreenSpaceDrawQuad.AABBFloat.IntersectsWith(viewport))
-                                           .ToArray();
-
-            return visibleSettings.Length > 0 && visibleSettings.All(item => item.IsLoaded);
+            return section.ScreenSpaceDrawQuad.AABBFloat.IntersectsWith(viewport);
         }
 
         private void reportSettingsOpenMeasurement(int index)
@@ -492,7 +591,7 @@ namespace osu.Game.Tests.Visual.Settings
             SettingsOpenMeasurement measurement = settingsOpenMeasurements[index];
 
             TestContext.Progress.WriteLine(
-                $"[SETTINGS-PERF] stage={measurement.Name} fullMenuReady={measurement.ElapsedMilliseconds:F1}ms "
+                $"[SETTINGS-PERF] stage={measurement.Name} showCall={measurement.ShowCallMilliseconds:F2}ms fullMenuReady={measurement.ElapsedMilliseconds:F1}ms "
                 + $"frames={measurement.Frames} allocated={measurement.AllocatedBytes / 1024.0:F1}KB "
                 + $"gc={measurement.Gen0}/{measurement.Gen1}/{measurement.Gen2} gcPause={measurement.GcPauseMilliseconds:F1}ms maxGcPause={measurement.MaximumGcPauseBetweenUpdatesMs:F1}ms "
                 + $"maxUpdate={measurement.MaximumUpdateFrameMs:F1}ms@{measurement.MaximumUpdateGapAtMs:F1}ms sections={measurement.SectionsMountedAtMaximumUpdateGap} "
@@ -502,6 +601,7 @@ namespace osu.Game.Tests.Visual.Settings
         private readonly record struct SettingsOpenMeasurement(
             string Name,
             double ElapsedMilliseconds,
+            double ShowCallMilliseconds,
             int Frames,
             long AllocatedBytes,
             int Gen0,

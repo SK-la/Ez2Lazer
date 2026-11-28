@@ -65,9 +65,9 @@ namespace osu.Game.EzOsuGame.Startup
         public static bool EnableSettingsSectionUpdateTrace { get; set; }
 
         /// <summary>
-        /// Keep settings sections out of the startup workload. They are loaded after the settings panel is first opened.
-        /// Set false only for startup-load A/B measurements.
+        /// Skip preparing settings during the menu intro. When false, the settings tree is prepared invisibly after MainMenu finishes loading offscreen.
+        /// Keep true only for cold-open A/B measurements.
         /// </summary>
-        public static bool SkipSettingsPreload { get; set; } = true;
+        public static bool SkipSettingsPreload { get; set; }
     }
 }

@@ -11,7 +11,6 @@ using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.Pets;
-using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterfaceV2;
@@ -131,20 +130,11 @@ namespace osu.Game.EzOsuGame.Overlays
             return items;
         }
 
-        protected override void LoadComplete()
-        {
-            base.LoadComplete();
-
-            if (!EzStartupTuning.SkipSettingsPreload)
-                Scheduler.AddOnce(populatePackList);
-        }
-
         protected override void LoadAsyncComplete()
         {
             base.LoadAsyncComplete();
 
-            if (EzStartupTuning.SkipSettingsPreload)
-                populatePackList();
+            populatePackList();
         }
 
         private void populatePackList()
