@@ -66,6 +66,8 @@ namespace osu.Game.Tests.EzOsuGame.Scoring
             Mod[] exceptions = [new ModNoMod(), maniaConstantSpeed, taikoConstantSpeed, classic, health];
             Assert.That(impactUnit.GetRelevantMods(exceptions, LeaderboardModFilter.All), Is.Empty);
             Assert.That(impactUnit.ModsMatch(exceptions, Array.Empty<Mod>(), LeaderboardModFilter.All), Is.True);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { new ModScoreV2() }, Array.Empty<Mod>(), LeaderboardModFilter.All), Is.True);
+            Assert.That(impactUnit.ModsMatch(new Mod[] { new ManiaModScoreV2() }, Array.Empty<Mod>(), LeaderboardModFilter.All), Is.True);
             Assert.That(impactUnit.ModsMatch(new Mod[] { loop }, Array.Empty<Mod>(), LeaderboardModFilter.All), Is.False);
         }
 

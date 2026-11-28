@@ -167,6 +167,12 @@ namespace osu.Game.Tests.NonVisual
             Assert.That(File.Exists(configFile), Is.True);
             var defaultDocument = JsonConvert.DeserializeObject<LeaderboardModImpactExceptionsDocument>(File.ReadAllText(configFile))!;
             Assert.That(defaultDocument.Version, Is.EqualTo(1));
+            Assert.That(defaultDocument.Rate, Does.Contain("osu.Game.Rulesets.Mods.ModScoreV2"));
+            Assert.That(defaultDocument.Rate, Does.Contain("osu.Game.Rulesets.Mania.Mods.ManiaModScoreV2"));
+            Assert.That(defaultDocument.Difficulty, Does.Contain("osu.Game.Rulesets.Mods.ModScoreV2"));
+            Assert.That(defaultDocument.Difficulty, Does.Contain("osu.Game.Rulesets.Mania.Mods.ManiaModScoreV2"));
+            Assert.That(defaultDocument.Conversion, Does.Contain("osu.Game.Rulesets.Mods.ModScoreV2"));
+            Assert.That(defaultDocument.Conversion, Does.Contain("osu.Game.Rulesets.Mania.Mods.ManiaModScoreV2"));
             Assert.That(defaultDocument.Conversion, Does.Contain("osu.Game.Rulesets.Mania.Mods.ManiaModConstantSpeed"));
 
             const string custom_json = """
