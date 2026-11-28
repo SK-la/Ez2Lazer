@@ -29,9 +29,9 @@ namespace osu.Game.Overlays
         public LocalisableString Title => SettingsStrings.HeaderTitle;
         public LocalisableString Description => SettingsStrings.HeaderDescription;
 
-        private readonly List<SettingsSubPanel> subPanels = new List<SettingsSubPanel>();
-
         private SettingsSubPanel? lastOpenedSubPanel;
+
+        private RulesetStore rulesets = null!;
 
         protected override Drawable CreateHeader() => new SettingsHeader(Title, Description);
 
@@ -56,8 +56,8 @@ namespace osu.Game.Overlays
 
             Show();
 
-            // wait for load of sections
-            if (!SectionsContainer.Any())
+            // The target may belong to a section that is still loading after the panel is first opened.
+            if (!SectionsContainer.ChildrenOfType<T>().Any())
             {
                 Scheduler.Add(ShowAtControl<T>);
                 return;
@@ -74,8 +74,12 @@ namespace osu.Game.Overlays
         [BackgroundDependencyLoader]
         private void load(RulesetStore rulesets)
         {
+            this.rulesets = rulesets;
             keyBindingPanel = createSubPanel(new KeyBindingPanel());
+        }
 
+        protected override void PopulateSections()
+        {
             var sections = new List<SettingsSection>
             {
                 // This list should be kept in sync with ScreenBehaviour.
@@ -122,14 +126,6 @@ namespace osu.Game.Overlays
 
             foreach (var s in sections)
                 AddSection(s);
-
-            foreach (var s in subPanels)
-            {
-                if (ReferenceEquals(s, keyBindingPanel))
-                    continue;
-
-                ContentContainer.Add(s);
-            }
         }
 
         private void openKeyBindingPanel()
@@ -153,8 +149,6 @@ namespace osu.Game.Overlays
             subPanel.Depth = 1;
             subPanel.Anchor = Anchor.TopRight;
             subPanel.State.ValueChanged += e => subPanelStateChanged(subPanel, e);
-
-            subPanels.Add(subPanel);
 
             return subPanel;
         }

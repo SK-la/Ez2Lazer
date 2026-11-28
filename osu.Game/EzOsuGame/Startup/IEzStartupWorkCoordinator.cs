@@ -8,8 +8,6 @@ namespace osu.Game.EzOsuGame.Startup
     /// </summary>
     public interface IEzStartupWorkCoordinator
     {
-        void OnPrepareMenuLoad();
-
         void OnLoadMenu();
 
         /// <summary>

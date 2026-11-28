@@ -8,7 +8,7 @@ using osu.Game.Overlays;
 namespace osu.Game.EzOsuGame.Startup
 {
     /// <summary>
-    /// Preloads settings sections and song select during startup.
+    /// Prepares the settings overlay during startup.
     /// Dependencies are injected via <see cref="Configure"/> to avoid fragile DI ordering during startup.
     /// Scheduling is driven by <see cref="EzStartupWorkCoordinator"/>.
     /// </summary>
@@ -16,30 +16,29 @@ namespace osu.Game.EzOsuGame.Startup
     {
         private SettingsOverlay? settings;
 
-        private bool lightStarted;
+        private bool settingsPreloadRequested;
 
         public EzStartupContentPreloader()
         {
             RelativeSizeAxes = Axes.Both;
         }
 
-        public void Configure(SettingsOverlay settings, ISongSelectScreenFactory songSelectScreenFactory)
+        public void Configure(SettingsOverlay settings)
         {
             this.settings = settings;
         }
 
-        public void BeginLight() => ScheduleSettingsPreload();
-
         public void ScheduleSettingsPreload()
         {
-            if (lightStarted)
+            if (settingsPreloadRequested)
                 return;
 
-            lightStarted = true;
+            settingsPreloadRequested = true;
+            EzStartupTrace.Log("Settings.preload requested");
 
             if (EzStartupTuning.SkipSettingsPreload)
             {
-                EzStartupTrace.LogDiagnostic("Settings.preload skipped (SkipSettingsPreload)");
+                EzStartupTrace.Log("Settings.preload skipped (SkipSettingsPreload)");
                 return;
             }
 
@@ -54,7 +53,7 @@ namespace osu.Game.EzOsuGame.Startup
                 return;
             }
 
-            EzStartupTrace.LogDiagnostic("Settings.preload scheduled");
+            EzStartupTrace.Log("Settings.preload scheduled");
             settings.BeginLoadingSections();
         }
 

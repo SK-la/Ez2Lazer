@@ -9,7 +9,7 @@ namespace osu.Game.EzOsuGame.Startup
     public static class EzStartupTuning
     {
         /// <summary>
-        /// Preload scheduling strategy. Default: <see cref="EzStartupPreloadTiming.PipelineDefault"/>.
+        /// Song-select preload scheduling strategy. Default: <see cref="EzStartupPreloadTiming.PipelineDefault"/>.
         /// </summary>
         public static EzStartupPreloadTiming PreloadTiming { get; set; } = EzStartupPreloadTiming.PipelineDefault;
 
@@ -35,18 +35,6 @@ namespace osu.Game.EzOsuGame.Startup
         public static double SongSelectEnterFilterDelayMs { get; set; } = 400;
 
         /// <summary>
-        /// When true, settings section async preload waits for BDSP startup processing to finish
-        /// instead of starting from game load. Set false for A/B against immediate preload.
-        /// </summary>
-        public static bool DeferSettingsPreloadUntilBdspFinished { get; set; } = true;
-
-        /// <summary>
-        /// After BDSP finishes, wait this long before settings async preload (song select preload uses its own +500ms buffer).
-        /// Spreads Gen2 pressure on the main menu.
-        /// </summary>
-        public static double SettingsPreloadDelayAfterBdspMs { get; set; } = 1_500;
-
-        /// <summary>
         /// Master switch for the high-level <see cref="EzStartupTrace.Log"/> milestones in a release build.
         /// Default off; enable to trace startup on a shipped build. Fine-grained investigation lines use
         /// <see cref="EzStartupTrace.LogDiagnostic"/> and are debug-build only regardless of this flag.
@@ -60,9 +48,13 @@ namespace osu.Game.EzOsuGame.Startup
         public static bool EnableStartupFrameSampling { get; set; }
 
         /// <summary>
-        /// Diagnostic: skip the settings-section async preload entirely.
-        /// Used to A/B whether the startup frame-rate dip is caused by settings preload or by other
-        /// startup work (BDSP backfill, song-select preload). Sections then load on first PopIn instead.
+        /// Trace settings section subtree update duration while collecting cold-open performance samples.
+        /// </summary>
+        public static bool EnableSettingsSectionUpdateTrace { get; set; }
+
+        /// <summary>
+        /// Skip preparing settings during the menu intro. When false, the settings tree is prepared invisibly after MainMenu finishes loading offscreen.
+        /// Keep true only for cold-open A/B measurements.
         /// </summary>
         public static bool SkipSettingsPreload { get; set; }
     }

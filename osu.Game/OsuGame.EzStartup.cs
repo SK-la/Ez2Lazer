@@ -21,7 +21,7 @@ namespace osu.Game
             Dependencies.CacheAs<ISongSelectScreenFactory>(factory);
 
             var preloader = new EzStartupContentPreloader();
-            preloader.Configure(Settings, factory);
+            preloader.Configure(Settings);
 
             var coordinator = new EzStartupWorkCoordinator();
             coordinator.Configure(preloader);
@@ -31,9 +31,6 @@ namespace osu.Game
 
             loadComponentSingleFile(preloader, Add, true);
             Dependencies.CacheAs<IEzStartupContentPreloader>(preloader);
-
-            if (!EzStartupTuning.DeferSettingsPreloadUntilBdspFinished)
-                preloader.ScheduleSettingsPreload();
         }
 
         // 保证主菜单始终持有一个预加载完成的 SongSelect 实例。

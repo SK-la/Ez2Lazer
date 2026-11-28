@@ -4,28 +4,28 @@
 namespace osu.Game.EzOsuGame.Startup
 {
     /// <summary>
-    /// Controls when Ez startup preload work is scheduled relative to Intro / MainMenu.
+    /// Controls when Song Select preload work is scheduled relative to Intro / MainMenu.
     /// Change <see cref="EzStartupTuning.PreloadTiming"/> to A/B test.
     /// </summary>
     public enum EzStartupPreloadTiming
     {
         /// <summary>
-        /// Settings at PrepareMenuLoad; song select +800ms; detach after main menu settles / BDSP Ez backfill.
+        /// Start Song Select preload after BDSP finishes, with a short buffer and a timeout fallback.
         /// </summary>
         PipelineDefault,
 
         /// <summary>
-        /// Settings and song select at PrepareMenuLoad; detach deferred.
+        /// Start Song Select preload when MainMenu finishes loading offscreen.
         /// </summary>
         PipelineEarlySongSelect,
 
         /// <summary>
-        /// Settings at PrepareMenuLoad; song select at LoadMenu; detach deferred.
+        /// Start Song Select preload after a short delay from MainMenu offscreen-ready.
         /// </summary>
         PipelineLateSongSelect,
 
         /// <summary>
-        /// All preload work at PrepareMenuLoad (legacy; may stack with BDSP).
+        /// Legacy alias for <see cref="PipelineEarlySongSelect"/>.
         /// </summary>
         ImmediateAll,
     }

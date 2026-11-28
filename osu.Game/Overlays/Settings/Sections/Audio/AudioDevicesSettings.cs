@@ -267,8 +267,6 @@ namespace osu.Game.Overlays.Settings.Sections.Audio
 
         private void initialiseAsioSettings()
         {
-            updateItems();
-
             suppressAsioFormatChanges = true;
 
             try

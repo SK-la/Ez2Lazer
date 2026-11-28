@@ -1,6 +1,7 @@
 ﻿// Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System.Diagnostics;
 using osuTK;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -8,6 +9,7 @@ using osu.Game.Graphics.Sprites;
 using System.Collections.Generic;
 using osu.Framework.Allocation;
 using osu.Framework.Localisation;
+using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics;
 
 namespace osu.Game.Overlays.Settings
@@ -80,6 +82,25 @@ namespace osu.Game.Overlays.Settings
                 Margin = new MarginPadding { Vertical = VERTICAL_PADDING, Horizontal = 5 },
                 Padding = SettingsPanel.CONTENT_PADDING,
             };
+        }
+
+        public override bool UpdateSubTree()
+        {
+            if (!EzStartupTuning.EnableSettingsSectionUpdateTrace || IsLoaded)
+            {
+                return base.UpdateSubTree();
+            }
+
+            var stopwatch = Stopwatch.StartNew();
+            bool updated = base.UpdateSubTree();
+
+            if (IsLoaded && stopwatch.Elapsed.TotalMilliseconds >= 5)
+            {
+                EzStartupTrace.LogDiagnostic(
+                    $"Settings.subsection update header=\"{Header}\" elapsedMs={stopwatch.Elapsed.TotalMilliseconds:F1} items={FlowContent.Children.Count}");
+            }
+
+            return updated;
         }
     }
 }

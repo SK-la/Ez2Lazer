@@ -20,6 +20,7 @@ using osu.Framework.Graphics.Shapes;
 using osu.Framework.Input.Events;
 using osu.Framework.Platform;
 using osu.Framework.Threading;
+using osu.Game.EzOsuGame.Overlays;
 using osu.Game.EzOsuGame.Startup;
 using osu.Game.Graphics.Containers;
 using osu.Game.Graphics.UserInterface;
@@ -99,26 +100,39 @@ namespace osu.Game.Overlays
         private LoadingLayer loading;
 
         private readonly List<SettingsSection> loadableSections = new List<SettingsSection>();
+        private readonly List<SidebarIconButton> loadedSidebarButtons = new List<SidebarIconButton>();
+        private readonly HashSet<SettingsSection> loadedSectionSet = new HashSet<SettingsSection>();
+        private readonly List<SettingsSection> loadedSections = new List<SettingsSection>();
+        private readonly Dictionary<int, List<Action>> sectionMountCallbacks = new Dictionary<int, List<Action>>();
 
-        private Task sectionsLoadingTask;
-        private List<SettingsSection> loadedSections;
+        private bool sectionsConstructionStarted;
+        private bool sectionsConstructionInProgress;
+        private int sectionsLoadingBatchesPending;
+        private int sectionsLoadingBatchCount;
+        private bool sidebarButtonsLoaded;
+        private bool sidebarButtonsMountInProgress;
+        private int sidebarButtonsMountedCount;
+        private bool searchBindingAdded;
+        private bool selectedSectionBindingAdded;
         private bool sectionsMountInProgress;
+        private bool hiddenPreloadActive;
         private Stopwatch sectionsLoadStopwatch;
-        private long? sectionsPreloadDurationMs;
+        private long? sectionsLoadDurationMs;
         private bool loadHeartbeatActive;
-        private double lastPopInTime;
-
-        private const double pop_in_section_load_delay = 150;
 
         /// <summary>
-        /// Whether settings sections have finished async construction (tree mount is deferred until PopIn).
+        /// Whether settings sections have finished async construction.
         /// </summary>
         public bool AreSectionsLoaded { get; private set; }
 
         /// <summary>
-        /// Whether settings sections and sidebar buttons are mounted and ready to show without further loading.
+        /// Whether the complete settings tree and sidebar are mounted and ready for display.
         /// </summary>
         public bool AreSectionsReadyForDisplay { get; private set; }
+
+        public bool IsInitialSectionReady { get; private set; }
+
+        public bool AreAllSectionsMounted => AreSectionsLoaded && SectionsContainer.Count == loadableSections.Count;
 
         public IBindable<SettingsSection> CurrentSection = new Bindable<SettingsSection>();
 
@@ -221,11 +235,11 @@ namespace osu.Game.Overlays
 
         protected void AddSection(SettingsSection section)
         {
-            if (IsLoaded)
-                // just to keep things simple. can be accommodated for if we ever need it.
-                throw new InvalidOperationException("All sections must be added before the panel is loaded.");
-
             loadableSections.Add(section);
+        }
+
+        protected virtual void PopulateSections()
+        {
         }
 
         protected virtual Drawable CreateHeader() => new Container();
@@ -234,14 +248,29 @@ namespace osu.Game.Overlays
 
         protected override void PopIn()
         {
+            if (hiddenPreloadActive)
+                setHiddenPreloadState(false);
+
             if (!AreSectionsReadyForDisplay)
             {
+                SectionsContainer.SearchContainer.AlwaysPresent = true;
+                Sidebar.AlwaysPresent = true;
                 loading.Show();
-                lastPopInTime = Time.Current;
-                Scheduler.AddDelayed(loadSections, pop_in_section_load_delay);
+                Sidebar.FadeTo(0);
+                Scheduler.AddDelayed(loadSections, 1);
             }
             else
-                Scheduler.Add(loadSections);
+            {
+                searchActive = !string.IsNullOrEmpty(SectionsContainer.SearchTerm);
+                SectionsContainer.SearchContainer.AlwaysPresent = searchActive;
+
+                if (searchActive)
+                    requestSectionsThrough(loadableSections.Count - 1);
+                else
+                    scheduleMountLoadedSections();
+            }
+
+            scheduleMountSidebarButtons();
 
             ContentContainer.MoveToX(ExpandedPosition, TRANSITION_LENGTH, Easing.OutQuint);
 
@@ -254,28 +283,28 @@ namespace osu.Game.Overlays
             SearchTextBox.HoldFocus = true;
         }
 
-        private void scheduleAfterPopInLoadDelay(Action action)
-        {
-            double delay = Math.Max(0, pop_in_section_load_delay - (Time.Current - lastPopInTime));
-
-            if (delay > 0)
-                Scheduler.AddDelayed(action, delay);
-            else
-                Scheduler.Add(action);
-        }
-
         protected virtual float ExpandedPosition => 0;
 
         protected override void PopOut()
         {
             base.PopOut();
 
+            if (sectionsConstructionStarted && !AreSectionsReadyForDisplay)
+                setHiddenPreloadState(true);
+
+            SectionsContainer.SearchContainer.AlwaysPresent = hiddenPreloadActive;
+            Sidebar.AlwaysPresent = hiddenPreloadActive;
+
             stopSubsectionHighlight();
 
             SectionsContainer.FadeEdgeEffectTo(0, WaveContainer.DISAPPEAR_DURATION, Easing.In);
-            ContentContainer.MoveToX(-WIDTH + ExpandedPosition, TRANSITION_LENGTH, Easing.OutQuint);
+            ContentContainer.MoveToX(hiddenPreloadActive ? ExpandedPosition : -WIDTH + ExpandedPosition,
+                                     hiddenPreloadActive ? 0 : TRANSITION_LENGTH,
+                                     Easing.OutQuint);
 
-            Sidebar?.MoveToX(-sidebar_width, TRANSITION_LENGTH, Easing.OutQuint);
+            Sidebar?.MoveToX(hiddenPreloadActive ? 0 : -sidebar_width,
+                             hiddenPreloadActive ? 0 : TRANSITION_LENGTH,
+                             Easing.OutQuint);
             this.FadeTo(0, TRANSITION_LENGTH / 2, Easing.OutQuint);
 
             SearchTextBox.HoldFocus = false;
@@ -303,11 +332,79 @@ namespace osu.Game.Overlays
             ContentContainer.Margin = new MarginPadding { Left = sidebarWidth + subsectionNavWidth };
 
             subsectionNavColumn?.X = ContentContainer.X + sidebarWidth;
+
+            updateSectionsDisplayReadiness();
+        }
+
+        private void updateSectionsDisplayReadiness()
+        {
+            var firstSection = loadableSections.FirstOrDefault();
+
+            if (!IsInitialSectionReady
+                && firstSection != null
+                && SectionsContainer.Children.Contains(firstSection)
+                && firstSection.IsLoaded)
+            {
+                IsInitialSectionReady = true;
+                SectionsContainer.SearchContainer.AlwaysPresent = hiddenPreloadActive || State.Value == Visibility.Visible && !AreSectionsReadyForDisplay;
+                EzStartupTrace.Log($"Settings.initialSection readyMs={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}");
+            }
+
+            if (!AreSectionsReadyForDisplay
+                && IsInitialSectionReady
+                && AreSectionsLoaded
+                && SectionsContainer.Count == loadableSections.Count
+                && Sidebar.Children.OfType<SidebarIconButton>().Count() == loadableSections.Count
+                && Sidebar.Children.OfType<SidebarIconButton>().All(button => button.IsLoaded)
+                && SectionsContainer.All(section => section.LoadState >= LoadState.Ready)
+                && SectionsContainer.Children.OfType<EzGameSection>().All(section => section.AreSubsectionsLoaded))
+            {
+                AreSectionsReadyForDisplay = true;
+                loadHeartbeatActive = false;
+
+                if (hiddenPreloadActive)
+                {
+                    EzStartupTrace.Log($"Settings.preload ready sections={SectionsContainer.Count} prepareMs={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}");
+                    setHiddenPreloadState(false);
+                }
+
+                SectionsContainer.SearchContainer.AlwaysPresent = State.Value == Visibility.Visible && searchActive;
+                Sidebar.AlwaysPresent = false;
+                SectionsContainer.SearchContainer.FadeTo(1);
+                Sidebar.FadeTo(1, 150, Easing.OutQuint);
+                SectionsContainer.Footer.FadeInFromZero(fade_in_duration, Easing.OutQuint);
+                loading.Hide();
+
+                if (!searchBindingAdded)
+                {
+                    searchBindingAdded = true;
+                    SearchTextBox.Current.BindValueChanged(term =>
+                    {
+                        SectionsContainer.SearchTerm = term.NewValue;
+
+                        searchActive = !string.IsNullOrEmpty(term.NewValue);
+                        SectionsContainer.SearchContainer.AlwaysPresent = searchActive;
+                        updateSubsectionNav();
+
+                        if (searchActive)
+                            requestSectionsThrough(loadableSections.Count - 1);
+                    }, true);
+                }
+
+                if (!selectedSectionBindingAdded)
+                {
+                    selectedSectionBindingAdded = true;
+                    SectionsContainer.SelectedSection.BindValueChanged(section => updateSelectedSidebarButton(section.NewValue), true);
+                }
+
+                sectionsLoadStopwatch?.Stop();
+                EzStartupTrace.Log($"Settings.fullTreeReady sections={SectionsContainer.Count} prepareMs={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}");
+            }
         }
 
         private const double fade_in_duration = 500;
 
-        private const int sections_add_batch_size = 3;
+        private const int sidebar_add_batch_size = 1;
 
         private const double preload_heartbeat_interval_ms = 3000;
 
@@ -317,8 +414,34 @@ namespace osu.Game.Overlays
         /// </summary>
         public void BeginLoadingSections()
         {
+            if (State.Value == Visibility.Hidden)
+            {
+                if (!sectionsConstructionStarted)
+                    EzStartupTrace.Log("Settings.preload hidden begin");
+
+                setHiddenPreloadState(true);
+            }
+
             loadSections();
         }
+
+        private void setHiddenPreloadState(bool active)
+        {
+            hiddenPreloadActive = active;
+            AlwaysPresent = active;
+
+            if (SectionsContainer == null || Sidebar == null)
+                return;
+
+            SectionsContainer.SearchContainer.AlwaysPresent = active || State.Value == Visibility.Visible && !AreSectionsReadyForDisplay;
+            Sidebar.AlwaysPresent = active || State.Value == Visibility.Visible && !AreSectionsReadyForDisplay;
+
+            ContentContainer?.MoveToX(active ? ExpandedPosition : -WIDTH + ExpandedPosition, 0);
+
+            Sidebar?.MoveToX(active ? 0 : -sidebar_width, 0);
+        }
+
+        private bool canMountSettings => State.Value == Visibility.Visible || hiddenPreloadActive;
 
         /// <summary>
         /// Emit a snapshot of section preload progress to the startup trace log.
@@ -327,49 +450,167 @@ namespace osu.Game.Overlays
         {
             EzStartupTrace.LogDiagnostic($"Settings.status context={context} loaded={AreSectionsLoaded} ready={AreSectionsReadyForDisplay} "
                                          + $"sections={loadableSections.Count} mounted={SectionsContainer?.Count ?? 0} "
-                                         + $"preloadMs={sectionsPreloadDurationMs?.ToString() ?? "-"}");
+                                         + $"loadMs={sectionsLoadDurationMs?.ToString() ?? "-"}");
         }
 
         private void loadSections()
         {
-            if (AreSectionsReadyForDisplay)
-                return;
-
-            if (!AreSectionsLoaded)
+            if (AreSectionsLoaded)
             {
-                if (sectionsLoadingTask != null)
-                    return;
-
-                beginAsyncSectionLoad();
+                scheduleMountLoadedSections();
                 return;
+            }
+
+            if (!sectionsConstructionStarted)
+            {
+                sectionsConstructionStarted = true;
+                sectionsConstructionInProgress = true;
+                sectionsLoadStopwatch = Stopwatch.StartNew();
+                EzStartupTrace.Log("Settings.prepare construction begin");
+                startLoadHeartbeat();
+
+                Task.Run(PopulateSections).ContinueWith(task => preloadScheduler.Add(() =>
+                {
+                    sectionsConstructionInProgress = false;
+
+                    if (IsDisposed)
+                        return;
+
+                    task.GetAwaiter().GetResult();
+                    beginAsyncSectionLoad();
+                }), TaskScheduler.Default);
+            }
+        }
+
+        private void beginAsyncSectionLoad()
+        {
+            EzStartupTrace.LogDiagnostic($"Settings.prepare load begin sections={loadableSections.Count}");
+
+            var sidebarButtons = createSidebarButtons(loadableSections).ToList();
+
+            if (loadableSections.Count == 0)
+            {
+                AreSectionsLoaded = true;
+                sectionsLoadDurationMs = sectionsLoadStopwatch.ElapsedMilliseconds;
+                return;
+            }
+
+            int batchCount = Math.Min(4, loadableSections.Count);
+            var sectionsByBatch = new List<SettingsSection>[batchCount];
+            var loadablesByBatch = new List<Drawable>[batchCount];
+
+            for (int i = 0; i < batchCount; i++)
+            {
+                sectionsByBatch[i] = new List<SettingsSection>();
+                loadablesByBatch[i] = new List<Drawable>();
+            }
+
+            for (int i = 0; i < loadableSections.Count; i++)
+            {
+                sectionsByBatch[i % batchCount].Add(loadableSections[i]);
+                loadablesByBatch[i % batchCount].Add(loadableSections[i]);
+            }
+
+            for (int i = 0; i < sidebarButtons.Count; i++)
+                loadablesByBatch[i % batchCount].Add(sidebarButtons[i]);
+
+            sectionsLoadingBatchCount = batchCount;
+            sectionsLoadingBatchesPending = batchCount;
+
+            for (int i = 0; i < batchCount; i++)
+            {
+                int batchIndex = i;
+                LoadComponentsAsync(loadablesByBatch[i], components => completeSectionLoadBatch(
+                    components,
+                    sectionsByBatch[batchIndex],
+                    sidebarButtons.Where(button => button.Section != null
+                                                   && loadableSections.IndexOf(button.Section) % batchCount == batchIndex).ToList()), scheduler: preloadScheduler);
+            }
+        }
+
+        private void requestSectionsThrough(int index, Action whenMounted = null)
+        {
+            if (index < 0 || index >= loadableSections.Count)
+                return;
+
+            if (index < SectionsContainer.Count)
+            {
+                whenMounted?.Invoke();
+                return;
+            }
+
+            if (whenMounted != null)
+            {
+                if (!sectionMountCallbacks.TryGetValue(index, out var callbacks))
+                    sectionMountCallbacks[index] = callbacks = new List<Action>();
+
+                callbacks.Add(whenMounted);
             }
 
             scheduleMountLoadedSections();
         }
 
-        private void beginAsyncSectionLoad()
+        private void completeSectionLoadBatch(
+            IEnumerable<Drawable> components,
+            IReadOnlyCollection<SettingsSection> sections,
+            IReadOnlyCollection<SidebarIconButton> sidebarButtons)
         {
-            EzStartupTrace.LogDiagnostic($"Settings.asyncPreload begin sections={loadableSections.Count}");
-            sectionsLoadStopwatch = Stopwatch.StartNew();
-            startLoadHeartbeat();
+            var loadedComponents = components.ToList();
+            loadedSectionSet.UnionWith(sections.Where(loadedComponents.Contains));
+            loadedSidebarButtons.AddRange(sidebarButtons.Where(loadedComponents.Contains));
+            sidebarButtonsLoaded = loadedSidebarButtons.Count == loadableSections.Count;
 
-            sectionsLoadingTask = LoadComponentsAsync(loadableSections, sections =>
+            loadedSections.Clear();
+            loadedSections.AddRange(loadableSections.TakeWhile(loadedSectionSet.Contains));
+
+            if (--sectionsLoadingBatchesPending == 0)
             {
-                loadedSections = sections.ToList();
                 AreSectionsLoaded = true;
+                loadedSidebarButtons.Sort((left, right) => loadableSections.IndexOf(left.Section).CompareTo(loadableSections.IndexOf(right.Section)));
+                sectionsLoadDurationMs = sectionsLoadStopwatch?.ElapsedMilliseconds;
+                EzStartupTrace.LogDiagnostic($"Settings.sections loaded batches={sectionsLoadingBatchCount} elapsedMs={sectionsLoadDurationMs}");
                 logSectionLoadSnapshot();
+            }
 
-                if (State.Value != Visibility.Visible)
-                {
-                    sectionsPreloadDurationMs = sectionsLoadStopwatch.ElapsedMilliseconds;
-                    sectionsLoadStopwatch.Stop();
-                    loadHeartbeatActive = false;
-                    EzStartupTrace.LogDiagnostic($"Settings.asyncPreload complete {sectionsPreloadDurationMs}ms (mount deferred)");
-                    return;
-                }
+            scheduleMountSidebarButtons();
+            scheduleMountLoadedSections();
+        }
 
-                scheduleAfterPopInLoadDelay(scheduleMountLoadedSections);
-            }, scheduler: preloadScheduler);
+        private void scheduleMountSidebarButtons()
+        {
+            if (!sidebarButtonsLoaded || sidebarButtonsMountInProgress || Sidebar.Children.OfType<SidebarIconButton>().Count() >= loadableSections.Count)
+                return;
+
+            if (!canMountSettings)
+                return;
+
+            sidebarButtonsMountInProgress = true;
+            Scheduler.Add(addSidebarButtonsBatch);
+        }
+
+        private void addSidebarButtonsBatch()
+        {
+            if (!canMountSettings)
+            {
+                sidebarButtonsMountInProgress = false;
+                return;
+            }
+
+            int batchEnd = Math.Min(sidebarButtonsMountedCount + sidebar_add_batch_size, loadedSidebarButtons.Count);
+
+            while (sidebarButtonsMountedCount < batchEnd)
+                Sidebar.Add(loadedSidebarButtons[sidebarButtonsMountedCount++]);
+
+            sidebarButtonsMountInProgress = false;
+
+            if (sidebarButtonsMountedCount < loadedSidebarButtons.Count)
+            {
+                scheduleMountSidebarButtons();
+                return;
+            }
+
+            updateSelectedSidebarButton(CurrentSection.Value);
+            updateSectionsDisplayReadiness();
         }
 
         /// <summary>
@@ -378,28 +619,20 @@ namespace osu.Game.Overlays
         /// </summary>
         private void logSectionLoadSnapshot()
         {
-            if (loadedSections == null)
+            if (!AreSectionsLoaded)
                 return;
 
-            foreach (var section in loadedSections.OrderByDescending(s => s.LoadDurationMs).Take(5))
+            foreach (var section in loadableSections.OrderByDescending(s => s.LoadDurationMs).Take(5))
                 EzStartupTrace.LogDiagnostic($"Settings.snapshot top5 {section.LoadDurationMs}ms header=\"{section.Header}\"");
         }
 
         private void scheduleMountLoadedSections()
         {
-            if (AreSectionsReadyForDisplay || loadedSections == null)
-                return;
-
-            int startIndex = SectionsContainer.Count;
-
-            if (startIndex >= loadedSections.Count)
-                return;
-
-            if (sectionsMountInProgress)
+            if (!canMountSettings || sectionsMountInProgress || SectionsContainer.Count >= loadedSections.Count)
                 return;
 
             sectionsMountInProgress = true;
-            Scheduler.Add(() => addSectionsInBatches(loadedSections, startIndex));
+            Scheduler.Add(addNextLoadedSection);
         }
 
         private void startLoadHeartbeat()
@@ -415,118 +648,103 @@ namespace osu.Game.Overlays
         {
             preloadScheduler.AddDelayed(() =>
             {
-                if (AreSectionsReadyForDisplay || (AreSectionsLoaded && State.Value != Visibility.Visible))
+                if (AreSectionsReadyForDisplay || (AreSectionsLoaded && !canMountSettings))
                 {
                     loadHeartbeatActive = false;
                     return;
                 }
 
-                if (sectionsLoadingTask != null)
+                if (sectionsConstructionInProgress || sectionsLoadingBatchesPending > 0 || sectionsMountInProgress)
                     scheduleLoadHeartbeat();
                 else
                     loadHeartbeatActive = false;
             }, preload_heartbeat_interval_ms);
         }
 
-        private void addSectionsInBatches(IReadOnlyList<SettingsSection> sections, int startIndex)
+        private void addNextLoadedSection()
         {
-            if (State.Value != Visibility.Visible)
+            if (!canMountSettings)
             {
                 sectionsMountInProgress = false;
                 return;
             }
 
-            if (startIndex == 0)
-                EzStartupTrace.LogDiagnostic($"Settings.mount batches begin count={sections.Count}");
+            int sectionIndex = SectionsContainer.Count;
 
-            int endIndex = Math.Min(startIndex + sections_add_batch_size, sections.Count);
+            sectionsMountInProgress = false;
+            if (sectionIndex >= loadedSections.Count)
+                return;
 
-            for (int i = startIndex; i < endIndex; i++)
-                SectionsContainer.Add(sections[i]);
+            SettingsSection section = loadedSections[sectionIndex];
+            SectionsContainer.Add(section);
 
-            if (endIndex < sections.Count)
+            if (sectionMountCallbacks.Remove(sectionIndex, out var callbacks))
             {
-                Scheduler.Add(() => addSectionsInBatches(sections, endIndex));
+                foreach (Action callback in callbacks)
+                    callback();
+            }
+
+            if (SectionsContainer.Count == loadableSections.Count && AreSectionsLoaded)
+            {
+                EzStartupTrace.LogDiagnostic("Settings.mount batches complete");
+                finishSectionsDisplay();
                 return;
             }
 
-            sectionsMountInProgress = false;
-            EzStartupTrace.LogDiagnostic("Settings.mount batches complete");
-            finishSectionsDisplay();
+            scheduleMountLoadedSections();
         }
 
         private void finishSectionsDisplay()
         {
-            SectionsContainer.Footer.FadeInFromZero(fade_in_duration, Easing.OutQuint);
-            SectionsContainer.SearchContainer.FadeInFromZero(fade_in_duration, Easing.OutQuint);
-
-            loading.Hide();
-
-            SearchTextBox.Current.BindValueChanged(term =>
-            {
-                SectionsContainer.SearchTerm = term.NewValue;
-
-                searchActive = !string.IsNullOrEmpty(term.NewValue);
-                updateSubsectionNav();
-            }, true);
-
-            mountSidebarButtons();
+            updateSectionsDisplayReadiness();
         }
 
-        private void mountSidebarButtons()
+        private IEnumerable<SidebarIconButton> createSidebarButtons(IEnumerable<SettingsSection> sections)
         {
-            if (Sidebar == null)
+            foreach (var section in sections)
+                yield return createSidebarButton(section);
+        }
+
+        private SidebarIconButton createSidebarButton(SettingsSection section) => new SidebarIconButton
+        {
+            Section = section,
+            Action = () =>
+            {
+                int index = loadableSections.IndexOf(section);
+
+                if (index < 0)
+                    return;
+
+                updateSelectedSidebarButton(section);
+                requestSectionsThrough(index, () => SectionsContainer.ScrollTo(section));
+            },
+        };
+
+        private void updateSelectedSidebarButton(SettingsSection section)
+        {
+            selectedSidebarButton?.Selected = false;
+            selectedSidebarButton = Sidebar.Children.OfType<SidebarIconButton>().FirstOrDefault(button => button.Section == section);
+            selectedSidebarButton?.Selected = true;
+            updateSubsectionNav();
+        }
+
+        internal void RefreshSubsectionNavigation(SettingsSection section)
+        {
+            if (indexedSection != section)
                 return;
 
-            EzStartupTrace.LogDiagnostic("Settings.sidebar mount begin (sync)");
-
-            float delay = 0;
-
-            foreach (var button in createSidebarButtons())
-            {
-                Sidebar.Add(button);
-
-                button.FadeOut()
-                      .Delay(delay)
-                      .FadeInFromZero(fade_in_duration, Easing.OutQuint);
-
-                delay += 40;
-            }
-
-            SectionsContainer.SelectedSection.BindValueChanged(section =>
-            {
-                selectedSidebarButton?.Selected = false;
-
-                selectedSidebarButton = Sidebar.Children.OfType<SidebarIconButton>().FirstOrDefault(b => b.Section == section.NewValue);
-
-                selectedSidebarButton?.Selected = true;
-
-                updateSubsectionNav();
-            }, true);
-
-            AreSectionsReadyForDisplay = true;
-            loadHeartbeatActive = false;
-            sectionsPreloadDurationMs = sectionsLoadStopwatch.ElapsedMilliseconds;
-            sectionsLoadStopwatch.Stop();
-            EzStartupTrace.Log($"Settings.ready mount+sidebar {sectionsPreloadDurationMs}ms");
+            indexedSection = null;
+            updateSubsectionNav();
         }
 
-        private IEnumerable<SidebarIconButton> createSidebarButtons()
+        internal void RefreshSearchFilter()
         {
-            foreach (var section in SectionsContainer)
-            {
-                yield return new SidebarIconButton
-                {
-                    Section = section,
-                    Action = () =>
-                    {
-                        if (!SectionsContainer.IsLoaded)
-                            return;
+            if (!searchActive)
+                return;
 
-                        SectionsContainer.ScrollTo(section);
-                    },
-                };
-            }
+            string searchTerm = SectionsContainer.SearchTerm;
+            SectionsContainer.SearchTerm = string.Empty;
+            SectionsContainer.SearchTerm = searchTerm;
         }
 
         /// <summary>
@@ -554,6 +772,7 @@ namespace osu.Game.Overlays
 
             // the second-level column is fixed: it is always reserved, and only its entries change with the section.
             bool shouldShow = ShowSubsectionNavColumn
+                              && section != null
                               && !subsectionNavSuppressed
                               && !searchActive;
 
@@ -617,6 +836,8 @@ namespace osu.Game.Overlays
         {
             public SearchContainer<SettingsSection> SearchContainer;
 
+            public override bool PropagatePositionalInputSubTree => SearchContainer.Alpha > 0 && base.PropagatePositionalInputSubTree;
+
             public string SearchTerm
             {
                 get => SearchContainer.SearchTerm;
@@ -641,7 +862,20 @@ namespace osu.Game.Overlays
                     RelativeSizeAxes = Axes.Both
                 };
 
-                SearchContainer.FilterCompleted += InvalidateScrollPosition;
+                SearchContainer.FilterCompleted += onSearchFilterCompleted;
+            }
+
+            private void onSearchFilterCompleted()
+            {
+                InvalidateScrollPosition();
+
+                if (string.IsNullOrEmpty(SearchTerm))
+                    return;
+
+                SettingsSection firstMatch = SearchContainer.Children.FirstOrDefault(section => section.IsPresent);
+
+                if (firstMatch != null)
+                    ScrollTo(firstMatch);
             }
 
             protected override void UpdateAfterChildren()

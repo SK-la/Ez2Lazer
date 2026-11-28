@@ -379,8 +379,6 @@ namespace osu.Game.Screens.Menu
                         startupWorkCoordinator?.OnMainMenuOffscreenReady(mainMenu);
                 });
             }
-
-            startupWorkCoordinator?.OnPrepareMenuLoad();
         }
 
         protected void LoadMenu()
