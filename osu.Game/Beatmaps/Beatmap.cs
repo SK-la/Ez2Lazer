@@ -15,7 +15,7 @@ using osu.Game.IO.Serialization.Converters;
 
 namespace osu.Game.Beatmaps
 {
-    public class Beatmap<T> : IBeatmap<T>, IDetachedSampleHost
+    public class Beatmap<T> : IBeatmap<T>, IDetachedSampleHostWithSnapshot
         where T : HitObject
     {
         private BeatmapDifficulty difficulty = new BeatmapDifficulty();
@@ -79,8 +79,32 @@ namespace osu.Game.Beatmaps
         /// <remarks>
         /// Populated by <see cref="DetachedSampleLedger"/> on the playable copy a mod operated on; not serialised.
         /// </remarks>
+        private readonly List<DetachedNoteSample> detachedSamples = new List<DetachedNoteSample>();
+
+        private DetachedNoteSample[]? detachedSampleSnapshot;
+
         [JsonIgnore]
-        public List<DetachedNoteSample> DetachedSamples { get; } = new List<DetachedNoteSample>();
+        public List<DetachedNoteSample> DetachedSamples
+        {
+            get
+            {
+#if DEBUG
+                if (detachedSampleSnapshot != null && !detachedSamples.SequenceEqual(detachedSampleSnapshot))
+                    throw new InvalidOperationException("Detached samples were modified after the ledger settled.");
+#endif
+
+                return detachedSamples;
+            }
+        }
+
+        void IDetachedSampleHostWithSnapshot.SetDetachedSamples(IReadOnlyList<DetachedNoteSample> samples)
+        {
+            if (detachedSampleSnapshot != null)
+                throw new InvalidOperationException("Detached samples have already been settled.");
+
+            detachedSamples.AddRange(samples);
+            detachedSampleSnapshot = detachedSamples.ToArray();
+        }
 
         /// <summary>
         /// Maps a hit object to the 0..1 playfield position its samples should be panned to.

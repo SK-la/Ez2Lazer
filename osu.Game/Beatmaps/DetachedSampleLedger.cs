@@ -30,6 +30,7 @@ namespace osu.Game.Beatmaps
     public class DetachedSampleLedger
     {
         private readonly List<Entry> entries = new List<Entry>();
+        private bool settled;
 
         private DetachedSampleLedger()
         {
@@ -59,8 +60,23 @@ namespace osu.Game.Beatmaps
         /// </summary>
         public void Settle(IBeatmap beatmap)
         {
-            if (entries.Count == 0 || beatmap is not IDetachedSampleHost host)
+            if (settled)
                 return;
+
+            if (beatmap is not IDetachedSampleHost host)
+            {
+                settled = true;
+                return;
+            }
+
+            var detachedSamples = new List<DetachedNoteSample>();
+
+            if (entries.Count == 0)
+            {
+                publishDetachedSamples(host, detachedSamples);
+                settled = true;
+                return;
+            }
 
             var timeline = host.SampleTimelineResolver;
 
@@ -107,8 +123,19 @@ namespace osu.Game.Beatmaps
                     continue;
                 }
 
-                host.DetachedSamples.Add(new DetachedNoteSample(sample.Time, sample.Sample, sample.Position));
+                detachedSamples.Add(new DetachedNoteSample(sample.Time, sample.Sample, sample.Position));
             }
+
+            publishDetachedSamples(host, detachedSamples);
+            settled = true;
+        }
+
+        private static void publishDetachedSamples(IDetachedSampleHost host, IReadOnlyList<DetachedNoteSample> samples)
+        {
+            if (host is IDetachedSampleHostWithSnapshot snapshotHost)
+                snapshotHost.SetDetachedSamples(samples);
+            else
+                host.DetachedSamples.AddRange(samples);
         }
 
         /// <summary>
