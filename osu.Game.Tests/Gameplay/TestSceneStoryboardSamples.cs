@@ -20,6 +20,7 @@ using osu.Framework.Graphics.Textures;
 using osu.Framework.IO.Stores;
 using osu.Framework.Platform;
 using osu.Framework.Testing;
+using osu.Framework.Timing;
 using osu.Game.Audio;
 using osu.Game.Beatmaps;
 using osu.Game.Configuration;
@@ -146,6 +147,75 @@ namespace osu.Game.Tests.Gameplay
         }
 
         [Test]
+        public void TestDetachedSamplesCatchUpAndReplayAfterRewind()
+        {
+            ManualClock manualClock = null;
+            DetachedSampleTrack track = null;
+            DrawableDetachedStoryboardSample[] samples = null;
+
+            AddStep("create detached sample track", () =>
+            {
+                manualClock = new ManualClock();
+                track = new DetachedSampleTrack(new[]
+                {
+                    new DetachedNoteSample(1000, new HitSampleInfo(HitSampleInfo.HIT_NORMAL), 0.25f),
+                    new DetachedNoteSample(1010, new HitSampleInfo(HitSampleInfo.HIT_NORMAL), 0.5f),
+                    new DetachedNoteSample(1020, new HitSampleInfo(HitSampleInfo.HIT_NORMAL), 0.75f),
+                }, _ => true)
+                {
+                    Clock = new FramedClock(manualClock),
+                };
+                Add(track);
+            });
+
+            AddUntilStep("all detached samples created", () =>
+            {
+                samples = track.ChildrenOfType<DrawableDetachedStoryboardSample>().OrderBy(s => s.LifetimeStart).ToArray();
+                return samples.Length == 3;
+            });
+
+            AddStep("catch up across dense sample times", () => manualClock.CurrentTime = 1070);
+            AddUntilStep("each sample requested", () => samples.All(s => s.RequestedPlaying));
+
+            AddStep("rewind before all samples", () => manualClock.CurrentTime = 900);
+            AddUntilStep("rewind stops each sample", () => samples.All(s => !s.RequestedPlaying));
+
+            AddStep("pass dense sample times again", () => manualClock.CurrentTime = 1070);
+            AddUntilStep("each sample requested again", () => samples.All(s => s.RequestedPlaying));
+        }
+
+        [Test]
+        public void TestDetachedSampleAtLateStartBoundaryIsSkipped()
+        {
+            ManualClock manualClock = null;
+            DetachedSampleTrack track = null;
+            DrawableDetachedStoryboardSample sample = null;
+
+            AddStep("create detached sample track", () =>
+            {
+                manualClock = new ManualClock();
+                track = new DetachedSampleTrack(new[]
+                {
+                    new DetachedNoteSample(1000, new HitSampleInfo(HitSampleInfo.HIT_NORMAL), DetachedNoteSample.CENTRE),
+                }, _ => true)
+                {
+                    Clock = new FramedClock(manualClock),
+                };
+                Add(track);
+            });
+
+            AddUntilStep("detached sample created", () =>
+            {
+                sample = track.ChildrenOfType<DrawableDetachedStoryboardSample>().SingleOrDefault();
+                return sample != null;
+            });
+
+            AddStep("seek to the late-start boundary", () => manualClock.CurrentTime = 1100);
+            AddUntilStep("sample update reflects skipped time", () => sample.LifetimeEnd == 1000);
+            AddAssert("sample remains unrequested", () => !sample.RequestedPlaying);
+        }
+
+        [Test]
         public void TestSamplePlaybackWithBeatmapHitsoundsOff()
         {
             GameplayClockContainer gameplayContainer = null;
@@ -257,7 +327,10 @@ namespace osu.Game.Tests.Gameplay
                 var ruleset = new OsuRuleset();
                 var beatmap = CreateWorkingBeatmap(ruleset.RulesetInfo).GetPlayableBeatmap(ruleset.RulesetInfo);
 
-                ((IDetachedSampleHost)beatmap).DetachedSamples.Add(new DetachedNoteSample(0, new HitSampleInfo(HitSampleInfo.HIT_NORMAL, volume: 60), DetachedNoteSample.CENTRE));
+                ((IDetachedSampleHost)beatmap).DetachedSamples.AddRange(new[]
+                {
+                    new DetachedNoteSample(0, new HitSampleInfo(HitSampleInfo.HIT_NORMAL, volume: 60), DetachedNoteSample.CENTRE),
+                });
 
                 Add(drawableRuleset = ruleset.CreateDrawableRulesetWith(beatmap));
             });

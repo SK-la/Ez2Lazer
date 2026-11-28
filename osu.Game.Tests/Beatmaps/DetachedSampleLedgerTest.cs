@@ -1,6 +1,7 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using osu.Framework.Localisation;
@@ -30,6 +31,46 @@ namespace osu.Game.Tests.Beatmaps
             DetachedSampleLedger.Capture(beatmap).Settle(beatmap);
 
             Assert.That(beatmap.DetachedSamples, Is.Empty);
+        }
+
+        [Test]
+        public void TestSettleIsIdempotent()
+        {
+            var removed = new TestNote(1000, new HitSampleInfo("key-a"));
+            var beatmap = new TestBeatmap { HitObjects = { removed } };
+            var ledger = DetachedSampleLedger.Capture(beatmap);
+
+            beatmap.HitObjects.Clear();
+
+            ledger.Settle(beatmap);
+            ledger.Settle(beatmap);
+
+            Assert.That(beatmap.DetachedSamples, Has.Count.EqualTo(1));
+            Assert.That(beatmap.DetachedSamples[0].Time, Is.EqualTo(1000));
+        }
+
+        [Test]
+        public void TestDetachedSamplesSnapshotAndLegacyListApi()
+        {
+            var beatmap = new TestBeatmap();
+            var host = (IDetachedSampleHostWithSnapshot)beatmap;
+            var sample = new DetachedNoteSample(1000, new HitSampleInfo("key-a"), DetachedNoteSample.CENTRE);
+            var source = new List<DetachedNoteSample> { sample };
+
+            host.SetDetachedSamples(source);
+            source.Clear();
+
+            Assert.That(beatmap.DetachedSamples, Has.Count.EqualTo(1));
+            Assert.That(beatmap.DetachedSamples[0], Is.SameAs(sample));
+
+            var detachedSamples = beatmap.DetachedSamples;
+            detachedSamples.Add(sample);
+
+#if DEBUG
+            Assert.Throws<InvalidOperationException>(() => _ = beatmap.DetachedSamples);
+#endif
+
+            Assert.Throws<InvalidOperationException>(() => host.SetDetachedSamples(source));
         }
 
         [Test]

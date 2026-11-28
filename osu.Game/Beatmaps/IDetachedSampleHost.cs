@@ -53,4 +53,16 @@ namespace osu.Game.Beatmaps
         /// </remarks>
         Func<ISampleInfo, bool> DetachedSampleIsHitsound { get; set; }
     }
+
+    /// <summary>
+    /// A detached sample host which snapshots the samples settled by <see cref="DetachedSampleLedger"/>.
+    /// </summary>
+    public interface IDetachedSampleHostWithSnapshot : IDetachedSampleHost
+    {
+        /// <summary>
+        /// Stores the detached samples produced by the ledger as a snapshot.
+        /// </summary>
+        /// <param name="samples">The detached samples to snapshot.</param>
+        void SetDetachedSamples(IReadOnlyList<DetachedNoteSample> samples);
+    }
 }
