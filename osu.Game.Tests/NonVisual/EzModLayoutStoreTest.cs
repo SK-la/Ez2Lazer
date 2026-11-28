@@ -1,8 +1,10 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
@@ -11,8 +13,13 @@ using osu.Game.EzOsuGame;
 using osu.Game.EzOsuGame.Layout;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Scoring;
+using osu.Game.Rulesets;
+using osu.Game.Rulesets.Catch;
+using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Mania.Mods;
 using osu.Game.Rulesets.Mods;
+using osu.Game.Rulesets.Osu;
+using osu.Game.Rulesets.Taiko;
 
 namespace osu.Game.Tests.NonVisual
 {
@@ -167,18 +174,16 @@ namespace osu.Game.Tests.NonVisual
             Assert.That(File.Exists(configFile), Is.True);
             var defaultDocument = JsonConvert.DeserializeObject<LeaderboardModImpactExceptionsDocument>(File.ReadAllText(configFile))!;
             Assert.That(defaultDocument.Version, Is.EqualTo(1));
-            Assert.That(defaultDocument.Rate, Does.Contain("osu.Game.Rulesets.Mods.ModScoreV2"));
-            Assert.That(defaultDocument.Rate, Does.Contain("osu.Game.Rulesets.Mania.Mods.ManiaModScoreV2"));
-            Assert.That(defaultDocument.Difficulty, Does.Contain("osu.Game.Rulesets.Mods.ModScoreV2"));
-            Assert.That(defaultDocument.Difficulty, Does.Contain("osu.Game.Rulesets.Mania.Mods.ManiaModScoreV2"));
-            Assert.That(defaultDocument.Conversion, Does.Contain("osu.Game.Rulesets.Mods.ModScoreV2"));
-            Assert.That(defaultDocument.Conversion, Does.Contain("osu.Game.Rulesets.Mania.Mods.ManiaModScoreV2"));
-            Assert.That(defaultDocument.Conversion, Does.Contain("osu.Game.Rulesets.Mania.Mods.ManiaModConstantSpeed"));
+            Assert.That(defaultDocument.Rate, Does.Contain("SV2").And.Contain("CS").And.Contain("NM"));
+            Assert.That(defaultDocument.Difficulty, Does.Contain("SV2").And.Contain("CL").And.Contain("NM"));
+            Assert.That(defaultDocument.Conversion, Does.Contain("SV2").And.Contain("CS").And.Contain("CL").And.Contain("OH").And.Contain("NM"));
+            Assert.That(defaultDocument.Rate!.Concat(defaultDocument.Difficulty!).Concat(defaultDocument.Conversion!)
+                                       .Any(value => value.Contains("osu.Game.", StringComparison.Ordinal)), Is.False);
 
             const string custom_json = """
                                       {
                                         "Version": 1,
-                                        "Rate": [],
+                                        "Rate": ["CS"],
                                         "Difficulty": [],
                                         "Conversion": []
                                       }
@@ -186,8 +191,30 @@ namespace osu.Game.Tests.NonVisual
             File.WriteAllText(configFile, custom_json);
 
             var customStore = new EzConfigStore(storage);
-            Assert.That(customStore.ModImpactUnit.GetRelevantMods(new Mod[] { new ManiaModConstantSpeed() }, LeaderboardModFilter.All), Has.Length.EqualTo(1));
+            Assert.That(customStore.ModImpactUnit.GetRelevantMods(new Mod[] { new ManiaModConstantSpeed() }, LeaderboardModFilter.All), Is.Empty);
             Assert.That(File.ReadAllText(configFile), Is.EqualTo(custom_json));
+        }
+
+        [Test]
+        public void TestAcronymsAreUniqueWithinRulesets()
+        {
+            var rulesets = new Ruleset[]
+            {
+                new OsuRuleset(),
+                new TaikoRuleset(),
+                new CatchRuleset(),
+                new ManiaRuleset(),
+            };
+
+            foreach (var ruleset in rulesets)
+            {
+                var duplicateAcronyms = ruleset.CreateAllMods()
+                                               .GroupBy(mod => mod.Acronym, StringComparer.Ordinal)
+                                               .Where(group => group.Count() > 1)
+                                               .Select(group => group.Key);
+
+                Assert.That(duplicateAcronyms, Is.Empty, ruleset.ShortName);
+            }
         }
 
         [Test]

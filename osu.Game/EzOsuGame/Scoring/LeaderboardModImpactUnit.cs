@@ -26,7 +26,7 @@ namespace osu.Game.EzOsuGame.Scoring
             NullValueHandling = NullValueHandling.Ignore,
         };
 
-        private sealed record ModImpact(Mod Mod, string ModType, IReadOnlyDictionary<string, object> Settings);
+        private sealed record ModImpact(Mod Mod, string Acronym, IReadOnlyDictionary<string, object> Settings);
 
         private readonly IReadOnlyDictionary<LeaderboardModFilter, HashSet<string>> modExceptions;
 
@@ -100,34 +100,23 @@ namespace osu.Game.EzOsuGame.Scoring
             Version = current_document_version,
             Rate =
             [
-                "osu.Game.Rulesets.Mods.ModNoMod",
-                "osu.Game.Rulesets.Mods.ModScoreV2",
-                "osu.Game.Rulesets.Mania.Mods.ManiaModScoreV2",
-                "osu.Game.Rulesets.Mania.Mods.ManiaModConstantSpeed",
-                "osu.Game.Rulesets.Taiko.Mods.TaikoModConstantSpeed",
+                "NM",
+                "SV2",
+                "CS",
             ],
             Difficulty =
             [
-                "osu.Game.Rulesets.Mods.ModNoMod",
-                "osu.Game.Rulesets.Mods.ModScoreV2",
-                "osu.Game.Rulesets.Mania.Mods.ManiaModScoreV2",
-                "osu.Game.Rulesets.Osu.Mods.OsuModClassic",
-                "osu.Game.Rulesets.Taiko.Mods.TaikoModClassic",
-                "osu.Game.Rulesets.Catch.Mods.CatchModClassic",
-                "osu.Game.Rulesets.Mania.Mods.ManiaModClassic",
+                "NM",
+                "SV2",
+                "CL",
             ],
             Conversion =
             [
-                "osu.Game.Rulesets.Mods.ModNoMod",
-                "osu.Game.Rulesets.Mods.ModScoreV2",
-                "osu.Game.Rulesets.Mania.Mods.ManiaModScoreV2",
-                "osu.Game.Rulesets.Mania.Mods.ManiaModConstantSpeed",
-                "osu.Game.Rulesets.Taiko.Mods.TaikoModConstantSpeed",
-                "osu.Game.Rulesets.Osu.Mods.OsuModClassic",
-                "osu.Game.Rulesets.Taiko.Mods.TaikoModClassic",
-                "osu.Game.Rulesets.Catch.Mods.CatchModClassic",
-                "osu.Game.Rulesets.Mania.Mods.ManiaModClassic",
-                "osu.Game.Rulesets.Mania.EzMania.Mods.CommunityMod.ManiaModO2Health",
+                "NM",
+                "SV2",
+                "CS",
+                "CL",
+                "OH",
             ],
         };
 
@@ -168,7 +157,7 @@ namespace osu.Game.EzOsuGame.Scoring
         private static ModImpact createImpact(Mod mod)
         {
             var settings = mod.SettingsMap.ToDictionary(setting => setting.Key, setting => setting.Value.GetUnderlyingSettingValue());
-            return new ModImpact(mod, mod.GetType().FullName ?? mod.GetType().Name, settings);
+            return new ModImpact(mod, mod.Acronym, settings);
         }
 
         private static bool isRelevant(Mod mod, LeaderboardModFilter filter)
@@ -177,10 +166,10 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private bool isExcepted(ModImpact impact, LeaderboardModFilter filter)
             => filter == LeaderboardModFilter.All
-                ? categories.Any(category => modExceptions[category].Contains(impact.ModType))
+                ? categories.Any(category => modExceptions[category].Contains(impact.Acronym))
                 : categories.Any(category => filter.HasFlag(category)
                                              && getCategories(impact.Mod).HasFlag(category)
-                                             && modExceptions[category].Contains(impact.ModType));
+                                             && modExceptions[category].Contains(impact.Acronym));
 
         private static LeaderboardModFilter getCategories(Mod mod)
         {
@@ -202,7 +191,7 @@ namespace osu.Game.EzOsuGame.Scoring
 
         private bool impactsMatch(ModImpact scoreMod, ModImpact selectedMod)
         {
-            if (scoreMod.ModType != selectedMod.ModType)
+            if (scoreMod.Acronym != selectedMod.Acronym)
                 return false;
 
             foreach (var (settingName, scoreSetting) in scoreMod.Settings)
