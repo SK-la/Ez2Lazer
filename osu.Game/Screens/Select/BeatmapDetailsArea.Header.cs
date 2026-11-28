@@ -18,9 +18,10 @@ using osu.Game.EzOsuGame.HUD;
 using osu.Game.EzOsuGame.Localization;
 using osu.Game.EzOsuGame.LocalProfile;
 using osu.Game.EzOsuGame.Overlays.Preview;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.EzOsuGame.Skills;
-using osu.Game.Graphics.UserInterface;
 using osu.Game.Graphics.UserInterfaceV2;
+using osu.Game.Graphics.UserInterface;
 using osu.Game.Localisation;
 using osu.Game.Online.Leaderboards;
 using osu.Game.Rulesets;
@@ -41,6 +42,7 @@ namespace osu.Game.Screens.Select
             private ShearedDropdown<BeatmapLeaderboardScope> scopeDropdown = null!;
             private ShearedDropdown<LeaderboardSortMode> sortDropdown = null!;
             private ShearedToggleButton selectedModsToggle = null!;
+            private Bindable<LeaderboardModFilter> modFilter = null!;
 
             private ShearedDropdown<string> ezPlayerDropdown = null!;
             private ShearedDropdown<EzRadarDisplayMode> leftRadarDropdown = null!;
@@ -63,6 +65,8 @@ namespace osu.Game.Screens.Select
 
             public IBindable<bool> FilterBySelectedMods => selectedModsToggle.Active;
 
+            public IBindable<LeaderboardModFilter> ModFilter => modFilter;
+
             public Bindable<string?> EzAnalysisPlayer { get; } = new Bindable<string?>();
 
             public Bindable<EzRadarDisplayMode> LeftRadarMode { get; } = new Bindable<EzRadarDisplayMode>(EzRadarDisplayMode.SunnySRSkill);
@@ -81,6 +85,8 @@ namespace osu.Game.Screens.Select
             [BackgroundDependencyLoader]
             private void load(OsuConfigManager config, Ez2ConfigManager ezConfig)
             {
+                modFilter = ezConfig.GetBindable<LeaderboardModFilter>(Ez2Setting.BeatmapDetailScoreModFilter);
+
                 InternalChildren = new Drawable[]
                 {
                     new Container

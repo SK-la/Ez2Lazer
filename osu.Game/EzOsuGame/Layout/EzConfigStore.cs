@@ -12,6 +12,7 @@ using osu.Framework.Platform;
 using osu.Game.EzOsuGame.Edit.Settings;
 using osu.Game.EzOsuGame.Mods;
 using osu.Game.EzOsuGame.Overlays.Preview;
+using osu.Game.EzOsuGame.Scoring;
 
 namespace osu.Game.EzOsuGame.Layout
 {
@@ -38,11 +39,14 @@ namespace osu.Game.EzOsuGame.Layout
 
         public BeatmapEditorSettings BeatmapEditor { get; }
 
+        internal LeaderboardModImpactUnit ModImpactUnit { get; }
+
         private readonly EzModLayoutDocument modLayout = new EzModLayoutDocument();
 
         public EzConfigStore(Storage gameStorage)
         {
             storage = gameStorage.GetStorageForDirectory(EzModifyPath.CONFIG_ROOT_PATH);
+            ModImpactUnit = LeaderboardModImpactUnit.Load(storage);
             PreviewManiaSettings = new EzPreviewManiaSettings();
             BeatmapEditor = new BeatmapEditorSettings();
             reloadPreview();

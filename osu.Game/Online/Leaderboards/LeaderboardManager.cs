@@ -13,6 +13,9 @@ using osu.Framework.Logging;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
 using osu.Game.Extensions;
+using osu.Game.EzOsuGame.Configuration;
+using osu.Game.EzOsuGame.Layout;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Online.API;
 using osu.Game.Online.API.Requests;
 using osu.Game.Rulesets;
@@ -46,6 +49,9 @@ namespace osu.Game.Online.Leaderboards
         [Resolved]
         private RulesetStore rulesets { get; set; } = null!;
 
+        [Resolved]
+        private EzConfigStore ezConfigStore { get; set; } = null!;
+
         /// <summary>
         /// Fetch leaderboard content with the new criteria specified in the background.
         /// On completion, <see cref="Scores"/> will be updated with the results from this call (unless a more recent call with a different criteria has completed).
@@ -73,12 +79,14 @@ namespace osu.Game.Online.Leaderboards
             {
                 case BeatmapLeaderboardScope.Local:
                 {
-                    localScoreSubscription = realm.RegisterForNotifications(r =>
-                        r.All<ScoreInfo>().Filter($"{nameof(ScoreInfo.BeatmapInfo)}.{nameof(BeatmapInfo.ID)} == $0"
-                                                  + $" AND {nameof(ScoreInfo.BeatmapInfo)}.{nameof(BeatmapInfo.Hash)} == {nameof(ScoreInfo.BeatmapHash)}"
-                                                  + $" AND {nameof(ScoreInfo.Ruleset)}.{nameof(RulesetInfo.ShortName)} == $1"
-                                                  + $" AND {nameof(ScoreInfo.DeletePending)} == false"
-                            , newCriteria.Beatmap.ID, newCriteria.Ruleset.ShortName), localScoresChanged);
+                    const string local_score_filter = $"{nameof(ScoreInfo.BeatmapInfo)}.{nameof(BeatmapInfo.ID)} == $0"
+                                                      + $" AND {nameof(ScoreInfo.BeatmapInfo)}.{nameof(BeatmapInfo.Hash)} == {nameof(ScoreInfo.BeatmapHash)}"
+                                                      + $" AND {nameof(ScoreInfo.Ruleset)}.{nameof(RulesetInfo.ShortName)} == $1"
+                                                      + $" AND {nameof(ScoreInfo.DeletePending)} == false";
+
+                    localScoreSubscription = realm.RegisterForNotifications(
+                        r => r.All<ScoreInfo>().Filter(local_score_filter, newCriteria.Beatmap.ID, newCriteria.Ruleset.ShortName),
+                        localScoresChanged);
                     return;
                 }
 
@@ -105,7 +113,9 @@ namespace osu.Game.Online.Leaderboards
                         return;
                     }
 
-                    if ((newCriteria.Scope.RequiresSupporter(newCriteria.ExactMods != null)) && !api.LocalUser.Value.IsSupporter)
+                    bool filterCategories = newCriteria.ModFilter != LeaderboardModFilter.None && newCriteria.ExactMods != null;
+
+                    if (newCriteria.Scope.RequiresSupporter(newCriteria.ExactMods != null && !filterCategories) && !api.LocalUser.Value.IsSupporter)
                     {
                         scores.Value = LeaderboardScores.Failure(LeaderboardFailState.NotSupporter);
                         return;
@@ -119,7 +129,9 @@ namespace osu.Game.Online.Leaderboards
 
                     IReadOnlyList<Mod>? requestMods = null;
 
-                    if (newCriteria.ExactMods != null)
+                    // The API's exact-mod filter would discard scores with irrelevant extra mods.
+                    // Category matching therefore operates on the unfiltered, bounded server response.
+                    if (newCriteria.ExactMods != null && !filterCategories)
                     {
                         if (!newCriteria.ExactMods.Any())
                             // add nomod for the request
@@ -134,19 +146,30 @@ namespace osu.Game.Online.Leaderboards
                         if (inFlightOnlineRequest != null && !newRequest.Equals(inFlightOnlineRequest))
                             return;
 
+                        IEnumerable<ScoreInfo> matchingScores = response.Scores.Select(s => s.ToScoreInfo(rulesets, newCriteria.Beatmap));
+                        var userScore = response.UserScore?.CreateScoreInfo(rulesets, newCriteria.Beatmap);
+
+                        if (filterCategories)
+                        {
+                            matchingScores = matchingScores.Where(s => ezConfigStore.ModImpactUnit.ModsMatch(s.Mods, newCriteria.ExactMods!, newCriteria.ModFilter));
+
+                            // An unfiltered personal best is not necessarily the best matching score.
+                            userScore = null;
+                        }
+
                         var result = LeaderboardScores.Success
                         (
-                            response.Scores.Select(s => s.ToScoreInfo(rulesets, newCriteria.Beatmap))
-                                    .OrderByTotalScore()
-                                    .Select((s, idx) =>
-                                    {
-                                        s.Position = idx + 1;
-                                        return s;
-                                    })
-                                    .ToArray(),
+                            matchingScores.OrderByTotalScore()
+                                          .Select((s, idx) =>
+                                          {
+                                              s.Position = filterCategories ? null : idx + 1;
+                                              return s;
+                                          })
+                                          .ToArray(),
                             scoresRequested: newRequest.ScoresRequested,
                             totalScores: response.ScoresCount,
-                            response.UserScore?.CreateScoreInfo(rulesets, newCriteria.Beatmap)
+                            userScore,
+                            isPartial: filterCategories
                         );
                         inFlightOnlineRequest = null;
                         scores.Value = result;
@@ -176,17 +199,15 @@ namespace osu.Game.Online.Leaderboards
 
             if (CurrentCriteria.ExactMods != null)
             {
-                if (!CurrentCriteria.ExactMods.Any())
+                if (CurrentCriteria.ModFilter != LeaderboardModFilter.None)
                 {
-                    // we need to filter out all scores that have any mods to get all local nomod scores
-                    newScores = newScores.Where(s => !s.Mods.Any());
+                    newScores = newScores.Where(s => ezConfigStore.ModImpactUnit.ModsMatch(s.Mods, CurrentCriteria.ExactMods, CurrentCriteria.ModFilter)
+                                                     && EzLocalScoreQueries.JudgeModeMatches(s.JudgeMode, CurrentCriteria.EzJudgeMode, CurrentCriteria.ModFilter));
                 }
                 else
                 {
-                    // otherwise find all the scores that have all of the currently selected mods (similar to how web applies mod filters)
-                    // we're creating and using a string HashSet representation of selected mods so that it can be translated into the DB query itself
+                    // Preserve exact acronym matching for existing gameplay/results callers.
                     var selectedMods = CurrentCriteria.ExactMods.Select(m => m.Acronym).ToHashSet();
-
                     newScores = newScores.Where(s => selectedMods.SetEquals(s.Mods.Select(m => m.Acronym)));
                 }
             }
@@ -210,7 +231,9 @@ namespace osu.Game.Online.Leaderboards
         RulesetInfo? Ruleset,
         BeatmapLeaderboardScope Scope,
         Mod[]? ExactMods,
-        LeaderboardSortMode Sorting = LeaderboardSortMode.Score
+        LeaderboardSortMode Sorting = LeaderboardSortMode.Score,
+        LeaderboardModFilter ModFilter = LeaderboardModFilter.None,
+        EzEnumJudgeMode? EzJudgeMode = null
     );
 
     public record LeaderboardScores
@@ -232,7 +255,7 @@ namespace osu.Game.Online.Leaderboards
         /// </summary>
         public int TotalScores { get; }
 
-        public bool IsPartial => ScoresRequested < TotalScores;
+        public bool IsPartial { get; }
 
         /// <summary>
         /// The local user's best score.
@@ -256,17 +279,18 @@ namespace osu.Game.Online.Leaderboards
             }
         }
 
-        private LeaderboardScores(ICollection<ScoreInfo> topScores, int scoresRequested, int totalScores, ScoreInfo? userScore, LeaderboardFailState? failState)
+        private LeaderboardScores(ICollection<ScoreInfo> topScores, int scoresRequested, int totalScores, ScoreInfo? userScore, LeaderboardFailState? failState, bool isPartial = false)
         {
             TopScores = topScores;
             ScoresRequested = scoresRequested;
             TotalScores = totalScores;
             UserScore = userScore;
             FailState = failState;
+            IsPartial = isPartial || scoresRequested < totalScores;
         }
 
-        public static LeaderboardScores Success(ICollection<ScoreInfo> topScores, int scoresRequested, int totalScores, ScoreInfo? userScore)
-            => new LeaderboardScores(topScores, scoresRequested, totalScores, userScore, null);
+        public static LeaderboardScores Success(ICollection<ScoreInfo> topScores, int scoresRequested, int totalScores, ScoreInfo? userScore, bool isPartial = false)
+            => new LeaderboardScores(topScores, scoresRequested, totalScores, userScore, null, isPartial);
 
         public static LeaderboardScores Failure(LeaderboardFailState failState)
             => new LeaderboardScores([], scoresRequested: 0, totalScores: 0, null, failState);

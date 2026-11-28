@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using osu.Game.Beatmaps;
 using osu.Game.Database;
+using osu.Game.EzOsuGame.Configuration;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Scoring;
@@ -80,11 +81,16 @@ namespace osu.Game.EzOsuGame.Scoring
             if (selectedMods.Count == 0)
                 return scoreMods.Length == 0;
 
-            //TODO: 1. 排行版的「已选模组」，需要改进匹配逻辑，比如去SV之类不能被过滤。
-            //TODO: 2. 这个匹配Mod筛选，暂时使用开关。未来需要改成一个多选下拉菜单，用来控制，哪类Mod被视为高差异Mod，高差异Mod即联动「已选模组」，以及当前功能。
-            //届时，此开关将被移除，原本的开关功能完全交由「已选模组」。
-            //TODO: 3. 难度卡Panel上所展示的评级，关联排行榜中排序条件切换展示规则。
             return selectedMods.Select(m => m.Acronym).ToHashSet().SetEquals(scoreMods.Select(m => m.Acronym));
+        }
+
+        public static bool JudgeModeMatches(int scoreJudgeMode, EzEnumJudgeMode? selectedJudgeMode, LeaderboardModFilter filter)
+        {
+            if (!filter.HasFlag(LeaderboardModFilter.Difficulty) || selectedJudgeMode == null)
+                return true;
+
+            int effectiveScoreMode = scoreJudgeMode < 0 ? (int)EzEnumJudgeMode.Lazer : scoreJudgeMode;
+            return effectiveScoreMode == (int)selectedJudgeMode.Value;
         }
 
         /// <summary>

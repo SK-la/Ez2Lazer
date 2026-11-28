@@ -47,16 +47,18 @@ namespace osu.Game.EzOsuGame.Localization
 
         public static readonly LocalisableString SORT_DIRECTION_DESCENDING = new EzLocalizationManager.EzLocalisableString("降序", "Descending");
 
-        public static readonly LocalisableString PANEL_RANK_FOLLOWS_MOD_FILTER = new EzLocalizationManager.EzLocalisableString(
-            "面板评级跟随 Mod 筛选",
-            "Panel rank follows mod filter");
-
-        public static readonly LocalisableString PANEL_RANK_FOLLOWS_MOD_FILTER_TOOLTIP = new EzLocalizationManager.EzLocalisableString(
-            "启用后，当排行版勾选「已选模组」时，选歌界面右侧难度卡所展示的评级，改为匹配当前活跃 Mod 的本地成绩中的最高评级。"
-            + "\n关闭时则为默认状态：始终显示最高分那条成绩的评级。",
-            "While enabled, difficulty panels show the highest rank among your local scores that exactly match the active mods, "
-            + "but only when the local leaderboard’s \"Selected mods\" filter is on."
-            + "\nWhen disabled, panels always show the rank from your highest-scoring local play (default).");
+        public static readonly LocalisableString LEADERBOARD_MOD_FILTER = new EzLocalizationManager.EzLocalisableString("高差异模组类别", "High-difference mod categories");
+        public static readonly LocalisableString LEADERBOARD_MOD_FILTER_EXACT = new EzLocalizationManager.EzLocalisableString("原版匹配", "Original matching");
+        public static readonly LocalisableString LEADERBOARD_MOD_FILTER_RATE = new EzLocalizationManager.EzLocalisableString("变速", "Rate");
+        public static readonly LocalisableString LEADERBOARD_MOD_FILTER_DIFFICULTY = new EzLocalizationManager.EzLocalisableString("难度", "Difficulty");
+        public static readonly LocalisableString LEADERBOARD_MOD_FILTER_CONVERSION = new EzLocalizationManager.EzLocalisableString("谱面转换", "Conversion");
+        public static readonly LocalisableString LEADERBOARD_MOD_FILTER_ALL = new EzLocalizationManager.EzLocalisableString("全部已选模组", "All selected mods");
+        public static readonly LocalisableString LEADERBOARD_FILTERED_ONLINE_SAMPLE = new EzLocalizationManager.EzLocalisableString(
+            "在线筛选仅覆盖服务器返回的成绩样本，且无法筛选判定模式。",
+            "Online filtering only applies to the returned score sample, and cannot filter by judgement mode.");
+        public static readonly LocalisableString LEADERBOARD_NO_MATCHING_SAMPLE_SCORES = new EzLocalizationManager.EzLocalisableString(
+            "返回的成绩样本中没有符合条件的成绩。",
+            "No matching scores were found in the returned sample.");
 
         public static readonly LocalisableString SKILL_AXIS = new EzLocalizationManager.EzLocalisableString(
             "技能轴",

@@ -8,6 +8,7 @@ using osu.Framework.Localisation;
 using osu.Game.Configuration;
 using osu.Game.EzOsuGame.Configuration;
 using osu.Game.EzOsuGame.Localization;
+using osu.Game.EzOsuGame.Scoring;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Mods.Input;
@@ -31,14 +32,13 @@ namespace osu.Game.Overlays.Settings.Sections.UserInterface
                 {
                     Keywords = new[] { "converts", "converted" }
                 },
-                new SettingsItemV2(new FormCheckBox
+                new SettingsItemV2(new FormEnumDropdown<LeaderboardModFilter>
                 {
-                    Caption = EzSongSelectStrings.PANEL_RANK_FOLLOWS_MOD_FILTER,
-                    HintText = EzSongSelectStrings.PANEL_RANK_FOLLOWS_MOD_FILTER_TOOLTIP,
-                    Current = ezConfig.GetBindable<bool>(Ez2Setting.SongSelectPanelRankFollowsModFilter),
+                    Caption = EzSongSelectStrings.LEADERBOARD_MOD_FILTER,
+                    Current = ezConfig.GetBindable<LeaderboardModFilter>(Ez2Setting.BeatmapDetailScoreModFilter),
                 })
                 {
-                    Keywords = new[] { "rank", "grade", "mod", "score", "panel", "评级", "mod筛选" }
+                    Keywords = new[] { "mod", "leaderboard", "filter", "high difference", "模组", "排行榜", "筛选" },
                 },
                 new SettingsItemV2(new SortDirectionDropdown
                 {
