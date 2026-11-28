@@ -1,6 +1,8 @@
 ﻿# 设置菜单冷打开性能追踪
 
-验收口径是点击后等到完整设置树已加载并挂载、侧栏顺序正确；不会把只显示 General 的时间当作菜单完成。设置内容只在用户打开面板后加载，不在游戏启动时预加载。
+验收口径是点击后等到完整设置树已加载并挂载、侧栏顺序正确；不会把只显示 General 的时间当作菜单完成。当前设置内容在 MainMenu 完成 offscreen 加载后隐藏准备，通常处于 Intro 后段；不会在游戏加载或 Intro 前段启动。
+
+`EzStartupPreloadTiming` 现在只调度 Song Select。BDSP 完成后的 settings 延迟入口已删除；所有启动设置请求统一由 MainMenu offscreen-ready 触发，MainMenu 入场仅作兜底，`SkipSettingsPreload` 是冷开 A/B 的总开关。
 
 ## 改动前基线
 
@@ -13,7 +15,7 @@
 
 ## 当前路径
 
-- 用户打开设置后，后台创建所有 section，并以 4 组并行执行 `LoadComponentsAsync`；启动阶段不预加载。
+- 默认在 MainMenu 完成 offscreen 加载后隐藏准备设置树；`SkipSettingsPreload` 只用于冷开 A/B。关闭预加载时，首次打开才以 4 组并行执行 `LoadComponentsAsync`。
 - 完成的 section 在 Update 线程按显示顺序逐个挂载；侧栏按钮也按对应 section 顺序挂载。
 - Ez 游玩 section 分批创建 11 个 subsection。隐藏的搜索和侧栏在完整内容 ready 前不开放。
 - 完整 ready 要求所有 section 与侧栏按钮完成加载和挂载，且 Ez 的 11 个 subsection 已挂入树中。
@@ -47,7 +49,7 @@ Framework 的滚动遮罩会推迟屏外 drawable 的首次 `UpdateSubTree()`。
 
 Release 的 593.6–641.9 ms 冷开样本单列记录；它与改动前 Debug 基线配置不同，不在本表中计算收益。
 
-### Intro 隐藏预加载对照
+### 隐藏预加载交互对照（Intro 时机模拟）
 
 两个新的 Release 可视测试在独立进程中分别运行，完整菜单计数和 ready 判据相同（12 sections、46 subsections、244 rows、33 weather controls）。冷开测量从 `Show()` 到完整树 ready；预加载测量从隐藏的 `BeginLoadingSections()` 到完整树 ready，再单独测首次 `Show()`。
 

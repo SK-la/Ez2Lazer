@@ -1,7 +1,6 @@
 // Copyright (c) ppy Pty Ltd <contact@ppy.sh>. Licensed under the MIT Licence.
 // See the LICENCE file in the repository root for full licence text.
 
-using System;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -42,22 +41,6 @@ namespace osu.Game.EzOsuGame.Startup
         public void Configure(IEzStartupContentPreloader preloader)
         {
             this.preloader = preloader;
-        }
-
-        public void OnPrepareMenuLoad()
-        {
-            switch (EzStartupTuning.PreloadTiming)
-            {
-                case EzStartupPreloadTiming.PipelineDefault:
-                    // Settings preload: OsuGame immediately, or after BDSP when DeferSettingsPreloadUntilBdspFinished.
-                    break;
-
-                case EzStartupPreloadTiming.PipelineEarlySongSelect:
-                case EzStartupPreloadTiming.PipelineLateSongSelect:
-                case EzStartupPreloadTiming.ImmediateAll:
-                    preloader.BeginLight();
-                    break;
-            }
         }
 
         public void OnLoadMenu()
@@ -118,7 +101,6 @@ namespace osu.Game.EzOsuGame.Startup
 
             if (backgroundDataStoreProcessor.IsStartupProcessingFinished)
             {
-                tryScheduleDeferredSettingsPreload();
                 Scheduler.AddDelayed(() => startSongSelectPreload("BDSP-already-finished"), bdsp_finished_song_select_buffer_ms);
                 return;
             }
@@ -135,7 +117,6 @@ namespace osu.Game.EzOsuGame.Startup
             if (!backgroundDataStoreProcessor.IsStartupProcessingFinished)
                 return;
 
-            tryScheduleDeferredSettingsPreload();
             songSelectFallbackDelegate?.Cancel();
             songSelectFallbackDelegate = null;
             backgroundDataStoreProcessor.StartupProcessingFinished -= onBdspStartupProcessingFinished;
@@ -152,21 +133,7 @@ namespace osu.Game.EzOsuGame.Startup
 
         private void onBdspStartupProcessingFinished()
         {
-            tryScheduleDeferredSettingsPreload();
             Scheduler.AddDelayed(() => startSongSelectPreload("BDSP-finished"), bdsp_finished_song_select_buffer_ms);
-        }
-
-        private void tryScheduleDeferredSettingsPreload()
-        {
-            if (!EzStartupTuning.DeferSettingsPreloadUntilBdspFinished)
-                return;
-
-            double delay = Math.Max(0, EzStartupTuning.SettingsPreloadDelayAfterBdspMs);
-
-            if (delay > 0)
-                Scheduler.AddDelayed(() => preloader.ScheduleSettingsPreload(), delay);
-            else
-                preloader.ScheduleSettingsPreload();
         }
 
         private void startSongSelectPreload(string reason)

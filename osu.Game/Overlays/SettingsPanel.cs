@@ -126,7 +126,7 @@ namespace osu.Game.Overlays
         public bool AreSectionsLoaded { get; private set; }
 
         /// <summary>
-        /// Whether the settings shell and its initially visible section are ready for interaction.
+        /// Whether the complete settings tree and sidebar are mounted and ready for display.
         /// </summary>
         public bool AreSectionsReadyForDisplay { get; private set; }
 
@@ -364,7 +364,7 @@ namespace osu.Game.Overlays
 
                 if (hiddenPreloadActive)
                 {
-                    EzStartupTrace.Log($"Settings.preload ready sections={SectionsContainer.Count} readyMs={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}");
+                    EzStartupTrace.Log($"Settings.preload ready sections={SectionsContainer.Count} prepareMs={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}");
                     setHiddenPreloadState(false);
                 }
 
@@ -398,7 +398,7 @@ namespace osu.Game.Overlays
                 }
 
                 sectionsLoadStopwatch?.Stop();
-                EzStartupTrace.Log($"Settings.ready sections={SectionsContainer.Count} readyMs={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}");
+                EzStartupTrace.Log($"Settings.fullTreeReady sections={SectionsContainer.Count} prepareMs={sectionsLoadStopwatch?.ElapsedMilliseconds ?? 0}");
             }
         }
 
@@ -466,7 +466,7 @@ namespace osu.Game.Overlays
                 sectionsConstructionStarted = true;
                 sectionsConstructionInProgress = true;
                 sectionsLoadStopwatch = Stopwatch.StartNew();
-                EzStartupTrace.Log("Settings.open construction begin");
+                EzStartupTrace.Log("Settings.prepare construction begin");
                 startLoadHeartbeat();
 
                 Task.Run(PopulateSections).ContinueWith(task => preloadScheduler.Add(() =>
@@ -484,7 +484,7 @@ namespace osu.Game.Overlays
 
         private void beginAsyncSectionLoad()
         {
-            EzStartupTrace.LogDiagnostic($"Settings.open load begin sections={loadableSections.Count}");
+            EzStartupTrace.LogDiagnostic($"Settings.prepare load begin sections={loadableSections.Count}");
 
             var sidebarButtons = createSidebarButtons(loadableSections).ToList();
 
@@ -568,7 +568,7 @@ namespace osu.Game.Overlays
                 AreSectionsLoaded = true;
                 loadedSidebarButtons.Sort((left, right) => loadableSections.IndexOf(left.Section).CompareTo(loadableSections.IndexOf(right.Section)));
                 sectionsLoadDurationMs = sectionsLoadStopwatch?.ElapsedMilliseconds;
-                EzStartupTrace.LogDiagnostic($"Settings.sections loaded batches={sectionsLoadingBatchCount} clickToLoadMs={sectionsLoadDurationMs}");
+                EzStartupTrace.LogDiagnostic($"Settings.sections loaded batches={sectionsLoadingBatchCount} elapsedMs={sectionsLoadDurationMs}");
                 logSectionLoadSnapshot();
             }
 

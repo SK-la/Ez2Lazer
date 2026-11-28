@@ -9,7 +9,7 @@ namespace osu.Game.EzOsuGame.Startup
     public static class EzStartupTuning
     {
         /// <summary>
-        /// Preload scheduling strategy. Default: <see cref="EzStartupPreloadTiming.PipelineDefault"/>.
+        /// Song-select preload scheduling strategy. Default: <see cref="EzStartupPreloadTiming.PipelineDefault"/>.
         /// </summary>
         public static EzStartupPreloadTiming PreloadTiming { get; set; } = EzStartupPreloadTiming.PipelineDefault;
 
@@ -33,18 +33,6 @@ namespace osu.Game.EzOsuGame.Startup
         /// First carousel filter after entering song select from main menu; staggers with screen fade-in.
         /// </summary>
         public static double SongSelectEnterFilterDelayMs { get; set; } = 400;
-
-        /// <summary>
-        /// When true, settings section async preload waits for BDSP startup processing to finish
-        /// instead of starting from game load. Set false for A/B against immediate preload.
-        /// </summary>
-        public static bool DeferSettingsPreloadUntilBdspFinished { get; set; } = true;
-
-        /// <summary>
-        /// After BDSP finishes, wait this long before settings async preload (song select preload uses its own +500ms buffer).
-        /// Spreads Gen2 pressure on the main menu.
-        /// </summary>
-        public static double SettingsPreloadDelayAfterBdspMs { get; set; } = 1_500;
 
         /// <summary>
         /// Master switch for the high-level <see cref="EzStartupTrace.Log"/> milestones in a release build.

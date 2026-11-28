@@ -6,12 +6,7 @@ namespace osu.Game.EzOsuGame.Startup
     public interface IEzStartupContentPreloader
     {
         /// <summary>
-        /// Begin preloading settings sections (lightweight).
-        /// </summary>
-        void BeginLight();
-
-        /// <summary>
-        /// Wait until the settings overlay is loaded, then start section preload. Call once from OsuGame after overlay chain is submitted.
+        /// Request settings preparation after the settings overlay has loaded.
         /// </summary>
         void ScheduleSettingsPreload();
 
@@ -21,12 +16,12 @@ namespace osu.Game.EzOsuGame.Startup
         void LogStatus(string context);
 
         /// <summary>
-        /// Whether settings section async construction has finished (mount may still be pending until PopIn).
+        /// Whether settings section background construction has finished.
         /// </summary>
         bool AreSettingsLoaded { get; }
 
         /// <summary>
-        /// Whether settings sections are mounted and the sidebar is ready (first visible open complete).
+        /// Whether all settings sections and sidebar entries are mounted and ready. This can complete while the overlay remains hidden.
         /// </summary>
         bool AreSettingsReadyForDisplay { get; }
     }
